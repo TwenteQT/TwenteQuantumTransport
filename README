@@ -1,7 +1,9 @@
-This is a universal solid-state transport code that was primarily written by Anton Starikov.
+The Twente Quantum Transport (TQT) code is a universal solid-state transport code that was written 
+over the course of 25 years in the Computational Materials Science group at the University of Twente 
+;see section V Credits for more details.
 It can be used to calculate transport-related parameters for large-scale systems with various 
 kinds of disorder (chemical, thermal, magnetic, etc), non-collinearity and more.
-The code incorporates the followingt frameworks: LMTO with/without spin-orbit coupling, 
+The code incorporates the following frameworks: LMTO with/without spin-orbit coupling, 
 exact muffin tin orbitals (EMTOs), Slater-Koster parametrized Hamiltonians, model Hamiltonians. 
 
 It can be used to calculate conductance, k-point resolved transmission, Gilbert magnetization 
