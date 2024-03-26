@@ -1,0 +1,20 @@
+set term png
+set output 'EMTOvsLMTO.png'
+
+set ylabel 'Conductance per atom'
+set xlabel 'No. of atoms in supercell'
+
+set key center center
+
+plot \
+"< paste OMTA/Ballistic/G.dat LMTO/Ballistic/G.dat" u 2:($4/$2) w lp title 'OMTA-b',\
+'' u 2:($8/$2) w lp title 'LMTO-b',\
+"< paste OMTA/Diffusive/G.dat LMTO/Diffusive/G.dat" u 2:($4/$2) w lp title 'OMTA-d',\
+'' u 2:($8/$2) w lp title 'LMTO-d'
+
+
+
+
+set term x11
+replot
+pause -1 'Press a button, dummy'

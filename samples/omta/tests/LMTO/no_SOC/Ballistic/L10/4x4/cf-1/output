@@ -1,0 +1,216 @@
+Transport code v4.0rc4 by Antst (HDF)
+TASKS=   1,  NTHREADS/TASK=  1
+######################################
+#     Equivalent of given config     #
+######################################
+
+### Output verbosity level:
+LOGLEVEL =      1
+WRITE_ALL_TIMES =      0   # default value
+
+### Kind of system to solve: 1=P-S, 2=H, 3=H-HOH, 5=Model Hamiltonian, 6=EMTO
+EQUATION_TYPE =      2
+### 
+### Spin-orbit interaction parameters:
+### 
+### Switch on spin-orbit. Valid only if "trans_full" binary used
+SO_ON =      0
+### Scaling of spin-orbit
+SO_SCALE =   1.0000000     # default value
+### Complex part of energy
+EI =    0.000000     # default value
+######################################
+### Rotation of magnetization parameters:
+### 
+### Valid only if "trans_full" binary used
+ROT_MASK =      0   # default value
+### Angle for stiff rotation of magnetization (after rot_mask is applied)
+ROT_ANGLE = [   0.00000    ,   0.00000    ,   0.00000    ]
+ROTCF =      0   # default value
+### Values in rotated potential parameters
+###  smaller than "rnegl" will be neglected.
+RNEGL =   0.1000000E-19 # default value
+
+### Options to control calculation of atomic parameters:
+### 
+### Scalar relativistic calculations
+ATOPT_IREL =      1   # default value
+ATOPT_NSIRK =      2   # default value
+ATOPT_DE_STEP =   0.1000000E-03 # default value
+
+### Options to control Ando solver:
+### 
+### Chooses eigenvalue solver used by Ando solver.
+### 0 - simple(fastest), 10 - general(optimal choice), 17 - quadro(slow, most stable)
+### in some cases when accuracy not enough, code will automaticaly fail-back to 17
+EIGVAL_SOLVER =     15
+EIGVAL_REFINE =      1   # default value
+### in some cases
+### use ando_part_of_spectrum*100% of eigenvalues for Ando
+ANDO_PART_OF_SPECTRUM =   1.0000000     # default value
+### Leads parameters:
+### 
+### Polarization in left/right leads is now automatically analyzed 
+### left_pol and right_pol are not used anymore
+### 
+### Identity of leads is to be automatically decided
+### leads_ident is not used anymore
+EXT_LEADS =      0   # default value
+
+### Write data for channel decomposition:
+ANDO_DECOMP_DATA =      0   # default value
+
+### Parameters of BZ sampling:
+#
+# Perform calculation only for one K-point
+# Ignore rest of BZ options
+# BZ_KPOINT = [0.0,0.0]
+#
+### Perform calculation for user specified area of BZ
+### Ignore symmetry related BZ options
+### Performs sampling only in selected BZ_AREA instead of full B.Zone
+# BZ_AREA = [0.0,1.0,0.0,1.0] # [x0,x1,y0,y1]
+#
+### Defines number of K-points ib B.Zone for sampling
+### NK=(2*bz_num_kpoints)^2
+BZ_NUM_KPOINTS =      3
+#
+### bz_sym and bz_inve defines symmetry in B.Zone
+BZ_SYM =      0   # default value
+BZ_INVE =      0   # default value
+### Set if deal with system with time-reversal symmetry
+BZ_TIMEREVERSAL =      0   # default value
+### If "bz_part" not equal to 1.0d0, then only bz_part*100%
+### in center of BZ will be used for sampling (bz_part>0)
+BZ_PART =   1.0000000     # default value
+###
+
+### when performs spin decomposition, if
+### "spin_dec_dir"= 0 , then Sz=Lz, else spin states
+### correspond to Sz direction in lead
+SPIN_DEC_DIR =      0   # default value
+### for rotated magnetic lead "spin_dec_dir"= 0 will lie.
+### for rotated non=magnetic lead "spin_dec_dir"= 1 will lie.
+######################################
+
+### General options:
+### 
+### Shift from Fermy level
+ENERGY_OFFSET =    0.000000
+### Minimal number of MPI processes per k-point:
+### if par_nprock == 0, then effectively par_nprock == mpi_comm_size (mpi_comm_world)
+PAR_NPROCK =      1   # default value
+### Options to control solvers behaviour:
+### 
+### Direct linear solver options:
+LINEQ_SOLVER =      0   # default value
+MUMPS_MEMORY_OVERHEAD =     -1   # default value
+MUMPS_PARTITIONER =      2   # default value
+MUMPS_REDIST_MTX =      0   # default value
+MUMPS_PERMSCALE =      7   # default value
+### if par_nprock/=1, then workhost controls occupancy of root-process in solver comm:
+MUMPS_WORKHOST =      1   # default value
+MUMPS_DEBUG =     -1   # default value
+# For OOC solver set variable MUMPS_TMP_DIR. Then OOC solver will be selected
+MUMPS_TMP_DIR =    # default value
+# For half-iterative solver (LINEQ_SOLVER==1)
+# LINEQ_MAXITER =      4
+# LINEQ_ACCURACY =   0.1000000E-11
+
+### Try to reduce memory usage on a price of performance
+CONSERVATIVE_MEMORY_USAGE =      0   # default value
+
+### Work to be performed:
+### Preform calculations only for selected spin
+### 0 - both, 1- Up, 2-Down
+### valid only for "trans_ps" binary
+DO_ONLY_SPIN =      0   # default value
+### Calculations for left-to-right going electrons:
+DO_LEFT_TO_RIGHT =      1
+### Calculations for right-to-left going electrons:
+DO_RIGHT_TO_LEFT =      1
+### Specular transmission is calculated by default now
+### do_spec is not used anymore
+
+### Damping options:
+DAMPING_DIFF_STEP =   0.1000000E-03 # default value
+DAMPING_AXIS_ORIENTATION =      0   # default value
+### If damping_axis_orientation==0 then differentiation about axis defined by rot_angle
+### If damping_axis_orientation==1 then differentiation about axis defined by macro-spin orientation
+
+### Domain-wall options:
+DW_CENTER_STEP =   0.1000000E-01 # default value
+DW_FLAPPING_STEP =   0.1000000E-03 # default value
+DW_NMODES =      0   # default value
+### If dw==0, calculate both alpha_theta (only if dw==1)  and alpha_phi (only if dw==2)
+
+### Write extra data:
+### Write wave functions:
+WRITE_WAVEFUNCS =      0   # default value
+### Write hamiltionians (or P-S) used for calculations:
+WRITE_HAM =      0   # default value
+### Write right-hand-side of linear equations
+WRITE_RHS =      0   # default value
+### Write transmission matrices
+WRITE_TRANS_MATRIX =      0   # default value
+### Write torques
+WRITE_TORQUE =      0   # default value
+### Write lead velocities
+WRITE_VELOC =      0   # default value
+### Do old currents (commutator [H, z])
+DO_OLDCURR =      0   # default value
+### Write currents (old option kept for compatibility if do_oldcurr undefined)
+WRITE_CURRENT =      0   # default value
+### Calculate interatomic currents (only for eq type 2 or 3)
+DO_IATCU =      0
+WRITE_DENS =      0   # default value
+### Continue interrupted calculation
+ICONT =      0   # default value
+DRSHIFT =    0.000000     # default value
+### Movement of domain wall center
+
+######################################
+#     End of config file is here!    #
+######################################
+Reading atom defenitions
+Reading atom defenitions ....Done!
+
+Reading geometry:geom_l
+Reading geometry:geom_l ...Done!
+
+Reading geometry:geom_r
+Reading geometry:geom_r ...Done!
+
+Reading geometry:geom_m
+Reading geometry:geom_m ...Done!
+
+S(k) calculation:
+number of unique clusters is=   1
+Maximal deviations:
+     0.001667   0.003179   0.001667
+
+S(k) calculation:
+number of unique clusters is=   1
+Maximal deviations:
+     0.001667   0.003179   0.001667
+
+S(k) calculation:
+number of unique clusters is=   1
+Maximal deviations:
+     0.001667   0.003179   0.001667
+
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+ Generating k mesh ...
+   AREA OF 2D-PRIMITIVE CELL: REAL=    7.999847
+                        RECIPROCAL=    4.934897
+   RECIP. BASIS: 1. VECTOR =    2.221463       0.000000
+                 2. VECTOR =    0.000000       2.221463
+   NUMBER OF K||-POINTS:   NBZ=      25
+ Done!
+
+   Init Time =       6.5326 seconds
+Starting transport calculation...
+Done!
+  Total Time =     382.9923 seconds

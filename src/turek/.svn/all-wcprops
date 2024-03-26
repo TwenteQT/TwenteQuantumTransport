@@ -1,0 +1,47 @@
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/codes/!svn/ver/1981/trans/trunk/src/turek
+END
+deps.mk
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/svn/codes/!svn/ver/1981/trans/trunk/src/turek/deps.mk
+END
+nids.F
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svn/codes/!svn/ver/1981/trans/trunk/src/turek/nids.F
+END
+oies.f
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svn/codes/!svn/ver/1981/trans/trunk/src/turek/oies.f
+END
+naes.f
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svn/codes/!svn/ver/1981/trans/trunk/src/turek/naes.f
+END
+nbds.F
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svn/codes/!svn/ver/1981/trans/trunk/src/turek/nbds.F
+END
+nbes.F
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svn/codes/!svn/ver/1981/trans/trunk/src/turek/nbes.F
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/svn/codes/!svn/ver/1981/trans/trunk/src/turek/Makefile
+END

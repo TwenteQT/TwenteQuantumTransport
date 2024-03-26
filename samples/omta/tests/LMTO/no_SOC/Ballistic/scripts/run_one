@@ -1,0 +1,13 @@
+#!
+#PBS -N test 
+#PBS -q test  
+#PBS -V
+#PBS -e job.err
+#PBS -o job.out
+#PBS -l walltime=72:00:00
+#PBS -l nodes=4
+#PBS -l mem=10gb
+
+cd $PBS_O_WORKDIR
+mpirun -np  4 ~/work/work1/Trans/omtatrans/bin/transomta_par.x
+

@@ -1,0 +1,16 @@
+include ../make.sys
+
+DIRS= obj
+
+.PHONY: obj clean
+
+all:obj
+
+obj:
+	+@(cd obj && make -f ../src/Makefile BIN=../../bin/)
+
+clean:
+	+@(cd obj && make -f ../src/Makefile clean)
+
+tags:
+	@(cd src && etags *.F90 *.F *.h;)

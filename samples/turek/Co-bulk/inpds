@@ -1,0 +1,84 @@
+--------  INPUT FOR DOS CALCULATION - FCC FE AND CO   ----------------
+    REMARK: NON-RELATIV., VWN XC
+     3    2                                       NL, NS
+     1   16    2                                NSYM, NK, INVE
+   225    3                                       NE, NDC
+   -0.80      0.32                                EBOT, ETOP
+   1.E-8      1.0                          CPA: DIFMAX, MIXING
+     0                                            NBZA
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X
+--------  INPUT FOR DOS & BSF CALCULATION - FCC CO-PT, CO-NI  --------
+    REMARK:  SPD 
+     3    2                                       NL, NS
+     1   30    2                                NSYM, NK, INVE
+   150    4                                       NE, NDC
+   -1.00      0.5                                EBOT, ETOP
+   1.E-8      1.0                          CPA: DIFMAX, MIXING
+     1                                            NBZA
+    3.14159265     3.14159265     3.14159265     SCALING FACTORS
+    0.0            0.0            0.0            K = GAMMA   
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X
+--------  INPUT FOR DOS & BSF CALCULATION - BCC FE-CO, FE-V  ---------
+    REMARK: SPD , SPIN-POLARIZED 
+     3    2                                       NL, NS
+     1   32    3                                NSYM, NK, INVE
+   489    4                                       NE, NDC
+   -0.80      0.42                                EBOT, ETOP
+   1.E-8      1.0                          CPA: DIFMAX, MIXING
+     4                                            NBZA
+    3.14159265     3.14159265     3.14159265     SCALING FACTORS
+    0.0            0.0            0.0            K = GAMMA   
+    0.0            0.0            2.0            K = H
+    0.0            1.0            1.0            K = N
+    1.0            1.0            1.0            K = P
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X
+--------  INPUT FOR DOS & BSF CALCULATION - HCP RH-CR  -----------
+    REMARK:  SPD ,  NON-MAGNETIC 
+     3    1                                       NL, NS
+     2   14    9                                NSYM, NK, INVE
+   489    4                                       NE, NDC
+   -0.85      0.37                                EBOT, ETOP
+   1.E-8      1.0                          CPA: DIFMAX, MIXING
+     4                                            NBZA
+    3.14159265     3.14159265     3.14159265     SCALING FACTORS
+    0.0            0.0            0.0            K = GAMMA   
+    0.0            0.0            0.625          K = A         (C/A=1.60)
+    1.33333333     0.0            0.0            K = K       
+    0.0            1.1547005      0.0            K = M   
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X
+--------  INPUT FOR DOS CALCULATION - FCC PU  -----------------------
+    REMARK: SC.-RELAT., CAPZ XC, SPDF
+     4    1                                       NL, NS
+     1   16    2                                NSYM, NK, INVE
+   245    3                                       NE, NDC
+   -0.05      1.17                                EBOT, ETOP
+   1.E-8      1.0                          CPA: DIFMAX, MIXING
+     0                                            NBZA
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X
+--------  INPUT FOR DOS CALCULATION - BCC LI-MG   --------------------
+    REMARK: NON-RELAT., VBH XC
+     3    1                                       NL, NS
+     1   22    3                                NSYM, NK, INVE
+   245    3                                       NE, NDC
+   -1.05      0.17                                EBOT, ETOP
+   1.E-8      1.0                          CPA: DIFMAX, MIXING
+     0                                            NBZA
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X
+--------  INPUT FOR DOS CALCULATION - FCC LI-AL   --------------------
+    REMARK: NON-RELAT., VBH XC
+     3    1                                       NL, NS
+     1   18    2                                NSYM, NK, INVE
+   245    3                                       NE, NDC
+   -1.05      0.17                                EBOT, ETOP
+   1.E-8      1.0                          CPA: DIFMAX, MIXING
+     0                                            NBZA
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X
+--------  INPUT FOR DOS CALCULATION - CSCL FE-AL  --------------------
+    REMARK:  NONRELATIVISTIC, VWN XC
+     3    1                                       NL, NS
+     1   13    1                                NSYM, NK, INVE
+   245    3                                       NE, NDC
+   -1.00      0.22                                EBOT, ETOP
+   1.E-8      1.0                          CPA: DIFMAX, MIXING
+     0                                            NBZA
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X

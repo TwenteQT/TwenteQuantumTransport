@@ -1,0 +1,3 @@
+HEADER    C Slater-Koster on-site parameters for graphene
+OPTIONS   LMX=1 HEX=F NSPIN=1 EUNIT=eV
+ONSITE    S=-8.868 P=0.0

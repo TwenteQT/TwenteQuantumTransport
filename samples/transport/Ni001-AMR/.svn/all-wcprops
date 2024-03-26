@@ -1,0 +1,89 @@
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/Ni001-AMR
+END
+job.ll
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/Ni001-AMR/job.ll
+END
+output
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/Ni001-AMR/output
+END
+test.par
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/Ni001-AMR/test.par
+END
+times
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/Ni001-AMR/times
+END
+trans.conf.x
+K 25
+svn:wc:ra_dav:version-url
+V 77
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/Ni001-AMR/trans.conf.x
+END
+geom_l
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/Ni001-AMR/geom_l
+END
+trans.conf.y
+K 25
+svn:wc:ra_dav:version-url
+V 77
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/Ni001-AMR/trans.conf.y
+END
+geom_m
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/Ni001-AMR/geom_m
+END
+trans.conf.z
+K 25
+svn:wc:ra_dav:version-url
+V 77
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/Ni001-AMR/trans.conf.z
+END
+test.seq
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/Ni001-AMR/test.seq
+END
+geom_r
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/Ni001-AMR/geom_r
+END
+README.txt
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/Ni001-AMR/README.txt
+END
+trans.conf
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/Ni001-AMR/trans.conf
+END
+atomlist
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/Ni001-AMR/atomlist
+END

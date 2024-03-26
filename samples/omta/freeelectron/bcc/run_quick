@@ -1,0 +1,14 @@
+#!/bin/bash
+#SBATCH -t 0-1
+#SBATCH -p cms18
+#SBATCH -N 1 --exclusive 
+#SBATCH -J bcc_OMTA
+#SBATCH --output=o%j
+#SBATCH --error=e%j
+
+
+ulimit -s unlimited
+date "+Began at: %H:%M:%S"
+
+mpirun ~/trunk/bin/htrans.x 
+date "+Finished at: %H:%M:%S"

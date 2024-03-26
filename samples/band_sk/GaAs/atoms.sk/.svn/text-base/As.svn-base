@@ -1,0 +1,4 @@
+HEADER    Ga Slater-Koster on-site parameters
+OPTIONS   LMX=1  NSPIN=1 
+ONSITE    S=-8.21  P=1.16
+

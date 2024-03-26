@@ -1,0 +1,779 @@
+
+ldl.c,256
+void LDL_symbolic188,10644
+LDL_int LDL_numeric	254,12987
+void LDL_lsolve327,15943
+void LDL_dsolve352,16677
+void LDL_ltsolve371,17199
+void LDL_perm396,17933
+void LDL_permt416,18464
+LDL_int LDL_valid_perm	436,18996
+LDL_int LDL_valid_matrix480,20304
+
+libgen.c,642
+int LOG_MAX=5,58
+#define COMPLAIN_EXIT 7,74
+inline void scanv3(9,134
+inline void scanv2(13,269
+int readinput(17,399
+t_atom *getatom(getatom154,5083
+double getmass(192,6285
+int cmpdist(210,6691
+double devmeansqr(217,6847
+void prepvisdat(239,7232
+void dumpvisdat(360,10586
+void writeatomlist(415,12363
+inline FILE *openread(openread430,12896
+void writegeom(439,13086
+inline void getcoordz(464,14236
+inline double randn(470,14395
+void writerotcf(486,14681
+void writerotmask(495,14863
+void initrnd(505,15115
+int cholesky(525,15548
+int get_cf_dists(552,16495
+#define CORR_LOWER_PART 586,17512
+#define MAXLOGSIZE 837,25595
+
+prandgen.c,756
+    int ord,4,37
+    int ord, nx,4,37
+    int ord, nx,ny,4,37
+    int ord, nx,ny,N,4,37
+    int ord, nx,ny,N,lbnl,4,37
+    int ord, nx,ny,N,lbnl,rbnl;4,37
+    int vis,5,69
+    int vis,mask,5,69
+    int vis,mask, corr;5,69
+    int reps,6,93
+    int reps,repn,6,93
+    int reps,repn,nreps;6,93
+    double scl;7,118
+    double dimcf,8,134
+    double dimcf,Tdeb,8,134
+    double dimcf,Tdeb,TK,8,134
+    double dimcf,Tdeb,TK,mdef;8,134
+    double Mtheta,9,169
+    double Mtheta,Mphi,9,169
+    double Mtheta,Mphi,Mdev;9,169
+    } t_opt;10,198
+inline int genscdist(19,564
+inline void genchemdist(62,1965
+void maketrgeom(88,2790
+void extrafields(232,7750
+    static void usage(244,8053
+    void readopts(273,9700
+    int main(443,14786
+
+randgen.c,648
+    int ord,4,37
+    int ord, nx,4,37
+    int ord, nx,ny,4,37
+    int ord, nx,ny,N,4,37
+    int ord, nx,ny,N,lbnl,4,37
+    int ord, nx,ny,N,lbnl,rbnl;4,37
+    int vis,5,69
+    int vis,mask,5,69
+    int vis,mask, corr;5,69
+    double scl;6,93
+    double dimcf,7,109
+    double dimcf,Tdeb,7,109
+    double dimcf,Tdeb,TK,7,109
+    double dimcf,Tdeb,TK,mdef;7,109
+    double Mtheta,8,144
+    double Mtheta,Mphi,8,144
+    double Mtheta,Mphi,Mdev;8,144
+    } t_opt;9,173
+inline int genscdist(18,533
+void maketrgeom(80,2398
+void extrafields(153,4857
+    static void usage(165,5160
+    void readopts(192,6635
+    int main(324,10483
+
+ldl.h,314
+#define LDL_H_ 2,15
+#define LDL_int 4,33
+#define LDL_ID 5,53
+#define LDL_symbolic 7,74
+#define LDL_numeric 8,108
+#define LDL_lsolve 9,140
+#define LDL_dsolve 10,170
+#define LDL_ltsolve 11,200
+#define LDL_perm 12,232
+#define LDL_permt 13,258
+#define LDL_valid_perm 14,286
+#define LDL_valid_matrix 15,324
+
+libgen.h,2300
+#define kboltz 11,176
+#define hbar 12,218
+#define caem 13,255
+#define debcf 14,289
+#define bohrrad 15,330
+#define aunit 16,369
+#define ES_ii2 17,406
+#define MAX_NUM_BOND 18,425
+#define MAX_NC 19,449
+#define MAX(25,539
+#define MIN(29,592
+#define atfmt 33,628
+#define fmt3s 34,669
+#define fmt2s 35,720
+#define fpvec3(37,777
+#define fpvec2(40,842
+typedef struct{int n;43,906
+typedef struct{int n;double r;43,906
+typedef struct{int n;double r;} cstr;43,906
+    double *x,x46,969
+    double *x,*y,y46,969
+    double *x,*y,*z,z46,969
+    double *x,*y,*z,*wsr;wsr46,969
+    int *ii1,ii147,995
+    int *ii1,*ii2,ii247,995
+    int *ii1,*ii2,*plane;plane47,995
+    char (*info)info48,1021
+    int num;49,1042
+    int nuniq,50,1055
+    int nuniq,nuniqa;50,1055
+    char **ulabels,ulabels51,1077
+    char **ulabels,**ulats;ulats51,1077
+    int *bonds1,bonds152,1105
+    int *bonds1,*bonds2,bonds252,1105
+    int *bonds1,*bonds2,nbond;52,1105
+} t_visdat;53,1136
+    double wsr,57,1167
+    double wsr,charge,57,1167
+    double wsr,charge,mass;57,1167
+    char *label;label58,1195
+    void *next;next59,1212
+    } t_atom;60,1228
+    int num;63,1259
+    t_atom *ptr;ptr64,1272
+    } t_atomset;65,1289
+    double coord[coord68,1324
+    int nc;69,1345
+    double *conc;conc70,1357
+    t_atom **at;at71,1375
+    } t_scsite;72,1392
+    int np,75,1426
+    int np,nb,75,1426
+    int np,nb,nmtr;75,1426
+    int nat,76,1446
+    int nat, tnat;76,1446
+    double cr;77,1465
+    double dimcf;78,1480
+    double scx[scx79,1498
+    double scx[3],trv[trv79,1498
+    double ltrans[ltrans80,1527
+    double ltrans[3],rtrans[rtrans80,1527
+    t_scsite *site;site81,1559
+    t_scsite **plane;plane82,1579
+    } t_scgeom;83,1601
+    double coord[coord86,1635
+    double mdir[mdir87,1656
+    int mask;88,1676
+    int pidx;89,1690
+    t_atom *at;at90,1704
+    } t_trsite;91,1720
+    int na,94,1753
+    int na,nmtr,94,1753
+    int na,nmtr,tp;94,1753
+    double cr;95,1773
+    double dimcf;96,1788
+    int sc[sc97,1806
+    double scx[scx98,1821
+    double scx[3],trv[trv98,1821
+    t_trsite *site;site99,1850
+    double trans[trans100,1870
+    double (*rcoord)rcoord101,1891
+    } t_trgeom;102,1920
+#define LOGMSG(106,1958
+
+masses.h,43
+static double atomic_mass[atomic_mass1,0
+
+randgen.h,2822
+#define kboltz 11,176
+#define hbar 12,218
+#define caem 13,255
+#define debcf 14,289
+#define bohrrad 15,330
+#define aunit 16,369
+#define ES_ii2 17,406
+#define MAX_NUM_BOND 18,425
+#define MAX_NC 19,449
+#define MAX(25,539
+#define MIN(29,592
+#define atfmt 33,628
+#define fmt3s 34,669
+#define fmt2s 35,720
+#define fpvec3(37,777
+#define fpvec2(40,842
+typedef struct{int n;43,906
+typedef struct{int n;double r;43,906
+typedef struct{int n;double r;} cstr;43,906
+    double *x,x46,969
+    double *x,*y,y46,969
+    double *x,*y,*z,z46,969
+    double *x,*y,*z,*wsr;wsr46,969
+    int *ii1,ii147,995
+    int *ii1,*ii2,ii247,995
+    int *ii1,*ii2,*plane;plane47,995
+    char (*info)info48,1021
+    int num;49,1042
+    int nuniq,50,1055
+    int nuniq,nuniqa;50,1055
+    char **ulabels,ulabels51,1077
+    char **ulabels,**ulats;ulats51,1077
+    int *bonds1,bonds152,1105
+    int *bonds1,*bonds2,bonds252,1105
+    int *bonds1,*bonds2,nbond;52,1105
+} t_visdat;53,1136
+    double wsr,57,1167
+    double wsr,charge,57,1167
+    double wsr,charge,mass;57,1167
+    char *label;label58,1195
+    void *next;next59,1212
+    } t_atom;60,1228
+    int num;63,1259
+    t_atom *ptr;ptr64,1272
+    } t_atomset;65,1289
+    double coord[coord68,1324
+    int nc;69,1345
+    double *conc;conc70,1357
+    t_atom **at;at71,1375
+    } t_scsite;72,1392
+    int np,75,1426
+    int np,nb,75,1426
+    int np,nb,nmtr;75,1426
+    int nat,76,1446
+    int nat, tnat;76,1446
+    double cr;77,1465
+    double dimcf;78,1480
+    double scx[scx79,1498
+    double scx[3],trv[trv79,1498
+    double ltrans[ltrans80,1527
+    double ltrans[3],rtrans[rtrans80,1527
+    t_scsite *site;site81,1559
+    t_scsite **plane;plane82,1579
+    } t_scgeom;83,1601
+    double coord[coord86,1635
+    double mdir[mdir87,1656
+    int mask;88,1676
+    int pidx;89,1690
+    t_atom *at;at90,1704
+    } t_trsite;91,1720
+    int na,94,1753
+    int na,nmtr,94,1753
+    int na,nmtr,tp;94,1753
+    double cr;95,1773
+    double dimcf;96,1788
+    int sc[sc97,1806
+    double scx[scx98,1821
+    double scx[3],trv[trv98,1821
+    t_trsite *site;site99,1850
+    double trans[trans100,1870
+    double (*rcoord)rcoord101,1891
+    } t_trgeom;102,1920
+    int ord,105,1953
+    int ord, nx,105,1953
+    int ord, nx,ny,105,1953
+    int ord, nx,ny,N,105,1953
+    int ord, nx,ny,N,lbnl,105,1953
+    int ord, nx,ny,N,lbnl,rbnl;105,1953
+    int vis,106,1985
+    int vis,mask,106,1985
+    int vis,mask, corr;106,1985
+    double scl;107,2009
+    double dimcf,108,2025
+    double dimcf,Tdeb,108,2025
+    double dimcf,Tdeb,TK,108,2025
+    double dimcf,Tdeb,TK,mdef;108,2025
+    double Mtheta,109,2060
+    double Mtheta,Mphi,109,2060
+    double Mtheta,Mphi,Mdev;109,2060
+    } t_opt;110,2089
+
+../../libtrans/src/ando.F90,1404
+      Subroutine alloc_ando 67,2571
+      Subroutine free_ando 152,5309
+      Subroutine free_ando_emb 200,6833
+      Subroutine solve_ando 216,7313
+      Subroutine fix_orth 316,11386
+         Subroutine rotforward 362,13059
+         Subroutine rotbackward 382,13906
+      Subroutine make_orth 403,14785
+      Subroutine make_orth_spin 419,15430
+      Function test_spinr 494,18211
+      Subroutine fix_phase 527,19368
+      Subroutine ando_help_swap_evecs_ 583,21387
+      Subroutine ando_help_fill_result_ 600,21981
+      Function ando_decompose_spin_ 778,29003
+      Subroutine ando_help_calc_Fmatr_ 834,30991
+      Subroutine ando_help_add_Fmatr_ 848,31578
+      Function ando_help_u_lambda_ 864,32238
+      Function ando_help_sort_norm_ando_ 876,32719
+      Subroutine ando_help_qsort_evals_ 979,36451
+         Function cmpr_fun 1085,39698
+      Subroutine ando_help_qsort_evalsim_ 1105,40312
+         Function cmpr_fun 1211,43561
+      Subroutine ando_help_inv_sub_cmat_ 1238,44357
+      Subroutine zggevx_driver 1267,45318
+      Function ando_help_calc_ando_eigsgen_ 1309,46889
+         Subroutine zggev_driver 1399,50285
+         Subroutine r8tomsqz_driver 1423,51120
+         Subroutine r16tomsqz_driver 1448,52270
+      Subroutine ando_help_calc_ando_eigs_ 1479,53611
+         Subroutine zgeev_driver 1519,55025
+      Subroutine ando_help_prep_lmatr_ 1544,55863
+
+../../libtrans/src/atoms.F90,216
+      Function read_atoms 70,2445
+      Subroutine rep_pfn 177,6482
+      Subroutine calc_potpar 210,7901
+      Subroutine dlangr 345,13645
+         Function auxdlangr 366,14215
+      Subroutine rsel 400,15285
+
+../../libtrans/src/bzgrid.F90,30
+      Subroutine gibz 19,482
+
+../../libtrans/src/geometry.F90,266
+      Function read_geom 26,855
+      Subroutine rep_geom 126,4498
+      Function make_leadgeom 158,6034
+      Function make_transportgeom 213,7863
+      Function make_scgeom 284,10727
+      Subroutine free_geom 329,12262
+      Subroutine load_mask 338,12501
+
+../../libtrans/src/hamiltonian.F90,718
+      Subroutine prep_system_sk 25,635
+      Subroutine prep_system_sc 47,1422
+      Subroutine prep_system_model 73,2375
+      Subroutine make_slater_rs(99,3315
+      Subroutine prep_system_slater_k(118,3854
+      Subroutine make_ps_sc 145,4610
+      Subroutine make_ps_sk 160,5079
+      Subroutine make_ham_sc 210,6721
+      Subroutine make_h_sc 226,7233
+      Subroutine make_h_sk 242,7739
+      Subroutine make_ham_sk 291,9113
+      Subroutine make_model_fourband 363,11254
+         Real * 8 Function RANF 934,38722
+      Function get3MMM 953,39354
+      Function getH 961,39570
+      Function make1cent 975,40008
+         Subroutine cent1mul 1004,40908
+         Subroutine cent1_size 1070,43561
+
+../../libtrans/src/heritage.F90,292
+      Subroutine rapo 13,254
+      Subroutine lipo 49,1256
+         Function auxf 103,3248
+      Function quad3 113,3581
+         Function auxf 163,5706
+      Subroutine PRIM3 174,6099
+         Function AUXF2 218,8108
+      Subroutine rukust 230,8514
+      Subroutine rsev 288,10737
+
+../../libtrans/src/logging.F90,146
+      Subroutine close_log_file10,273
+      Subroutine flush_log15,424
+      Subroutine do_log 21,566
+         Subroutine open_log_file30,911
+
+../../libtrans/src/noncollinear_ps.F90,67
+      Function rot_pfun 12,310
+      Function dump_drho 120,3689
+
+../../libtrans/src/potpars.F90,602
+      Function prep_rot_mask 35,1081
+      Subroutine free_ppar 69,2218
+      Subroutine free_ppar_f 78,2447
+      Subroutine init_ppar 91,2796
+      Function make_ppar 102,3095
+      Function make_ppar_full 159,5286
+      Subroutine prep_so 286,9840
+      Subroutine mk_so_atom 349,11998
+      Subroutine make_Lmats 402,14375
+      Subroutine free_Lmats 421,15097
+      Subroutine CalcLInts 431,15435
+         Subroutine transmat 461,16538
+      Function unmat 478,17176
+      Subroutine zcsrcompress 495,17575
+      Subroutine RotateZCSR 543,19043
+      Subroutine GetRotOp 559,19517
+
+../../libtrans/src/praxis.F90,368
+Function flin 20,481
+Subroutine minfit 135,3989
+Subroutine minny 523,12296
+Function praxis 807,19000
+Subroutine print2 1333,32921
+Subroutine quad 1404,34924
+Subroutine r8mat_print 1521,37931
+Subroutine r8mat_print_some 1561,38733
+Subroutine r8vec_print 1664,41184
+Subroutine r8vec_swap 1710,42101
+Subroutine sort 1748,42904
+Subroutine timestamp 1827,44954
+
+../../libtrans/src/readcfg.F90,508
+      Subroutine free_option_list 33,1082
+      Subroutine trans_config_init 48,1526
+      Function is_opt_exists 370,16802
+      Subroutine log_opt_i 391,17431
+      Subroutine log_opt_d 406,17842
+      Function getopt_i 421,18262
+      Function getopt_d 450,19207
+      Function getopt_da 483,20336
+      Function split_array_opt 531,22033
+      Subroutine dump_config 563,22984
+      Subroutine read_config_file 576,23371
+      Function process_str 617,24827
+      Subroutine s_cap 658,25850
+
+../../libtrans/src/rotations.F90,204
+      Function read_rot_mask 7,103
+      Function spinrm 43,1279
+      Function getderangle 131,5131
+      Function rotspheric 141,5511
+      Function zmatmul3 157,6324
+      Function expm 165,6684
+
+../../libtrans/src/sparselib.F90,4049
+      Subroutine zalloccoo 202,5899
+      Subroutine ralloccoo 241,7054
+      Subroutine zinitcsr 283,8295
+      Subroutine rinitcsr 294,8554
+      Subroutine zalloccsr 304,8797
+      Subroutine ralloccsr 347,10079
+      Subroutine zrealloccsr 387,11219
+      Subroutine rrealloccsr 428,12629
+      Subroutine zfreecoo 468,14035
+      Subroutine rfreecoo 485,14507
+      Subroutine zfreecsr 504,14981
+      Subroutine rfreecsr 521,15445
+      Subroutine zallocdense 538,15909
+      Subroutine zallocdiag 566,16649
+      Subroutine rallocdiag 592,17352
+      Subroutine zfreedense 618,18055
+      Subroutine zfreediag 631,18374
+      Subroutine rfreediag 644,18690
+      Function zcsr_sptofull 657,19046
+      Subroutine zrcsrshiftdiag 674,19545
+      Subroutine zzcsrshiftdiag 747,21932
+      Subroutine csradddiag_zz 849,25362
+      Subroutine csradddiag_rr 955,29018
+      Subroutine csradddiag_zr 1036,31690
+      Subroutine csr_diapos 1121,34431
+      Subroutine mmcsrdiag_zz 1140,34999
+      Subroutine mmcsrdiag_zr 1165,35612
+      Subroutine mmcsrdiag_rr 1190,36222
+      Subroutine mmdiagcsr_rr 1217,36930
+      Subroutine mmdiagcsr_zz 1241,37566
+      Subroutine mmdiagcsr_rz 1265,38208
+      Function fmmdiagcsr_rz 1291,38972
+      Function fmmdiagcsr_rr 1302,39326
+      Function fmmdiagcsr_zr 1313,39680
+      Function fmmdiagcsr_zz 1325,40060
+      Function fmmcsrdiag_zz 1338,40534
+      Function fmmcsrdiag_zr 1352,40916
+      Function fmmcsrdiag_rr 1365,41297
+      Function fmmcsrdiag_rz 1378,41678
+      Function fmmcsrvector_zz 1391,42161
+      Function fmmcsrdense_zz 1416,42985
+      Function fmmcsrdense_zr 1444,43852
+      Function fmmcsrdense_rz 1470,44714
+      Function fmmcsrdense_rr 1496,45576
+      Function zgetcsrsubmat 1523,46433
+      Function rgetcsrsubmat 1564,47642
+      Function zgetrowind 1604,48847
+      Function rgetrowind 1620,49282
+      Subroutine addblocks 1636,49717
+         Function cpdata 1759,53800
+      Subroutine dumpzcoo 1779,54400
+      Subroutine dumpzcsr 1793,54819
+      Subroutine dumprcsr 1809,55346
+      Subroutine dumpzdiag 1823,55782
+      Subroutine dumprdiag 1836,56186
+      Subroutine dumpzdense 1849,56564
+      Subroutine dumpzdensemat 1864,57059
+      Subroutine dumprdense 1880,57539
+      Subroutine dumprvector 1894,58004
+      Subroutine dumpzvector 1906,58397
+      Subroutine z_coo2csr 1919,58816
+      Subroutine r_coo2csr 1935,59270
+      Subroutine rcoocsr 1952,59766
+      Subroutine zcoocsr 2026,62008
+      Function r_conv2csr 2098,64251
+      Function z_conv2csr 2126,65154
+      Subroutine rcoicsr 2155,66058
+      Subroutine zcoicsr 2252,69675
+      Subroutine zdense2coo 2349,73295
+      Subroutine r_ordercsr 2372,73964
+      Subroutine z_ordercsr 2403,74749
+      Subroutine z_cooaddel 2437,75641
+      Subroutine r_cooaddel 2452,76102
+      Subroutine spmatmul_size 2469,76562
+      Function fmmcsrcsr_zz 2513,78080
+      Function fmmcsrcsr_zr 2547,79092
+      Function fmmcsrcsr_rz 2581,80101
+      Subroutine matmul_normal_zz 2617,81112
+      Subroutine matmul_normal_zr 2665,82940
+      Subroutine matmul_normal_rz 2714,84818
+      Function fmmcsrdiagcsr_zrz 2768,86822
+      Subroutine matmul_withdiag_zrz 2805,87947
+      Subroutine spcopy_csr_z 2858,89956
+      Subroutine spcopy_csr_r 2891,90875
+      Subroutine spcopy_csr_rz 2921,91623
+      Function csrherm_z 2950,92397
+      Function csrtransp_z 2962,92853
+      Function csrherm_r 2972,93226
+      Subroutine csrcsc2z 2985,93656
+      Subroutine csrcsc2r 3025,94831
+      Function fcsraddcsr_zz 3065,96000
+      Function fcsraddcsr_zr 3110,97380
+      Subroutine matadd_size 3142,98385
+      Subroutine aplb1_zz 3199,100053
+      Subroutine amib1_zz 3255,101743
+      Subroutine amib1_zr 3310,103406
+      Subroutine aplb1_zr 3367,105106
+      Subroutine denseaddcsr_zz 3423,106803
+      Subroutine iqsort 3450,107526
+      Subroutine dqsort 3565,110330
+      Function collectspmat 3680,113261
+
+../../libtrans/src/spsolvers.F90,338
+      Subroutine sp_solve 14,365
+      Subroutine sp_solve 42,1360
+      Subroutine sp_solve 87,2801
+      Subroutine sp_solve 134,4399
+      Subroutine sp_solve 151,4901
+      Subroutine sp_solve 186,5987
+      Subroutine zsp_solver 219,6842
+      Subroutine zcsp_solver 407,12853
+      Subroutine mumps_error_handler 642,19911
+
+../../libtrans/src/structure.F90,1643
+      Subroutine init_mathop 85,3070
+      Function calc_screal 95,3298
+      Function prep_sc_real 145,4703
+         Function fillstr 244,7990
+         Subroutine allocstr 330,11532
+         Subroutine calc_numbers 348,12067
+      Function prep_sc_real_rel 397,13707
+         Function fillstr 495,17090
+         Subroutine allocstr 597,21257
+         Subroutine calc_numbers 613,21779
+      Subroutine do_rep_cls 665,23426
+      Subroutine free_mathop 692,24475
+      Subroutine make_drho 708,24877
+         Subroutine fillsk 719,25190
+         Function fillskrows 762,26586
+      Subroutine make_sk 800,28063
+         Subroutine fillsk 842,29310
+         Function fillskrows 888,30800
+      Subroutine do_calc_strconst 925,32235
+      Subroutine calc_sc_alpha 943,32752
+      Function find_unique_clusters 1069,37272
+         Subroutine add_cluster 1119,38644
+         Function is_same_cluster 1166,40214
+      Subroutine free_cluster_list 1203,41646
+      Function find_neibs 1228,42365
+         Subroutine add_neib 1335,45822
+         Function get_dist 1367,46791
+      Subroutine free_neibs 1377,47073
+      Subroutine invert_rematrix 1400,47692
+      Subroutine sort_neibs_pos 1436,48894
+         Function cmpr_fun 1543,52206
+      Subroutine sort_neibs_num 1574,53134
+         Function cmpr_fun 1680,56389
+      Subroutine cansc 1697,56868
+      Function harm_nc 1808,60491
+      Function harm 1847,61685
+      Function gaunty 1938,65078
+      Function gacor 1990,66638
+      Function tuff 2092,69893
+Subroutine getscsym 2112,70395
+Subroutine setscsym 2158,71822
+Subroutine symscons 2183,72639
+
+../../libtrans/src/supercell.F90,233
+      Subroutine prep_dec_idx 13,455
+      Subroutine prep_ham_idx 35,1066
+      Subroutine prepare_supercell 55,1610
+      Function get_sc_ando 137,4346
+      Subroutine write_ando 373,12888
+      Function read_ando 444,15416
+
+../../libtrans/src/transport.F90,384
+  Function mmul_norm 23,586
+      Subroutine free_trmat 44,1312
+      Subroutine cond_helper 58,1713
+      Function cond_crosspin 88,3063
+      Function cond_full 156,5427
+      Function cond_singlespin 240,9151
+      Function spec_help 309,11659
+      Subroutine cond_spec 359,13276
+      Subroutine embed_boundary 406,14999
+      Subroutine write_trans_matrices 443,16082
+
+../../libtrans/src/r16tomsqz.F,147
+      SUBROUTINE R16TOMSQZ(12,385
+      SUBROUTINE R16CQZHES(91,3022
+      SUBROUTINE R16CQZVAL(376,12000
+      SUBROUTINE R16CQZVEC(768,25478
+
+../../libtrans/src/r8tomsqz.F,143
+      SUBROUTINE R8TOMSQZ(11,357
+      SUBROUTINE R8CQZHES(90,3006
+      SUBROUTINE R8CQZVAL(375,11805
+      SUBROUTINE R8CQZVEC(767,25058
+
+../../libtrans/src/math_def.h,542
+#define DEF_SING_PREC 10,327
+#define DEF_DBL_PREC 11,351
+#define DEF_cmplx_zero 15,458
+#define DEF_cmplx_one 18,601
+#define DEF_cmplx_Ione 21,743
+#define DEF_QUAD_PREC 26,868
+#define DEF_long_zero 29,970
+#define DEF_long_one 32,1075
+#define DEF_long_two 35,1179
+#define DEF_cmplx_zeroL 38,1289
+#define DEF_cmplx_oneL 41,1434
+#define DEF_cmplx_IoneL 44,1578
+#define DEF_M_PI 50,1783
+#define DEF_M_PI_2 52,1873
+#define DEF_M_PI_4 54,1965
+#define DEF_M_1_PI 56,2056
+#define DEF_M_2_PI 58,2147
+#define _antst_math_defs_ 59,2230
+
+../../libsk/src/fmtlib.F90,418
+ INTEGER FUNCTION  DECIMAL_DIGITS(60,1986
+ SUBROUTINE GETFMT_REAL_SCALAR(129,4384
+ SUBROUTINE GETFMT_REAL_VECTOR(227,8026
+SUBROUTINE GETFMT_REAL_MATRIX(367,12552
+ SUBROUTINE GETFMT_LOG__SCALAR(391,13492
+ SUBROUTINE GETFMT_LOG__VECTOR(424,14577
+ SUBROUTINE GETFMT_INT__SCALAR(475,16080
+ SUBROUTINE GETFMT_INT__VECTOR(522,17744
+ SUBROUTINE GETFMT_CHAR_SCALAR(607,20542
+ SUBROUTINE GETFMT_CHAR_VECTOR(663,22516
+
+../../libsk/src/setuplib.F90,1743
+  INTEGER FUNCTION IEND 345,13485
+  CHARACTER*13 FUNCTION TO_CHAR(357,13971
+  SUBROUTINE ERRMSG 372,14339
+   CHARACTER FUNCTION SEVERITY(400,15287
+ SUBROUTINE SPLIT(421,15880
+  SUBROUTINE SHOW_CONTENT(479,17535
+  INTEGER FUNCTION ELEMENTS_READ(494,18025
+  LOGICAL FUNCTION FOUND_TOKEN(508,18494
+  LOGICAL FUNCTION  FOUND_CATEGORY(517,18824
+  SUBROUTINE OPEN_SETUP(573,20756
+  SUBROUTINE CATEGORY(704,24618
+  SUBROUTINE SUB_CATEGORY(780,26849
+SUBROUTINE SEARCH_TOKEN(853,29002
+  SUBROUTINE READ_REAL_SCALAR(928,31934
+  SUBROUTINE READ_INT__SCALAR(976,34075
+  SUBROUTINE READ_LOG__SCALAR(1024,36218
+  SUBROUTINE READ_CHAR_SCALAR(1072,38361
+  SUBROUTINE READ_REAL_VECTOR(1119,40404
+  SUBROUTINE READ_INT__VECTOR(1186,43216
+  SUBROUTINE READ_LOG__VECTOR(1252,46027
+  SUBROUTINE READ_CHAR_VECTOR(1318,48837
+  SUBROUTINE READ_REAL_MATRIX(1375,51367
+  SUBROUTINE OPEN_SETUP_OUT(1435,53443
+ SUBROUTINE WRITE_TOKEN(1483,54821
+ SUBROUTINE WRITE_CATEGORY(1528,56470
+SUBROUTINE WRITE_REAL_SCALAR(1587,58748
+ SUBROUTINE WRITE_REAL_VECTOR(1640,60617
+ SUBROUTINE WRITE_REAL_MATRIX(1713,63225
+ SUBROUTINE WRITE_INT__SCALAR(1739,64289
+ SUBROUTINE WRITE_INT__VECTOR(1786,65817
+ SUBROUTINE WRITE_LOG__SCALAR(1854,68065
+ SUBROUTINE WRITE_LOG__VECTOR(1901,69592
+  SUBROUTINE WRITE_CHAR_SCALAR(1968,71839
+ SUBROUTINE WRITE_CHAR_VECTOR(2016,73406
+ SUBROUTINE IO_REAL_SCALAR(2093,75778
+ SUBROUTINE IO_REAL_VECTOR(2158,78173
+ SUBROUTINE IO_REAL_MATRIX(2221,80612
+ SUBROUTINE IO_INT__SCALAR(2286,83165
+SUBROUTINE IO_INT__VECTOR(2350,85458
+ SUBROUTINE IO_CHAR_SCALAR(2415,87895
+ SUBROUTINE IO_CHAR_VECTOR(2484,90227
+ SUBROUTINE IO_LOG__SCALAR(2554,92957
+SUBROUTINE IO_LOG__VECTOR(2618,95263
+ SUBROUTINE IO_CATEGORY(2682,97704
+
+../../libsk/src/sk_ham.F90,653
+    subroutine make_onsite(10,90
+    subroutine slater_ham_ij(49,1080
+     function scale_sk(112,3166
+     subroutine def_skblock(129,3635
+     function which_shell(199,6319
+     subroutine wigner_mat(231,7040
+     function calc_slater_ham 263,7694
+     Function find_slater_neibs 306,9026
+      Subroutine add_neib 430,12732
+      Function get_dist 462,13590
+    subroutine rep_neighbours(472,13851
+    subroutine scale_geom(498,14621
+    subroutine prep_ham_slater 518,15102
+        Function fillstr_slater 632,18498
+         Subroutine allocstr 773,23498
+         Subroutine calc_numbers 792,24106
+      Subroutine gibz_2d 840,25751
+
+../../libsk/src/sk_io.F90,403
+  subroutine read_slater_atom(12,142
+  subroutine scale_sk_atom(67,2058
+  subroutine rep_onsite(95,2771
+  subroutine allocate_sk(136,3974
+  subroutine read_slater_hopping(166,4688
+  subroutine scale_sk_hopping(320,11087
+  subroutine rep_hopping(361,12437
+  subroutine hswitch(435,15072
+  subroutine rswitch(453,15592
+  Function read_slater_atoms 472,15879
+  subroutine sk_shift_pot(560,18586
+
+../../libsk/src/spherical.F90,279
+  function length(8,67
+  function vec_prod(18,268
+  function fact(28,499
+  function volume(48,757
+  function kdelta(60,1048
+  function cwigner(73,1215
+  function rwigner(116,2583
+  function euler_mat(156,3455
+  function euler_ang(182,4360
+  subroutine rot_mat(226,5404
+
+../../libsk/src/math_def.h,542
+#define DEF_SING_PREC 10,327
+#define DEF_DBL_PREC 11,351
+#define DEF_cmplx_zero 15,458
+#define DEF_cmplx_one 18,601
+#define DEF_cmplx_Ione 21,743
+#define DEF_QUAD_PREC 26,868
+#define DEF_long_zero 29,970
+#define DEF_long_one 32,1075
+#define DEF_long_two 35,1179
+#define DEF_cmplx_zeroL 38,1289
+#define DEF_cmplx_oneL 41,1434
+#define DEF_cmplx_IoneL 44,1578
+#define DEF_M_PI 50,1783
+#define DEF_M_PI_2 52,1873
+#define DEF_M_PI_4 54,1965
+#define DEF_M_1_PI 56,2056
+#define DEF_M_2_PI 58,2147
+#define _antst_math_defs_ 59,2230
+
+masses1.h,0

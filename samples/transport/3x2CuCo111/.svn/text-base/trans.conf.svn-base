@@ -1,0 +1,7 @@
+bz_num_kpoints=1
+bz_sym=0
+bz_inve=0
+bz_timereversal=1
+EQUATION_TYPE =   1
+#SO_ON=1
+LOGLEVEL =      10

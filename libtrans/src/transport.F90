@@ -1,0 +1,571 @@
+!!$ $Id: transport.F90 1878 2013-04-08 12:54:47Z antst $
+#include "math_def.h"
+Module transport
+      Use sparselib
+      Use ando_module
+      Type t_t_matrix
+         Integer :: nc, nr, exists (2, 2) = 0
+         Real (Kind=DEF_DBL_PREC) :: val (2, 2) = 0.0d0, spec (2, 2) = 0.0d0
+         Type (zdensemat) :: mat (2, 2)
+      End Type t_t_matrix
+
+      Type t_lead_data
+         Type (t_ando_sollution), Pointer :: ando
+         Integer :: ir, jc, nr, nm, inj
+      End Type t_lead_data
+
+      Type t_tranrefl
+         Type (t_t_matrix) :: T, R
+      End Type t_tranrefl
+
+Contains
+
+      Function mmul_norm (A, B, ldb, C) Result (T)
+!!$ Helper function.
+!!$ Multiple matrix by matrix and return result
+!!$ and square of norm of result
+         Implicit None
+         Complex (Kind=DEF_DBL_PREC) :: A (:, :), B (:, :)
+         Real (Kind=DEF_DBL_PREC) :: T
+         Type (zdensemat) :: C
+         Integer :: n, m, l, ldb
+         Real (Kind=DEF_DBL_PREC), External :: dznrm2
+
+         n = size (A, DIM=1)
+         m = size (A, DIM=2)
+         l = size (B, DIM=2)
+         Call alloc (C, n, l)
+         Call zgemm ('N', 'N', n, l, m, DEF_cmplx_one, A(1, 1), n, B(1, 1), &
+&ldb, DEF_cmplx_zero, C%bl(1, 1), &
+        & n)
+         T = dznrm2 (n*l, C%bl(1, 1), 1) ** 2
+         Return
+      End Function mmul_norm
+
+      Subroutine free_trmat (C)
+         Implicit None
+         Type (t_tranrefl) :: C
+         Call free (C%T%mat(1, 1))
+         Call free (C%T%mat(1, 2))
+         Call free (C%T%mat(2, 1))
+         Call free (C%T%mat(2, 2))
+         Call free (C%R%mat(1, 1))
+         Call free (C%R%mat(1, 2))
+         Call free (C%R%mat(2, 1))
+         Call free (C%R%mat(2, 2))
+
+      End Subroutine free_trmat
+
+      Subroutine cond_helper (lin, lout, rhs, tr, is, is2, il, il2, consv)
+         Implicit None
+         Real (Kind=DEF_DBL_PREC) :: consv
+         Type (t_lead_data) :: lin, lout
+         Type (t_t_matrix) :: tr
+         Type (zdensemat) :: rhs
+         Integer :: is, is2, il, il2
+!!$ Local vars
+         Real (Kind=DEF_DBL_PREC), External :: dznrm2
+
+         If (lin%inj > 0 .And. lout%nm > 0) Then
+            Call alloc (tr%mat(is, is2), lout%nm, lin%nm)
+            Call zgemm ('N', 'N', lout%nm, lin%nm, lout%nr, DEF_cmplx_one, lout%ando%Uout_i(1, 1), lout%nm, &
+           & rhs%bl(lout%ir, lin%inj), rhs%nrow, DEF_cmplx_zero, tr%mat(is, is2)%bl(1, 1), lout%nm)
+            If (is == is2 .And. il == il2) Then
+               Call zgemm ('N', 'N', lout%nm, lin%nm, lout%nr,-DEF_cmplx_one, lout%ando%Uout_i(1, 1), &
+              & lout%nm, lin%ando%Uin(1, 1), lin%nr, DEF_cmplx_one, tr%mat(is, is2)%bl(1, 1), lout%nm)
+               consv = consv - lin%nm
+            End If
+            tr%val (is, is2) = dznrm2 (lout%nm*lin%nm, tr%mat(is, is2)%bl(1, 1), 1) ** 2
+            tr%exists (is, is2) = 1
+            tr%val (is, is2) = Abs (tr%val(is, is2))
+            consv = consv + Abs (tr%val(is, is2))
+         Else
+            tr%val (is, is2) = 0.0d0
+            tr%exists (is, is2) = 0
+         End If
+      End Subroutine cond_helper
+
+
+      Function cond_crosspin (tran, rhs, l_ando1, r_ando1, l_ando2, r_ando2, havelr, haverl) Result (consv)
+         Use ando_module
+         Implicit None
+!!$    Arguments
+         Type (t_ando_sollution), Target :: l_ando1, r_ando1, l_ando2, r_ando2
+         Type (zdensemat) :: rhs
+         Type (t_tranrefl) :: tran (2)
+         Real (Kind=DEF_DBL_PREC) :: consv
+         Integer :: havelr, haverl
+!!$ Local vars
+         Integer :: shift, i, j, is, is2
+         Type (t_lead_data) :: lead (2, 2)
+
+         tran(2)%R%exists = 0
+         tran(2)%T%exists = 0
+         tran(2)%R%val = 0.0d0
+         tran(2)%T%val = 0.0d0
+         consv = 1.0d-20
+
+         lead(1, 1)%ando => l_ando1
+         lead(2, 1)%ando => l_ando2
+         lead(1, 2)%ando => r_ando1
+         lead(2, 2)%ando => r_ando2
+         Do i = 1, 2
+            Do j = 1, 2
+               lead(i, j)%nm = lead(i, j)%ando%Nout
+               lead(i, j)%nr = lead(i, j)%ando%n
+               lead(i, j)%inj = 0
+            End Do
+         End Do
+
+         lead(1, 1)%ir = 1
+         lead(2, 1)%ir = rhs%nrow / 2 + 1
+         lead(1, 2)%ir = rhs%nrow / 2 - lead(1, 2)%nr + 1
+         lead(2, 2)%ir = rhs%nrow - lead(2, 2)%nr + 1
+
+         shift = 0
+         If (havelr /= 0) Then
+            Do j = 1, 2
+               If (lead(j, 1)%nm > 0) Then
+                  lead(j, 1)%inj = shift + 1
+                  shift = shift + lead(j, 1)%nm
+               End If
+            End Do
+            Do is = 1, 2
+               Do is2 = 1, 2
+                  Call cond_helper (lead(is, 1), lead(is2, 1), rhs, tran(1)%R, is, is2, 1, 1, consv)
+                  Call cond_helper (lead(is, 1), lead(is2, 2), rhs, tran(1)%T, is, is2, 1, 2, consv)
+               End Do
+            End Do
+         End If
+         If (haverl /= 0) Then
+            Do j = 1, 2
+               If (lead(j, 2)%nm > 0) Then
+                  lead(j, 2)%inj = shift + 1
+                  shift = shift + lead(j, 2)%nm
+               End If
+            End Do
+            Do is = 1, 2
+               Do is2 = 1, 2
+                  Call cond_helper (lead(is, 2), lead(is2, 2), rhs, tran(2)%R, is, is2, 2, 2, consv)
+                  Call cond_helper (lead(is, 2), lead(is2, 1), rhs, tran(2)%T, is, is2, 2, 1, consv)
+               End Do
+            End Do
+         End If
+         consv = Abs (consv)
+      End Function cond_crosspin
+
+      Function cond_full (tran, rhs, l_ando, r_ando, havelr, haverl) Result (consv)
+         Use ando_module
+         Implicit None
+!!$    Arguments
+         Type (t_ando_sollution) :: l_ando, r_ando
+         Integer :: havelr, haverl
+         Type (zdensemat) :: rhs
+         Type (t_tranrefl) :: tran (2)
+         Type (t_tranrefl) :: pre_tran (2)
+         Real (Kind=DEF_DBL_PREC) :: consv, con1
+         Integer :: lnu (2), lno (2), rnu (2), is1, is2, i, j, dir
+         Integer, Pointer :: lmask (:, :), rmask (:, :), lmasko (:, :)
+         Real (Kind=DEF_DBL_PREC), External :: dznrm2
+!!$          Real (Kind=DEF_DBL_PREC) :: tof
+         consv = cond_singlespin (1, pre_tran, rhs, l_ando, r_ando, havelr, haverl)
+!!$          tof=0.0d0
+!!$          write(*,'(g15.6,1x,8(g15.7,1x))') sum(abs(pre_tran(1)%T%mat(1,1)%bl(:,:))**2),pre_tran(1)%T%mat(1,1)%bl(:,:)-tof
+!!$          write(*,'(g15.6,1x,8(g15.7,1x))') sum(abs(pre_tran(2)%T%mat(1,1)%bl(:,:))**2),pre_tran(2)%T%mat(1,1)%bl(:,:)-tof
+
+         con1 = 0.0d0
+!!$          write(*,*) l_ando%SNin,l_ando%SNout
+!!$          write(*,*) r_ando%SNin,r_ando%SNout
+         Do dir = 1, 2
+            If (dir == 1) Then
+               lnu = l_ando%SNin
+               lno = l_ando%SNout
+               lmask => l_ando%mask_in
+               lmasko => l_ando%mask_out
+
+               rnu = r_ando%SNout
+               rmask => r_ando%mask_out
+            Else
+               lnu = r_ando%SNin
+               lno = r_ando%SNout
+               lmask => r_ando%mask_in
+               lmasko => r_ando%mask_out
+
+               rnu = l_ando%SNout
+               rmask => l_ando%mask_out
+            End If
+            tran(dir)%T%exists(:, :) = 0
+            tran(dir)%R%exists(:, :) = 0
+            tran(dir)%R%val(:, :) = 0.0d0
+            tran(dir)%T%val(:, :) = 0.0d0
+
+            If (pre_tran(dir)%R%exists(1, 1) == 1) Then
+               Do is1 = 1, 2
+                  Do is2 = 1, 2
+                     If (lnu(is1) > 0) Then
+                        If (lno(is2) > 0) Then
+                           Call alloc (tran(dir)%R%mat(is1, is2), lno(is2), lnu(is1))
+                           Do i = 1, lnu (is1), 1
+                              Do j = 1, lno (is2), 1
+                                 tran(dir)%R%mat(is1, is2)%bl(j, i) = pre_tran(dir)%R%mat(1, 1)%bl(lmasko(j, &
+                                & is2), lmask(i, is1))
+                              End Do
+                           End Do
+                           tran(dir)%R%exists(is1, is2) = 1
+                           tran(dir)%R%val(is1, is2) = dznrm2 (lnu(is1)*lno(is2), tran(dir)%R%mat(is1, &
+                          & is2)%bl, 1) ** 2
+                           con1 = con1 + tran(dir)%R%val(is1, is2)
+                        End If
+
+                        If (rnu(is2) > 0) Then
+                           Call alloc (tran(dir)%T%mat(is1, is2), rnu(is2), lnu(is1))
+                           Do i = 1, lnu (is1), 1
+                              Do j = 1, rnu (is2), 1
+                                 tran(dir)%T%mat(is1, is2)%bl(j, i) = pre_tran(dir)%T%mat(1, 1)%bl(rmask(j, &
+                                & is2), lmask(i, is1))
+                              End Do
+                           End Do
+                           tran(dir)%T%exists(is1, is2) = 1
+                           tran(dir)%T%val(is1, is2) = dznrm2 (lnu(is1)*rnu(is2), tran(dir)%T%mat(is1, &
+                          & is2)%bl, 1) ** 2
+                           con1 = con1 + tran(dir)%T%val(is1, is2)
+                        End If
+                     End If
+                  End Do
+               End Do
+            End If
+            Call free_trmat (pre_tran(dir))
+         End Do
+      End Function cond_full
+
+      Function cond_singlespin (is, tran, rhs, l_ando, r_ando, havelr, haverl) Result (consv)
+!!$    Calculates the transmission and reflection coefficients and
+!!$    the conductance from Landauer formula.
+         Use ando_module
+         Implicit None
+!!$    Arguments
+         Type (t_ando_sollution) :: l_ando, r_ando
+         Integer :: havelr, haverl, is
+         Type (zdensemat) :: rhs
+         Type (t_tranrefl) :: tran (2)
+         Real (Kind=DEF_DBL_PREC) :: consv
+!!$    Local variables
+         Integer :: nm, sz, ldr, s1
+         consv = 1.0d-20
+         ldr = rhs%nrow
+         nm = 0
+         If (havelr /= 0) Then
+            nm = l_ando%Nout
+!!$  L->L conductance
+            sz = l_ando%n
+               tran(1)%R%val(is, is) = mmul_norm (l_ando%Uout_i, rhs%bl(1:sz, 1:nm)-l_ando%Uin, sz, &
+              & tran(1)%R%mat(is, is))
+!!$  L->R conductance
+            If (r_ando%Nout > 0) Then
+               sz = r_ando%n
+               tran(1)%T%val(is, is) = mmul_norm (r_ando%Uout_i, rhs%bl(ldr-sz+1:ldr, 1:nm), ldr, &
+              & tran(1)%T%mat(is, is))
+               tran(1)%T%exists(is, is) = 1
+            Else
+               tran(1)%T%val(is, is) = 0.0d0
+            End If
+            tran(1)%R%exists(is, is) = 1
+            consv = consv + Abs (tran(1)%R%val(is, is)+tran(1)%T%val(is, is)-l_ando%Nout)
+         Else
+            tran(1)%T%exists(is, :) = 0
+            tran(1)%R%exists(is, :) = 0
+            tran(1)%R%val(is, is) = 0.0d0
+            tran(1)%T%val(is, is) = 0.0d0
+         End If
+
+         If (haverl /= 0) Then
+            s1 = nm + 1
+            nm = nm + r_ando%Nout
+!!$  R->R conductance
+            sz = r_ando%n
+               tran(2)%R%val(is, is) = mmul_norm (r_ando%Uout_i, rhs%bl(ldr-sz+1:ldr, s1:nm)-r_ando%Uin, sz, &
+              & tran(2)%R%mat(is, is))
+!!$  R->L conductance
+            If (l_ando%Nout > 0) Then
+               sz = l_ando%n
+               tran(2)%T%val(is, is) = mmul_norm (l_ando%Uout_i, rhs%bl(1:sz, s1:nm), ldr, tran(2)%T%mat(is, &
+              & is))
+               tran(2)%T%exists(is, is) = 1
+            Else
+               tran(2)%T%val(is, is) = 0.0d0
+            End If
+            tran(2)%R%exists(is, is) = 1
+            consv = consv + Abs (tran(2)%R%val(is, is)+tran(2)%T%val(is, is)-r_ando%Nin)
+         Else
+            tran(2)%T%exists(is, :) = 0
+            tran(2)%R%exists(is, :) = 0
+            tran(2)%R%val(is, is) = 0.0d0
+            tran(2)%T%val(is, is) = 0.0d0
+         End If
+      End Function cond_singlespin
+
+
+      Function spec_help (is, is1, in_scell, out_scell, S, small) Result (spec_cond)
+!!$  Calculates specular part of the scattering matrix S
+         Use ando_module
+         Use supercell
+!!$    Arguments
+         Integer :: is, is1
+         Type (t_supercell) :: in_scell, out_scell
+         Real (Kind=DEF_DBL_PREC) :: spec_cond, small
+         Complex (Kind=DEF_DBL_PREC) :: S (:, :)
+!!$ Local variables
+         Integer :: Nin, Nout, ii, oi, in_indx, out_indx
+         Real (Kind=DEF_DBL_PREC) :: vec (2), lvec
+
+         spec_cond = 0.0d0
+
+         Nin = sum (in_scell%nreal(:, is))
+         Nout = sum (out_scell%nreal(:, is1))
+
+         If ((Nin /= 0) .And. (Nout /= 0)) Then
+
+            in_indx = 0
+            Do ii = 1, in_scell%size ! Loop over "incoming" k|| points
+
+               nk_in = in_scell%nreal (ii, is)
+               If (nk_in == 0) Cycle
+
+               out_indx = 0
+               Do oi = 1, out_scell%size ! Loop over "outgoing" k|| points
+
+                  nk_out = out_scell%nreal (oi, is1)
+
+                  If (nk_out == 0) Cycle
+                  vec = in_scell%kbase (:, ii) - out_scell%kbase(:, oi)
+                  lvec = Sqrt (dot_product(vec, vec))
+
+                  If (lvec <= small) Then ! Is k||=k'|| ?
+                     spec_cond = spec_cond + sum (Abs(S(out_indx+1:out_indx+nk_out, &
+                    & in_indx+1:in_indx+nk_in))**2)! Specular block
+                  End If
+
+                  out_indx = out_indx + nk_out
+               End Do
+
+               in_indx = in_indx + nk_in
+            End Do
+
+         End If
+
+      End Function spec_help
+
+      Subroutine cond_spec (is1, is2, tran, lscell, rscell)
+!!$ Calculates the specular (defined by k||=k'||) components of T,T',R,R'(sigma,sigma')
+         Use ando_module
+         Use supercell
+         Implicit None
+!!$    Arguments
+         Type (t_tranrefl) :: tran (2)
+         Type (t_supercell) :: lscell, rscell
+         Integer :: is1, is2
+!!$ Local variables
+         Real (Kind=DEF_DBL_PREC), Parameter :: small_rel = 1.0d-4
+         Integer :: isi, iso
+         Real (Kind=DEF_DBL_PREC) :: small
+
+!!$ For the lenght differences smaller than "small" K vectors are considered identical
+         small = small_rel * Min (lscell%min_diff, rscell%min_diff)
+
+         tran(1)%T%spec(:, :) = 0.0d0
+         tran(1)%R%spec(:, :) = 0.0d0
+         tran(2)%T%spec(:, :) = 0.0d0
+         tran(2)%R%spec(:, :) = 0.0d0
+
+         Do isi = is1, is2
+            Do iso = is1, is2
+!!$ Specular part of T
+               If (tran(1)%T%exists(isi, iso) > 0) tran(1)%T%spec(isi, iso) = spec_help (isi, iso, lscell, &
+              & rscell, tran(1)%T%mat(isi, iso)%bl, small)
+!!$ Specular part of R
+               If (tran(1)%R%exists(isi, iso) > 0) tran(1)%R%spec(isi, iso) = spec_help (isi, iso, lscell, &
+              & lscell, tran(1)%R%mat(isi, iso)%bl, small)
+
+!!$ Specular part of T' (right to left)
+               If (tran(2)%T%exists(isi, iso) > 0) tran(2)%T%spec(isi, iso) = spec_help (isi, iso, rscell, &
+              & lscell, tran(2)%T%mat(isi, iso)%bl, small)
+!!$ Specular part of R' (right to right)
+               If (tran(2)%R%exists(isi, iso) > 0) tran(2)%R%spec(isi, iso) = spec_help (isi, iso, rscell, &
+              & rscell, tran(2)%R%mat(isi, iso)%bl, small)
+            End Do
+         End Do
+
+      End Subroutine cond_spec
+
+      Subroutine embed_boundary (ham, rhs, l_ando, r_ando, nl, nr)
+         Use ando_module
+         Implicit None
+         Type (zcsrmat) :: ham
+         Type (zdensemat) :: rhs
+         Type (t_ando_sollution) :: l_ando, r_ando
+!!$ Local
+         Type (matblk) :: blocks (2)
+         Integer :: nl, nr
+         Integer :: in1, in2, lsz, rsz
+!!$ Code
+         lsz = l_ando%n
+         rsz = r_ando%n
+!!$    write(*,*) lsz,rsz
+         blocks(1)%fcol = 1
+         blocks(1)%frow = 1
+         blocks(2)%fcol = ham%ncol - rsz + 1
+         blocks(2)%frow = ham%ncol - rsz + 1
+         blocks(1)%bl = l_ando%emb
+         blocks(2)%bl = r_ando%emb
+        
+         Call addblocks (ham, blocks, 2) 
+         Call alloc (rhs, ham%nrow, nl*l_ando%Nin+nr*r_ando%Nin)
+
+         in1 = l_ando%Nout * nl
+         If (nl == 1) Then
+            rhs%bl (1:lsz, 1:in1) = l_ando%bound
+         End If
+
+         in2 = in1 + r_ando%Nout * nr
+         If (nr == 1) Then
+            rhs%bl (ham%nrow-rsz+1:ham%nrow, in1+1:in2) = r_ando%bound
+         End If
+         Return
+      End Subroutine embed_boundary
+
+      Subroutine embed_boundary_only_left (ham, rhs, l_ando, nl)
+         Use ando_module
+         Implicit None
+         Type (zcsrmat) :: ham
+         Type (zdensemat) :: rhs
+         Type (t_ando_sollution) :: l_ando
+!!$ Local
+         Type (matblk) :: blocks (1)
+         Integer :: nl, nr
+         Integer :: in1, in2, lsz, rsz
+!!$ Code
+         lsz = l_ando%n
+!!$    write(*,*) lsz,rsz
+         blocks(1)%fcol = 1
+         blocks(1)%frow = 1
+         blocks(1)%bl = l_ando%emb
+        
+         Call addblocks (ham, blocks, 1) 
+         Call alloc (rhs, ham%nrow, nl*l_ando%Nin)
+
+         in1 = l_ando%Nout * nl
+         If (nl == 1) Then
+            rhs%bl (1:lsz, 1:in1) = l_ando%bound
+         End If
+
+         Return
+      End Subroutine embed_boundary_only_left
+
+      Subroutine embed_boundary_srhs (ham, rhs, l_ando, r_ando, nl, nr)
+         Use ando_module
+         Implicit None
+         Type (zcsrmat) :: ham, rhs
+         Type (t_ando_sollution) :: l_ando, r_ando
+!!$ Local
+         Type (matblk) :: blocks (2)
+         Integer :: nl, nr, i, j, k
+         Integer :: in1, in2, lsz, rsz
+         Complex (Kind=DEF_DBL_PREC) :: q
+!!$          integer,allocatable :: idx(:)
+!!$ Code
+         lsz = l_ando%n
+         rsz = r_ando%n
+!!$    write(*,*) lsz,rsz
+         blocks(1)%fcol = 1
+         blocks(1)%frow = 1
+         blocks(2)%fcol = ham%ncol - rsz + 1
+         blocks(2)%frow = ham%ncol - rsz + 1
+         blocks(1)%bl = l_ando%emb
+         blocks(2)%bl = r_ando%emb
+
+
+         Call addblocks (ham, blocks, 2)
+         Call alloc (rhs, nl*l_ando%Nin*lsz+nr*r_ando%Nin*rsz, nl*l_ando%Nin+nr*r_ando%Nin, ham%nrow)
+
+         in1 = 0
+         in2 = 0
+         k = 0
+         If (nl == 1) Then
+            rhs%A (1:l_ando%Nin*lsz) = transfer (l_ando%bound(1:lsz, 1:l_ando%Nin), (/ q /))
+
+            Do j = 1, l_ando%Nin
+               rhs%ir (j) = in2 + 1
+               Do i = 1, lsz
+                  rhs%jc (in2+i) = i
+               End Do
+               in2 = in2 + lsz
+            End Do
+            in1 = l_ando%Nin * lsz
+            k = l_ando%Nin
+         End If
+
+         If (nr == 1) Then
+            rhs%A (in1+1:in1+r_ando%Nin*rsz) = transfer (r_ando%bound(1:rsz, 1:r_ando%Nin), (/ q /))
+            in1 = rhs%ncol - rsz
+            Do j = 1, r_ando%Nin
+               rhs%ir (k+j) = in2 + 1
+               Do i = 1, rsz
+                  rhs%jc (in2+i) = in1 + i
+               End Do
+               in2 = in2 + rsz
+            End Do
+         End If
+         rhs%ir (rhs%nrow+1) = in2 + 1
+         rhs%nnz = nl * l_ando%Nin * lsz + nr * r_ando%Nin * rsz
+         If (in2 /= rhs%nnz) Then
+            Write (*,*) 'srhs error!'
+            Stop
+         End If
+         Return
+      End Subroutine embed_boundary_srhs
+
+      Subroutine write_trans_matrices (pfx, tm, ki)
+         Implicit None
+         Type (t_tranrefl) :: tm
+         Integer :: ki
+         Character :: pfx
+!!$ Local vars
+         Character (Len=2) :: pf (2, 2) = reshape ( (/ 'uu', 'du', 'ud', 'dd' /), (/ 2, 2 /))
+         Integer is1, is2
+         Character (Len=200) :: cwork
+
+         Do is1 = 1, 2
+            Do is2 = 1, 2
+               If (tm%R%exists(is1, is2) /= 0) Then
+                  Write (cwork, '("tmx/'//pfx//'_'//pf(is1, is2)//'_refl_",i6.6,".dat")') ki
+                  Call dump_matrix (tm%R%mat(is1, is2)%bl, trim(cwork))
+               End If
+               If (tm%T%exists(is1, is2) /= 0) Then
+                  Write (cwork, '("tmx/'//pfx//'_'//pf(is1, is2)//'_trans_",i6.6,".dat")') ki
+                  Call dump_matrix (tm%T%mat(is1, is2)%bl, trim(cwork))
+               End If
+            End Do
+         End Do
+      End Subroutine write_trans_matrices
+      Subroutine prept (tm, tval)
+         Type (t_t_matrix), Intent (In) :: tm
+         Real (Kind=DEF_DBL_PREC), Intent (Out) :: tval (2, 2)
+!!$ Local vars
+         Integer :: j, i
+
+         Do i = 1, 2
+            Do j = 1, 2
+               If (tm%exists(i, j) /= 0) Then
+                  tval (i, j) = tm%val(i, j)
+               Else
+#if defined(HAVE_NAN)
+                  tval (i, j) = 0.0d0 / 0.0d0
+#else
+                  tval (i, j) = - 100
+#endif
+               End If
+            End Do
+         End Do
+      End Subroutine prept
+
+End Module transport

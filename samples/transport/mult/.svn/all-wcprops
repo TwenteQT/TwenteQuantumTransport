@@ -1,0 +1,17 @@
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/mult
+END
+.gitignore
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/mult/.gitignore
+END
+mult.F90
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/mult/mult.F90
+END

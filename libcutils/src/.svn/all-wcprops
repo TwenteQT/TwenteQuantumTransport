@@ -1,0 +1,53 @@
+K 25
+svn:wc:ra_dav:version-url
+V 50
+/svn/codes/!svn/ver/1981/trans/trunk/libcutils/src
+END
+c_ftn_defs.h
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/1981/trans/trunk/libcutils/src/c_ftn_defs.h
+END
+deps.mk
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/codes/!svn/ver/1981/trans/trunk/libcutils/src/deps.mk
+END
+c_mkdir.c
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1981/trans/trunk/libcutils/src/c_mkdir.c
+END
+qsort.c
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/codes/!svn/ver/1981/trans/trunk/libcutils/src/qsort.c
+END
+c_fileio.c
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/codes/!svn/ver/1981/trans/trunk/libcutils/src/c_fileio.c
+END
+memstat.c
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1981/trans/trunk/libcutils/src/memstat.c
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svn/codes/!svn/ver/1981/trans/trunk/libcutils/src/Makefile
+END
+c_conv_ptr.c
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/1981/trans/trunk/libcutils/src/c_conv_ptr.c
+END

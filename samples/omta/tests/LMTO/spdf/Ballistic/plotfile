@@ -1,0 +1,40 @@
+set term png size 
+set output 'Pt_Film.png'
+
+set fit errorvariables
+
+h = 6.62607004
+ec = 1.60217662
+
+area = sqrt(3)/8 
+
+area10 = area * 5*5 
+
+elem_G_to_Ohma2 = h*ec**(-2)*10**(4)
+ff = elem_G_to_Ohma2
+
+f1(x) = a1*x+b1
+
+fit f1(x) 'G.dat' u 1:(ff*$2*area10) via a1,b1
+
+gg = 0.0392*sqrt(3)
+
+set print "rho.dat"
+print 0.128,a1*gg,a1_err*gg
+set print
+
+set key left top
+set xlabel 'z(nm)'
+set ylabel 'AR'
+
+#set yrange [0:0.02]
+
+
+plot \
+ 'G.dat' u 1:(ff*$2*area10) title '0.128' lc 1, f1(x) lc 1 title '0.128 fit',\
+
+set term x11
+set output
+replot
+
+pause -1 "Hit return to continue"

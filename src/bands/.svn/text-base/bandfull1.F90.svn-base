@@ -1,0 +1,270 @@
+!!#   $Id: band.F90 149 2006-10-26 16:29:08Z antst $
+
+#include "math_def.h"
+
+Program bandfull
+      Use transport
+      Use ando_module
+      Use atoms_module
+      Use geometry_module
+      Use structure
+      Use supercell
+      Use hamiltonian
+      Use logging
+      Use sparse_solvers
+      Use bzgrid
+      Use readcfg
+      Use rotations
+      Implicit None
+
+      Type t_bandopts
+         Integer :: loglvl, nE, irel
+         Real (Kind=DEF_DBL_PREC) :: bE, eE, specpart
+         Real (Kind=DEF_DBL_PREC) :: kpar (2), ucrit
+         Integer :: gensol, sdcdir
+         Type (t_pot_opts) :: po
+      End Type t_bandopts
+      Type (t_atoms_set) :: atoms
+      Type (t_bandopts) :: opt
+      Type (t_geometry) :: bgeo, tbgeo
+      Type (t_strconst) :: bsc
+      Type (t_mathop) :: msys, bsk
+      Type (t_potparp_options) :: optspp
+      Type (t_potpar_mats) :: bpar
+      Type (t_ando_options) :: aopts
+      Type (t_ando_sollution) :: ando
+      Real (Kind=DEF_DBL_PREC), Pointer :: k (:)
+      Real (Kind=DEF_DBL_PREC) :: stE, en
+      Integer :: is, n, nh, nn, j, nmod, i
+      Integer :: bandf (2) = (/ 292, 293 /)
+      Integer :: ebandf (2) = (/ 294, 295 /)
+      Complex (Kind=DEF_DBL_PREC), Pointer :: ons (:, :)
+      Complex (Kind=DEF_DBL_PREC), Pointer :: ofs (:, :)
+      Complex (Kind=DEF_DBL_PREC), Pointer :: hops (:, :)
+      Complex (Kind=DEF_DBL_PREC), Pointer :: ham (:, :)
+      Complex (Kind=DEF_DBL_PREC) :: ph
+      Real (Kind=DEF_DBL_PREC), Pointer :: rotm (:, :)
+      Integer :: npars
+      Real (Kind=DEF_DBL_PREC) :: kk, k1, dffact
+      Complex (Kind=DEF_DBL_PREC) :: fact
+      Integer :: lwork, info, mdf, nd, pohops
+      Complex (Kind=DEF_DBL_PREC), Pointer :: work (:)
+      Real (Kind=DEF_DBL_PREC), Pointer :: rwork (:), ev (:), kdf (:)
+      Integer, Pointer :: iwork (:)
+
+#ifdef _VERS_
+      Call do_log (1, 'Band code v'//_VERS_//' by Antst')
+#else
+      Call do_log (1, 'Band code vXXXX by Antst')
+#endif
+
+      Call band_config_init (opt)
+      Log_Level = opt%loglvl
+
+      atoms = read_atoms ('atomlist')
+      tbgeo = read_geom ('geom_b', atoms)
+      pohops = 1
+      If (opt%po%kind > 2) pohops = 2
+
+      bgeo = make_leadgeom (tbgeo, pohops, 1)
+
+      Call free_geom (tbgeo)
+
+      rotm => prep_rot_mask (bgeo, opt%po)
+
+
+      bsc = calc_screal (bgeo, 1)
+      optspp%irel = opt%irel
+      Call make_sk (bsk, bsc, opt%kpar, 1)
+
+      stE = (opt%eE-opt%bE) / (opt%nE-1)
+      en = opt%bE
+
+      Open (Unit=bandf(1), File='plotup.b', Action='write')
+      Open (Unit=bandf(2), File='plotdown.b', Action='write')
+      Open (Unit=ebandf(1), File='bandup', Action='write')
+      Open (Unit=ebandf(2), File='banddown', Action='write')
+
+      aopts%use_ev_solver = opt%gensol
+      aopts%dir = 1
+      aopts%usestates = 1
+      aopts%needEmb = 0
+      aopts%needBound = 0
+      aopts%need_split = 1
+      aopts%refine = 0
+      aopts%usestates = opt%specpart
+
+      If (opt%po%rot_mask /= 0 .And. opt%sdcdir /= 0) Then
+         aopts%rotm = spinrm (rotm(:, 1:1))
+      End If
+
+      Call prep_dec_idx (bgeo, aopts%split_idx)
+
+      n = bsc%nrows / pohops
+      nh = pohops
+
+      Allocate (ons(bsc%nrows, bsc%nrows))
+      Allocate (ofs(bsc%nrows, bsc%nrows))
+      Allocate (hops(n, n*(nh+1)))
+      Allocate (ham(n, n))
+      lwork = 4 * n
+!!$       lwork = 2 * n ** 2 + 5 * n + 1
+      Allocate (work(lwork))
+      Allocate (rwork(lwork))
+      Allocate (iwork(lwork))
+      Allocate (ev(n))
+
+      Allocate (k(bsc%nrows))
+      ph = Exp (DEF_cmplx_Ione*DEF_M_PI)
+      npars = 0
+
+      mdf = pohops
+      dffact = 1.0d0 / real (mdf, kind=8)
+!!$       Allocate (mine(mdf))
+      Allocate (kdf(mdf))
+!!$       optspp%dE=1.0d-2
+      Do nn = 1, opt%nE
+         Call calc_potpar (atoms, optspp, en)
+!!$ Prepare potential parameters matrices
+!!$ for leads and transport region
+         If (opt%po%rot_mask == 0) Then
+            bpar = make_ppar_full (bgeo, opt%po)
+         Else
+            bpar = make_ppar_full (bgeo, opt%po, rotm)
+         End If
+
+         Call prep_system (msys, bsk, bpar, opt%po, 1)
+
+         ons = sptofull (msys%c)
+         ofs = sptofull (msys%r)
+
+         Call free_mathop (msys)
+         hops (1:n, 1:n) = ons (1:n, 1:n)
+         hops (1:n, n+1:n+nh*n) = ofs (n*nh-n+1:n*nh, 1:nh*n)
+         Call free_mathop (msys)
+!!$ Solve ando problem
+         Call solve_ando (ofs, hops, n, nh, ando, aopts)
+         Do is = 1, 2
+            nmod = ando%Snin (is)
+            Do i = 1, nmod, 1
+               k (i) = Abs (imag(Log(ando%lin(ando%mask_in(i, is)))))
+               kk = k (i) * dffact
+               If (mdf > 1) Then
+                  Do nd = 1, mdf
+                     ham = hops (1:n, 1:n)
+                     k1 = dffact * real (Int(nd/2), kind=8) * 2.0d0 * DEF_M_PI - real ((-1)**nd, kind=8) * kk
+                     kdf (nd) = k1
+                     Do j = 1, nh
+                        fact = Exp (DEF_cmplx_Ione*k1*real(j, kind=8))
+                        ham = ham + (hops(:, j*n+1:(j+1)*n)*fact) + transpose (conjg(hops(:, &
+                       & j*n+1:(j+1)*n)*fact))
+                     End Do
+                     Call zheevd ('N', 'U', n, ham, n, ev, work, lwork, rwork, lwork, iwork, lwork, info)
+                     If (info /= 0) Then
+                        Write (*,*) 'EV problem'
+                        Stop
+                     End If
+                     If (minval(Abs(ev)) < opt%ucrit) kk = k1
+                  End Do
+               End If
+               Write (ebandf(is), '(2(1x,f12.8))') kk, en
+            End Do
+
+            k (nmod+1:bsc%nrows) = 0.0 / 0.0
+            Write (bandf(is), '(250(1x,f12.8))') en, (k(j), j=1, bsc%nrows)
+         End Do
+
+         Call free_ppar_f (bpar)
+         en = en + stE
+      End Do
+      Close (Unit=bandf(1))
+      Close (Unit=bandf(2))
+      Close (Unit=ebandf(1))
+      Close (Unit=ebandf(2))
+
+
+      Call do_log (1, 'Done!')
+Contains
+
+
+      Subroutine band_config_init (opt)
+         Implicit None
+         Type (t_bandopts) :: opt
+!!$ Local vars
+         Type (t_config_option), Pointer :: optlist
+         Real (Kind=8) :: t1 (2) = (/ 0.0d0, 0.0d0 /)
+         Real (Kind=DEF_DBL_PREC) :: ap
+
+         Call read_config_file ('band.conf', optlist)
+         Call do_log (1, '######################################')
+         Call do_log (1, '#     Equivalent of given config     #')
+         Call do_log (1, '######################################')
+         Call do_log (1, '')
+
+         Call do_log (1, '### Output verbosity level:')
+         opt%loglvl = getopt_i (optlist, 'LogLevel', 1)
+         Call do_log (1, '')
+         opt%bE = getopt_d (optlist, 'energy_from',-0.2d0)
+         opt%eE = getopt_d (optlist, 'energy_to', 0.2d0)
+
+         opt%ucrit = getopt_d (optlist, 'ucrit', 1.0d-6)
+
+         opt%nE = getopt_i (optlist, 'num_points', 100)
+         Call do_log (1, '')
+         Call do_log (1, '### Kind of system to solve: 1=P-S, 2=H-HOH')
+         opt%po%kind = getopt_i (optlist, 'equation_type', 1)
+         Call do_log (1, '### ')
+         Call do_log (1, '### Spin-orbit interaction parameters:')
+         Call do_log (1, '### ')
+         Call do_log (1, '### Switch on spin-orbit. Valid only if "equation_type"==2')
+         Call do_log (1, '### and "trans_full" binary used')
+         opt%po%so = getopt_i (optlist, 'SO_ON', 0)
+         Call do_log (1, '### Scaling of spin-orbit')
+         opt%po%so_scale = getopt_d (optlist, 'SO_scale', 1.0d0)
+         Call do_log (1, '######################################')
+
+         opt%po%rot_mask = getopt_i (optlist, 'rot_mask', 0)
+         Call do_log (1, '### Rotation of magnetization parameters:')
+         Call do_log (1, '### ')
+         Call do_log (1, '### Valid only if "trans_full" binary used')
+         If (opt%po%rot_mask == 1) Then
+            Call do_log (1, '### Using spin-rotation mask from external file "rot_mask"!')
+            Call do_log (1, '### For left/right lead rotations will be')
+            Call do_log (1, '### used same values as for first/last atoms!')
+            Call do_log (1, '# ROT_angle = [0.0, 0.0]')
+         Else
+            opt%po%rot_mask = 0
+            Call do_log (1, '### Angle for rotation of magnetization')
+            opt%po%rot_angle = getopt_da (optlist, 'ROT_angle', 2, t1)
+            If (sum(Abs(opt%po%rot_angle)) > 0.0d0) opt%po%rot_mask = 2
+            opt%po%rot_angle = opt%po%rot_angle *DEF_M_PI
+            Call do_log (1, '### Using embedded rotation!')
+         End If
+         Call do_log (1, '### Values in rotated potential parameters')
+         Call do_log (1, '###  smaller than "rnegl" will be neglected.')
+         opt%po%rnegl = getopt_d (optlist, 'rnegl', 1.0d-10)
+         Call do_log (1, '')
+         Call do_log (1, '### when performs spin decomposition, if')
+         Call do_log (1, '### "spin_dec_dir"= 0 , then Sz=Lz, else spin states')
+         Call do_log (1, '### correspond to Sz direction in lead')
+         opt%sdcdir = getopt_i (optlist, 'spin_dec_dir', 0)
+
+         Call do_log (1, '### for rotated magnetic lead "spin_dec_dir"= 0 will lie.')
+         Call do_log (1, '### for rotated non=magnetic lead "spin_dec_dir"= 1 will lie.')
+
+         Call do_log (1, '######################################')
+         Call do_log (1, '')
+         opt%kpar = getopt_da (optlist, 'kpar', 2, t1)
+         opt%irel = getopt_i (optlist, 'irel', 1)
+         opt%gensol = getopt_i (optlist, 'eigval_solver', 10)
+         ap = 1.0d0 / opt%po%kind
+         Call do_log (1, '### in some cases')
+         Call do_log (1, '### use ando_part_of_spectrum*100% of eigenvalues for Ando')
+         opt%specpart = getopt_d (optlist, 'ando_part_of_spectrum', ap)
+!!$ Call do_log(1,'######################################')
+         Call do_log (1, '')
+
+         Call do_log (1, '######################################')
+         Call free_option_list (optlist)
+      End Subroutine band_config_init
+End Program bandfull

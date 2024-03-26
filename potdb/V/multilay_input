@@ -1,0 +1,37 @@
+A|V
+3          # number of slabs
+7x7     # supercell
+25        # number of configurations
+-----------------------------------------------------
+Parameters:
+D = {0.18}
+K = {40}
+-----------------------------------------------------
+Slabs:
+
+ V {
+scvec1=  1,  0,  0
+scvec2  =  0,  1,  0
+scvec3 = 0,  0,  1
+nlay = 1
+stiff = 0.0
+rms = 0.0
+}
+ V {
+scvec1=  1,  0,  0
+scvec2  =  0,  1,  0
+scvec3 = 0,  0,  1
+nlay = K
+stiff = 1.0
+rms = D     #0.188244194      # 0.155638969
+}
+ V {
+scvec1=  1,  0,  0
+scvec2  =  0,  1,  0
+scvec3 = 0,  0,  1
+nlay = 1
+stiff = 0.0
+rms = 0.0
+}
+
+#0.205347147

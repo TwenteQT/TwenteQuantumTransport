@@ -1,0 +1,1918 @@
+#include "math_def.h"
+Module  mod_praxis
+Implicit None
+Type:: comblocks
+   Real (Kind=DEF_DBL_PREC):: qa
+   Real (Kind=DEF_DBL_PREC):: qb
+   Real (Kind=DEF_DBL_PREC):: qc
+   Real (Kind=DEF_DBL_PREC):: qd0
+   Real (Kind=DEF_DBL_PREC):: qd1
+   Real (Kind=DEF_DBL_PREC):: qf1
+   Integer (Kind=4):: nl
+   Integer (Kind=4):: nf
+   Real (Kind=DEF_DBL_PREC):: dmin
+   Real (Kind=DEF_DBL_PREC):: fx
+   Real (Kind=DEF_DBL_PREC):: ldt
+End Type comblocks
+!!$ Contains
+End Module  mod_praxis
+
+Function flin (n, j, l, f, x, v, q0, q1, tval,cb)
+
+!*****************************************************************************80
+
+!! FLIN is the function of one variable to be minimized by MINNY.
+
+!!$  Discussion:
+
+!!$    In fact, what is happening is that the scalar function F(X),
+!!$    where X is an N dimensional vector, is being minimized along a
+!!$    fixed line.
+
+!!$  Modified:
+
+!!$    22 May 2006
+
+!!$  Author:
+
+!!$    Richard Brent
+!!$    FORTRAN90 version by John Burkardt
+
+!!$  Reference:
+
+!!$    Richard Brent,
+!!$    Algorithms for Minimization with Derivatives,
+!!$    Prentice Hall, 1973,
+!!$    Reprinted by Dover, 2002.
+
+!!$  Parameters:
+
+!!$    Input, integer ( kind = 4 ) N, the number of variables.
+
+!!$    Input, integer ( kind = 4 ) J, indicates the kind of search.
+!!$    If J is nonzero, then the search is linear in the direction of V(*,J).
+!!$    If J is zero, then the search is parabolic, based on X, Q0 and Q1.
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) L, is the parameter determining the particular
+!!$    point at which F is to be evaluated.
+!!$    For a linear search ( J is nonzero ), L is the size of the step
+!!$    along the direction V(*,J).
+!!$    For a quadratic search ( J is zero ), L is a parameter which specifies
+!!$    a point in the plane of X, Q0 and Q1.
+
+!!$    Input, external F, is the name of the function to be minimized.
+!!$    The function should have the form
+!!$      function f(x,n)
+!!$      integer ( kind = 4 ) ( kind = 4 ) n
+!!$      real    ( Kind=DEF_DBL_PREC ) f
+!!$      real    ( Kind=DEF_DBL_PREC ) x(n)
+!!$    and accepts X and N as input, returning in F the function value.
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) X(N), the base point of the search.
+
+!!$    Input/output, integer ( kind = 4 ) NF, the function evaluation counter.
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) V(N,N), a matrix whose columns constitute
+!!$    search directions.  If J is nonzero, then a linear search is being
+!!$    carried out in the direction of V(*,J).
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) Q0(N), Q1(N), two auxiliary points used to
+!!$    determine the plane when a quadratic search is performed.
+
+!!$    Output, real ( Kind=DEF_DBL_PREC ) FLIN, the value of the function at the
+!!$    given point.
+      Use mod_praxis
+      Implicit None
+
+      Integer (Kind=4) n
+      type(comblocks):: cb
+      Real (Kind=DEF_DBL_PREC), External :: f
+      Integer :: tval
+!!$       Character (Len=1) :: tval (100)
+!!$       type(ando_t_fixspin_):: tval
+      Real (Kind=DEF_DBL_PREC) flin
+!!$       Integer (Kind=4) nf
+!!$       Integer (Kind=4) i
+      Integer (Kind=4) j
+      Real (Kind=DEF_DBL_PREC) l
+      Real (Kind=DEF_DBL_PREC):: q0 (n)
+      Real (Kind=DEF_DBL_PREC):: q1 (n)
+      Real (Kind=DEF_DBL_PREC):: v (n, n)
+      Real (Kind=DEF_DBL_PREC):: x (n)
+      Real (Kind=DEF_DBL_PREC), pointer:: t (:)
+
+     allocate(t (n))
+     
+
+      If (j /= 0) Then
+
+!!$  The search is linear.
+
+         t (1:n) = x (1:n) + l * v (1:n, j)
+
+      Else
+
+!!$  The search is along a parabolic space curve.
+
+         cb%qa = (l*(l-cb%qd1)) / (cb%qd0*(cb%qd0+cb%qd1))
+         cb%qb = ((l+cb%qd0)*(cb%qd1-l)) / (cb%qd0*cb%qd1)
+         cb%qc = (l*(l+cb%qd0)) / (cb%qd1*(cb%qd0+cb%qd1))
+
+         t (1:n) = cb%qa * q0 (1:n) + cb%qb * x (1:n) + cb%qc * q1 (1:n)
+
+      End If
+
+!!$  The function evaluation counter NF is incremented.
+
+      cb%nf = cb%nf + 1
+
+!!$  Evaluate the function.
+
+      flin = f (t, n, tval)
+      deallocate(t)
+      Return
+End Function
+Subroutine minfit (m, n, tol, ab, q)
+
+!*****************************************************************************80
+
+!! MINFIT computes the singular value decomposition of an N by N array.
+
+!!$  Discussion:
+
+!!$    This is an improved version of the EISPACK routine MINFIT
+!!$    restricted to the case M = N and P = 0.
+
+!!$    The singular values of the array AB are returned in Q.  AB is
+!!$    overwritten with the orthogonal matrix V such that u.diag(q) = ab.v,
+!!$    where U is another orthogonal matrix.
+
+!!$  Modified:
+
+!!$    22 May 2006
+
+!!$  Author:
+
+!!$    Richard Brent
+!!$    FORTRAN90 version by John Burkardt
+
+!!$  Reference:
+
+!!$    Richard Brent,
+!!$    Algorithms for Minimization with Derivatives,
+!!$    Prentice Hall, 1973,
+!!$    Reprinted by Dover, 2002.
+
+!!$    James Wilkinson, Christian Reinsch,
+!!$    Handbook for Automatic Computation,
+!!$    Volume II, Linear Algebra, Part 2,
+!!$    Springer Verlag, 1971.
+
+!!$    B Smith, J Boyle, Jack Dongarra, Burton Garbow, Y Ikebe,
+!!$    Virginia Klema, Cleve Moler,
+!!$    Matrix Eigensystem Routines, EISPACK Guide,
+!!$    Lecture Notes in Computer Science, Volume 6,
+!!$    Springer Verlag, 1976.
+
+!!$  Parameters:
+
+!!$    Input, integer ( kind = 4 ) M, the leading dimension of AB, which must be
+!!$    at least N.
+
+!!$    Input, integer ( kind = 4 ) N, the order of the matrix AB.
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) TOL, a tolerance which determines when a vector
+!!$    (a column or part of a column of the matrix) may be considered
+!!$    "essentially" equal to zero.
+
+!!$    Input/output, real ( Kind=DEF_DBL_PREC ) AB(M,N).  On input, an N by N array whose
+!!$    singular value decomposition is desired.  On output, ?
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) Q(N), ?
+
+      Implicit None
+
+      Integer (Kind=4) m
+      Integer (Kind=4) n
+
+      Real (Kind=DEF_DBL_PREC) ab (m, n)
+      Real (Kind=DEF_DBL_PREC) c
+      Real (Kind=DEF_DBL_PREC),pointer:: e (:)
+      Real (Kind=DEF_DBL_PREC) eps
+      Real (Kind=DEF_DBL_PREC) f
+      Real (Kind=DEF_DBL_PREC) g
+      Real (Kind=DEF_DBL_PREC) h
+      Integer (Kind=4) i
+      Integer (Kind=4) ii
+      Integer (Kind=4) j
+      Integer (Kind=4) k
+      Integer (Kind=4) kk
+      Integer (Kind=4) kt
+      Integer (Kind=4), Parameter :: kt_max = 30
+      Integer (Kind=4) l
+      Integer (Kind=4) l2
+      Integer (Kind=4) ll2
+      Real (Kind=DEF_DBL_PREC) q (n)
+      Real (Kind=DEF_DBL_PREC) s
+      Real (Kind=DEF_DBL_PREC) temp
+      Real (Kind=DEF_DBL_PREC) tol
+      Real (Kind=DEF_DBL_PREC) x
+      Real (Kind=DEF_DBL_PREC) y
+      Real (Kind=DEF_DBL_PREC) z
+
+      allocate(e(n))
+!!$  Householder's reduction to bidiagonal form.
+
+      If (n == 1) Then
+         q (1) = ab (1, 1)
+         ab (1, 1) = 1.0D+00
+         Return
+      End If
+
+      eps = epsilon (eps)
+      g = 0.0D+00
+      x = 0.0D+00
+
+      Do i = 1, n
+
+         e (i) = g
+         l = i + 1
+
+         s = sum (ab(1:n, i)**2)
+
+         g = 0.0D+00
+
+         If (tol <= s) Then
+
+            f = ab (i, i)
+
+            g = Sqrt (s)
+            If (0.0D+00 <= f) Then
+               g = - g
+            End If
+
+            h = f * g - s
+            ab (i, i) = f - g
+
+            Do j = l, n
+
+               f = dot_product (ab(i:n, i), ab(i:n, j)) / h
+
+               ab (i:n, j) = ab (i:n, j) + f * ab (i:n, i)
+
+            End Do
+
+         End If
+
+         q (i) = g
+
+         s = sum (ab(i, l:n)**2)
+
+         g = 0.0D+00
+
+         If (tol <= s) Then
+
+            If (i /= n) Then
+               f = ab (i, i+1)
+            End If
+
+            g = Sqrt (s)
+            If (0.0D+00 <= f) Then
+               g = - g
+            End If
+
+            h = f * g - s
+
+            If (i /= n) Then
+
+               ab (i, i+1) = f - g
+               e (l:n) = ab (i, l:n) / h
+
+               Do j = l, n
+
+                  s = dot_product (ab(j, l:n), ab(i, l:n))
+
+                  ab (j, l:n) = ab (j, l:n) + s * e (l:n)
+
+               End Do
+
+            End If
+
+         End If
+
+         y = Abs (q(i)) + Abs (e(i))
+
+      End Do
+
+      x = Max (x, y)
+
+!!$  Accumulation of right-hand transformations.
+
+      ab (n, n) = 1.0D+00
+      g = e (n)
+      l = n
+
+      Do ii = 2, n
+
+         i = n - ii + 1
+
+         If (g /= 0.0D+00) Then
+
+            h = ab (i, i+1) * g
+
+            Do j = l, n
+               ab (j, i) = ab (i, j) / h
+            End Do
+
+            Do j = l, n
+
+               s = dot_product (ab(i, l:n), ab(l:n, j))
+
+               ab (l:n, j) = ab (l:n, j) + s * ab (l:n, i)
+
+            End Do
+
+         End If
+
+         ab (i, l:n) = 0.0D+00
+         ab (l:n, i) = 0.0D+00
+         ab (i, i) = 1.0D+00
+
+         g = e (i)
+
+      End Do
+
+      l = i
+
+!!$  Diagonalization of the bidiagonal form.
+
+      eps = eps * x
+
+      Do kk = 1, n
+
+         k = n - kk + 1
+         kt = 0
+
+101      Continue
+
+         kt = kt + 1
+
+         If (kt_max < kt) Then
+            e (k) = 0.0D+00
+            Write (*, '(a)') ' '
+            Write (*, '(a)') 'MINFIT - Warning!'
+            Write (*, '(a)') '  The QR algorithm failed to converge.'
+         End If
+
+         Do ll2 = 1, k
+
+            l2 = k - ll2 + 1
+            l = l2
+
+            If (Abs(e(l)) <= eps) Then
+               Go To 120
+            End If
+
+            If (l /= 1) Then
+               If (Abs(q(l-1)) <= eps) Then
+                  Exit
+               End If
+            End If
+
+         End Do
+
+!!$  Cancellation of E(L) if 1 < L.
+
+         c = 0.0D+00
+         s = 1.0D+00
+
+         Do i = l, k
+
+            f = s * e (i)
+            e (i) = c * e (i)
+            If (Abs(f) <= eps) Then
+               Go To 120
+            End If
+            g = q (i)
+
+!!$  q(i) = h = sqrt(g*g + f*f).
+
+            If (Abs(f) < Abs(g)) Then
+               h = Abs (g) * Sqrt (1.0D+00+(f/g)**2)
+            Else If (f == 0.0D+00) Then
+               h = 0.0D+00
+            Else
+               h = Abs (f) * Sqrt (1.0D+00+(g/f)**2)
+            End If
+
+            q (i) = h
+
+            If (h == 0.0D+00) Then
+               g = 1.0D+00
+               h = 1.0D+00
+            End If
+
+            c = g / h
+            s = - f / h
+
+         End Do
+
+!!$  Test for convergence.
+
+120      Continue
+
+         z = q (k)
+
+         If (l == k) Then
+            If (z < 0.0D+00) Then
+               q (k) = - z
+               ab (1:n, k) = - ab (1:n, k)
+            End If
+            !Cycle
+            Exit !update 2021
+         End If
+
+!!$  Shift from bottom 2*2 minor.
+
+         x = q (l)
+         y = q (k-1)
+         g = e (k-1)
+         h = e (k)
+         f = ((y-z)*(y+z)+(g-h)*(g+h)) / (2.0D+00*h*y)
+
+         g = Sqrt (f*f+1.0D+00)
+
+         If (f < 0.0D+00) Then
+            temp = f - g
+         Else
+            temp = f + g
+         End If
+
+         f = ((x-z)*(x+z)+h*(y/temp-h)) / x
+
+!!$  Next QR transformation.
+
+         c = 1.0D+00
+         s = 1.0D+00
+
+         Do i = l + 1, k
+
+            g = e (i)
+            y = q (i)
+            h = s * g
+            g = g * c
+
+            If (Abs(f) < Abs(h)) Then
+               z = Abs (h) * Sqrt (1.0D+00+(f/h)**2)
+            Else If (f == 0.0D+00) Then
+               z = 0.0D+00
+            Else
+               z = Abs (f) * Sqrt (1.0D+00+(h/f)**2)
+            End If
+
+            e (i-1) = z
+
+            If (z == 0.0D+00) Then
+               f = 1.0D+00
+               z = 1.0D+00
+            End If
+
+            c = f / z
+            s = h / z
+            f = x * c + g * s
+            g = - x * s + g * c
+            h = y * s
+            y = y * c
+
+            Do j = 1, n
+               x = ab (j, i-1)
+               z = ab (j, i)
+               ab (j, i-1) = x * c + z * s
+               ab (j, i) = - x * s + z * c
+            End Do
+
+            If (Abs(f) < Abs(h)) Then
+               z = Abs (h) * Sqrt (1.0D+00+(f/h)**2)
+            Else If (f == 0.0D+00) Then
+               z = 0.0D+00
+            Else
+               z = Abs (f) * Sqrt (1.0D+00+(h/f)**2)
+            End If
+
+            q (i-1) = z
+
+            If (z == 0.0D+00) Then
+               f = 1.0D+00
+               z = 1.0D+00
+            End If
+
+            c = f / z
+            s = h / z
+            f = c * g + s * y
+            x = - s * g + c * y
+
+         End Do
+
+         e (l) = 0.0D+00
+         e (k) = f
+         q (k) = x
+         Go To 101
+
+      End Do
+      deallocate(e)
+      Return
+End Subroutine
+Subroutine minny (n, j, nits, d2, x1, f1, fk, f, x, t, h, v, q0, q1, tval,cb)
+
+!*****************************************************************************80
+
+!! MINNY minimizes a scalar function of N variables along a line.
+
+!!$  Discussion:
+
+!!$    MINNY minimizes F along the line from X in the direction V(*,J) unless
+!!$    J is less than 1, when a quadratic search is made in the plane
+!!$    defined by q0,q1,x.
+
+!!$    If fk = .true., then f1 is flin(x1).  Otherwise x1 and f1 are ignored
+!!$    on entry unless final fx is greater than f1.
+
+!!$  Modified:
+
+!!$    22 May 2006
+
+!!$  Author:
+
+!!$    Richard Brent
+!!$    FORTRAN90 version by John Burkardt
+
+!!$  Reference:
+
+!!$    Richard Brent,
+!!$    Algorithms for Minimization with Derivatives,
+!!$    Prentice Hall, 1973,
+!!$    Reprinted by Dover, 2002.
+
+!!$  Parameters:
+
+!!$    Input, integer ( kind = 4 ) N, the number of variables.
+
+!!$    Input, integer ( kind = 4 ) J, indicates the kind of search.
+!!$    If J is positive, then the search is linear in the direction of V(*,J).
+!!$    If J is zero, then the search is parabolic, based on X, Q0 and Q1.
+
+!!$    Input, integer ( kind = 4 ) NITS, the maximum number of times the interval may be
+!!$    halved to retry the calculation.
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) D2, is either zero, or an approximation to
+!!$    the value of (1/2) times the second derivative of F.
+
+!!$    Input/output, real ( Kind=DEF_DBL_PREC ) X1, on entry, an estimate of the
+!!$    distance from X to the minimum along V(*,J), or, if J = 0, a curve.
+!!$    On output, the distance between X and the minimizer that was found.
+
+!!$    Input/output, real ( Kind=DEF_DBL_PREC ) F1, ?
+
+!!$    Input, logical FK; if FK is TRUE, then on input F1 contains
+!!$    the value FLIN(X1).
+
+!!$    Input, external real ( Kind=DEF_DBL_PREC ) F, is the name of the function to
+!!$    be minimized.  The function should have the form
+!!$      function f(x,n)
+!!$      integer ( kind = 4 ) n
+!!$      real    ( Kind=DEF_DBL_PREC ) f
+!!$      real    ( Kind=DEF_DBL_PREC ) x(n)
+!!$    and accepts X and N as input, returning in F the function value.
+
+!!$    ?, real ( Kind=DEF_DBL_PREC ) X(N), ?
+
+!!$    ?, real ( Kind=DEF_DBL_PREC ) T, ?
+
+!!$    ?, real ( Kind=DEF_DBL_PREC ) H, ?
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) V(N,N), a matrix whose columns are direction
+!!$    vectors along which the function may be minimized.
+
+!!$    ?, real ( Kind=DEF_DBL_PREC ) Q0(N), ?
+
+!!$    ?, real ( Kind=DEF_DBL_PREC ) Q1(N), ?
+      Use mod_praxis
+      Implicit None
+      
+      type(comblocks):: cb
+
+      Real (Kind=DEF_DBL_PREC) d1
+      Real (Kind=DEF_DBL_PREC) d2
+      Logical dz
+      Real (Kind=DEF_DBL_PREC), External :: f
+      Integer :: tval
+!!$       Character (Len=1) :: tval (100)
+!!$       type(ando_t_fixspin_):: tval
+      Real (Kind=DEF_DBL_PREC) f0
+      Real (Kind=DEF_DBL_PREC) f1
+      Real (Kind=DEF_DBL_PREC) f2
+      Logical fk
+      Real (Kind=DEF_DBL_PREC) flin
+      Real (Kind=DEF_DBL_PREC) fm
+      Real (Kind=DEF_DBL_PREC) h
+!!$       Integer (Kind=4) i
+      Integer (Kind=4) j
+      Integer (Kind=4) k
+      Real (Kind=DEF_DBL_PREC) m2
+      Real (Kind=DEF_DBL_PREC) m4
+      Real (Kind=DEF_DBL_PREC) machep
+      Integer (Kind=4) n
+      Integer (Kind=4) nits
+      Real (Kind=DEF_DBL_PREC) q0 (n)
+      Real (Kind=DEF_DBL_PREC) q1 (n)
+      Real (Kind=DEF_DBL_PREC) s
+      Real (Kind=DEF_DBL_PREC) sf1
+      Real (Kind=DEF_DBL_PREC) small
+      Real (Kind=DEF_DBL_PREC) sx1
+      Real (Kind=DEF_DBL_PREC) t
+      Real (Kind=DEF_DBL_PREC) t2
+      Real (Kind=DEF_DBL_PREC) temp
+      Real (Kind=DEF_DBL_PREC) v (n, n)
+      Real (Kind=DEF_DBL_PREC) x (n)
+      Real (Kind=DEF_DBL_PREC) x1
+      Real (Kind=DEF_DBL_PREC) x2
+      Real (Kind=DEF_DBL_PREC) xm
+
+      machep = epsilon (machep)
+      small = machep ** 2
+      m2 = Sqrt (machep)
+      m4 = Sqrt (m2)
+      sf1 = f1
+      sx1 = x1
+      k = 0
+      xm = 0.0D+00
+      fm = cb%fx
+      f0 = cb%fx
+      dz = (d2 < machep)
+
+!!$  Find the step size.
+
+      s = Sqrt (sum(x(1:n)**2))
+
+      If (dz) Then
+         temp = cb%dmin
+      Else
+         temp = d2
+      End If
+
+      t2 = m4 * Sqrt (Abs(cb%fx)/temp+s*cb%ldt) + m2 * cb%ldt
+      s = m4 * s + t
+      If (dz .And. s < t2) Then
+         t2 = s
+      End If
+
+      t2 = Max (t2, small)
+      t2 = Min (t2, 0.01D+00*h)
+
+      If (fk .And. f1 <= fm) Then
+         xm = x1
+         fm = f1
+      End If
+
+      If ( .Not. fk .Or. Abs(x1) < t2) Then
+
+         If (0.0D+00 <= x1) Then
+            temp = 1.0D+00
+         Else
+            temp = - 1.0D+00
+         End If
+
+         x1 = temp * t2
+         f1 = flin (n, j, x1, f, x, v, q0, q1, tval,cb)
+
+      End If
+
+      If (f1 <= fm) Then
+         xm = x1
+         fm = f1
+      End If
+
+!!$  Evaluate FLIN at another point and estimate the second derivative.
+
+4     Continue
+
+      If (dz) Then
+
+         If (f1 <= f0) Then
+            x2 = 2.0D+00 * x1
+         Else
+            x2 = - x1
+         End If
+
+         f2 = flin (n, j, x2, f, x, v, q0, q1, tval,cb)
+
+         If (f2 <= fm) Then
+            xm = x2
+            fm = f2
+         End If
+
+         d2 = (x2*(f1-f0)-x1*(f2-f0)) / ((x1*x2)*(x1-x2))
+
+      End If
+
+!!$  Estimate the first derivative at 0.
+
+      d1 = (f1-f0) / x1 - x1 * d2
+      dz = .True.
+
+!!$  Predict the minimum.
+
+      If (d2 <= small) Then
+
+         If (0.0D+00 <= d1) Then
+            x2 = - h
+         Else
+            x2 = h
+         End If
+
+      Else
+
+         x2 = (-0.5D+00*d1) / d2
+
+      End If
+
+      If (h < Abs(x2)) Then
+
+         If (x2 <= 0.0D+00) Then
+            x2 = - h
+         Else
+            x2 = h
+         End If
+
+      End If
+
+!!$  Evaluate F at the predicted minimum.
+
+      Do
+
+         f2 = flin (n, j, x2, f, x,  v, q0, q1, tval,cb)
+
+         If (nits <= k .Or. f2 <= f0) Then
+            Exit
+         End If
+
+         k = k + 1
+
+         If (f0 < f1 .And. 0.0D+00 < x1*x2) Then
+            Go To 4
+         End If
+
+         x2 = 0.5D+00 * x2
+
+      End Do
+
+!!$  Increment the one-dimensional search counter.
+
+      cb%nl = cb%nl + 1
+
+      If (fm < f2) Then
+         x2 = xm
+      Else
+         fm = f2
+      End If
+
+!!$  Get a new estimate of the second derivative.
+
+      If (small < Abs(x2*(x2-x1))) Then
+         d2 = (x2*(f1-f0)-x1*(fm-f0)) / ((x1*x2)*(x1-x2))
+      Else
+         If (0 < k) Then
+            d2 = 0.0D+00
+         End If
+      End If
+
+      d2 = Max (d2, small)
+
+      x1 = x2
+      cb%fx = fm
+
+      If (sf1 < cb%fx) Then
+         cb%fx = sf1
+         x1 = sx1
+      End If
+
+!!$  Update X for linear but not parabolic search.
+
+      If (j /= 0) Then
+
+         x (1:n) = x (1:n) + x1 * v (1:n, j)
+
+      End If
+
+      Return
+End Subroutine
+Function praxis (t0, h0, n,  x, f, tval)
+
+!*****************************************************************************80
+
+!! PRAXIS seeks an N-dimensional minimizer X of a scalar function F(X).
+
+!!$  Discussion:
+
+!!$    PRAXIS returns the minimum of the function F(X,N) of N variables
+!!$    using the principal axis method.  The gradient of the function is
+!!$    not required.
+
+!!$    The approximating quadratic form is
+
+!!$      Q(x') = F(x,n) + (1/2) * (x'-x)' * A * (x'-x)
+
+!!$    where X is the best estimate of the minimum and
+
+!!$      A = inverse(V') * D * inverse(V)
+
+!!$    V(*,*) is the matrix of search directions;
+!!$    D(*) is the array of second differences.
+
+!!$    If F(X) has continuous second derivatives near X0, then A will tend
+!!$    to the hessian of F at X0 as X approaches X0.
+
+!!$  Modified:
+
+!!$    22 May 2006
+
+!!$  Author:
+
+!!$    Richard Brent
+!!$    FORTRAN90 version by John Burkardt
+
+!!$  Reference:
+
+!!$    Richard Brent,
+!!$    Algorithms for Minimization with Derivatives,
+!!$    Prentice Hall, 1973,
+!!$    Reprinted by Dover, 2002.
+
+!!$  Parameters:
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) T0, is a tolerance.  PRAXIS attempts to return
+!!$    praxis = f(x) such that if X0 is the true local minimum near X, then
+!!$    norm ( x - x0 ) < T0 + sqrt ( EPSILON ( X ) ) * norm ( X ),
+!!$    where EPSILON ( X ) is the machine precision for X.
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) H0, is the maximum step size.  H0 should be
+!!$    set to about the maximum distance from the initial guess to the minimum.
+!!$    If H0 is set too large or too small, the initial rate of
+!!$    convergence may be slow.
+
+!!$    Input, integer ( kind = 4 ) N, the number of variables.
+
+!!$    Input, integer ( kind = 4 ) PRIN, controls the printing of intermediate results.
+!!$    0, nothing is printed.
+!!$    1, F is printed after every n+1 or n+2 linear minimizations.
+!!$       final X is printed, but intermediate X is printed only
+!!$       if N is at most 4.
+!!$    2, the scale factors and the principal values of the approximating
+!!$       quadratic form are also printed.
+!!$    3, X is also printed after every few linear minimizations.
+!!$    4, the principal vectors of the approximating quadratic form are
+!!$       also printed.
+
+!!$    Input/output, real ( Kind=DEF_DBL_PREC ) X(N), is an array containing on entry a
+!!$    guess of the point of minimum, on return the estimated point of minimum.
+
+!!$    Input, external real ( Kind=DEF_DBL_PREC ) F, is the name of the function to be
+!!$    minimized.  The function should have the form
+!!$      function f(x,n)
+!!$      integer ( kind = 4 ) n
+!!$      real    ( Kind=DEF_DBL_PREC ) f
+!!$      real    ( Kind=DEF_DBL_PREC ) x(n)
+!!$    and accepts X and N as input, returning in F the function value.
+
+!!$    Output, real ( Kind=DEF_DBL_PREC ) PRAXIS, the function value at the minimizer.
+
+      Use mod_praxis
+
+      Implicit None
+
+      Integer (Kind=4) n
+
+      Real (Kind=DEF_DBL_PREC),pointer:: d (:)
+      Real (Kind=DEF_DBL_PREC) df
+      Real (Kind=DEF_DBL_PREC) dn
+      Real (Kind=DEF_DBL_PREC) dni
+      Real (Kind=DEF_DBL_PREC), External :: f
+      Integer :: tval
+!!$       Character (Len=1) :: tval (100)
+!!$ type(ando_t_fixspin_):: tval
+      Real (Kind=DEF_DBL_PREC) f1
+      Real (Kind=DEF_DBL_PREC) h
+      Real (Kind=DEF_DBL_PREC) h0
+      Integer (Kind=4) i
+      Integer (Kind=4) ii
+      Logical illc
+!!$       Integer (Kind=4), Save :: iseed = 1234567
+      Integer (Kind=4) j
+      Integer (Kind=4) k
+      Integer (Kind=4) k2
+      Integer (Kind=4) kl
+      Integer (Kind=4) kt
+      Integer (Kind=4) ktm
+      Real (Kind=DEF_DBL_PREC) large
+      Real (Kind=DEF_DBL_PREC) ldfac
+      Real (Kind=DEF_DBL_PREC) lds
+      Real (Kind=DEF_DBL_PREC) m2
+      Real (Kind=DEF_DBL_PREC) m4
+      Real (Kind=DEF_DBL_PREC) machep
+      Integer (Kind=4) nits
+      Real (Kind=DEF_DBL_PREC) praxis
+!!$       Integer (Kind=4) prin
+      Real (Kind=DEF_DBL_PREC),pointer:: q0 (:)
+      Real (Kind=DEF_DBL_PREC),pointer:: q1 (:)
+      Real (Kind=DEF_DBL_PREC) r
+      Real (Kind=DEF_DBL_PREC) s
+      Real (Kind=DEF_DBL_PREC) scbd
+      Real (Kind=DEF_DBL_PREC) sf
+      Real (Kind=DEF_DBL_PREC) sl
+      Real (Kind=DEF_DBL_PREC) small
+      Real (Kind=DEF_DBL_PREC) t
+      Real (Kind=DEF_DBL_PREC) t0
+      Real (Kind=DEF_DBL_PREC) t2
+      Real (Kind=DEF_DBL_PREC),pointer:: v (:, :)
+      Real (Kind=DEF_DBL_PREC) value
+      Real (Kind=DEF_DBL_PREC) vlarge
+      Real (Kind=DEF_DBL_PREC) vsmall
+      Real (Kind=DEF_DBL_PREC) x (n)
+      Real (Kind=DEF_DBL_PREC),pointer:: y (:)
+      Real (Kind=DEF_DBL_PREC),pointer:: z (:)
+      Integer (Kind=4) seed_size
+      Integer (Kind=4), allocatable :: seed(:)
+
+      type(comblocks), pointer:: cb(:)
+      allocate(cb(1))
+
+      allocate(y (n),z (n),v (n, n),q0 (n),q1 (n),d (n))
+
+!!$  Initialization.
+      call random_seed()
+      call random_seed(size=seed_size)
+      allocate(seed(seed_size))
+      seed(:)=314159265
+
+      machep = epsilon (machep)
+      small = machep * machep
+      vsmall = small * small
+      large = 1.0D+00 / small
+      vlarge = 1.0D+00 / vsmall
+      m2 = Sqrt (machep)
+      m4 = Sqrt (m2)
+
+!!$  Heuristic numbers:
+
+!!$  If the axes may be badly scaled (which is to be avoided if
+!!$  possible), then set SCBD = 10.  Otherwise set SCBD = 1.
+
+!!$  If the problem is known to be ill-conditioned, initialize ILLC = true.
+
+!!$  KTM is the number of iterations without improvement before the
+!!$  algorithm terminates.  KTM = 4 is very cautious; usually KTM = 1
+!!$  is satisfactory.
+
+      scbd = 1.0D+00
+      illc = .False.
+      ktm = 1
+
+      If (illc) Then
+         ldfac = 0.1D+00
+      Else
+         ldfac = 0.01D+00
+      End If
+
+      kt = 0
+      cb%nl = 0
+      cb%nf = 1
+      cb%fx = f (x, n, tval)
+      cb%qf1 = cb%fx
+      t = small + Abs (t0)
+      t2 = t
+      cb%dmin = small
+      h = h0
+      h = Max (h, 100.0D+00*t)
+      cb%ldt = h
+
+!!$  The initial set of search directions V is the identity matrix.
+
+      v (1:n, 1:n) = 0.0D+00
+      Do i = 1, n
+         v (i, i) = 1.0D+00
+      End Do
+
+      d (1) = 0.0D+00
+      cb%qd0 = 0.0D+00
+      q0 (1:n) = x (1:n)
+      q1 (1:n) = x (1:n)
+
+!!$       If (0 < prin) Then
+!!$          Call print2 (n, x, prin, fx, nf, nl)
+!!$       End If
+
+!!$  The main loop starts here.
+
+      Do
+
+         sf = d (1)
+         d (1) = 0.0D+00
+         s = 0.0D+00
+
+!!$  Minimize along the first direction v(*,1).
+
+         nits = 2
+         value = cb(1)%fx
+
+         Call minny (n, 1, nits, d(1), s, value, .False., f, x, t, h, v, q0, q1, tval,cb(1))
+
+         If (s <= 0.0D+00) Then
+            v (1:n, 1) = - v (1:n, 1)
+         End If
+
+         If (sf <= 0.9D+00*d(1) .Or. d(1) <= 0.9D+00*sf) Then
+            d (2:n) = 0.0D+00
+         End If
+
+!!$  The inner loop starts here.
+
+         Do k = 2, n
+
+            y (1:n) = x (1:n)
+
+            sf = cb(1)%fx
+
+            If (0 < kt) Then
+               illc = .True.
+            End If
+
+80          Continue
+
+            kl = k
+            df = 0.0D+00
+
+!!$  A random step follows (to avoid resolution valleys).
+!!$  PRAXIS assumes that the random number generator returns a random
+!!$  number uniformly distributed in (0,1).
+
+            If (illc) Then
+               seed(:)=314159265
+               call random_seed(put=seed)
+               Do i = 1, n
+                  Call random_number (harvest=r)
+                  s = (0.1D+00*cb(1)%ldt+t2*10.0D+00**kt) * (r-0.5D+00)
+                  z (i) = s
+                  x (1:n) = x (1:n) + s * v (1:n, i)
+               End Do
+
+               cb(1)%fx = f (x, n, tval)
+               cb(1)%nf = cb(1)%nf + 1
+
+            End If
+
+!!$  Minimize along the "non-conjugate" directions V(*,K),...,V(*,N).
+
+            Do k2 = k, n
+
+               sl = cb(1)%fx
+               s = 0.0D+00
+               nits = 2
+               value = cb(1)%fx
+               
+               Call minny (n, k2, nits, d(k2), s, value, .False., f, x, t, h, v, q0, q1, tval,cb(1))
+
+               If (illc) Then
+                  s = d (k2) * ((s+z(k2))**2)
+               Else
+                  s = sl - cb(1)%fx
+               End If
+
+               If (df <= s) Then
+                  df = s
+                  kl = k2
+               End If
+
+            End Do
+
+!!$  If there was not much improvement on the first try, set
+!!$  ILLC = true and start the inner loop again.
+
+            If ( .Not. illc) Then
+               If (df < Abs(100.0D+00*machep*cb(1)%fx)) Then
+                  illc = .True.
+                  Go To 80
+               End If
+            End If
+
+!!$             If (k == 2 .And. 1 < prin) Then
+!!$                Call r8vec_print (n, d, '  The second difference array')
+!!$             End If
+
+!!$  Minimize along the "conjugate" directions V(*,1),...,V(*,K-1).
+
+            Do k2 = 1, k - 1
+
+               s = 0.0D+00
+               nits = 2
+               value = cb(1)%fx
+
+               Call minny (n, k2, nits, d(k2), s, value, .False., f, x, t, h, v, q0, q1, tval,cb(1))
+
+            End Do
+
+            f1 = cb(1)%fx
+            cb(1)%fx = sf
+            lds = 0
+
+            Do i = 1, n
+               sl = x (i)
+               x (i) = y (i)
+               sl = sl - y (i)
+               y (i) = sl
+               lds = lds + sl ** 2
+            End Do
+
+            lds = Sqrt (lds)
+
+!!$  Discard direction V(*,kl).
+
+!!$  If no random step was taken, V(*,KL) is the "non-conjugate"
+!!$  direction along which the greatest improvement was made.
+
+            If (small < lds) Then
+
+               Do ii = 1, kl - k
+                  i = kl - ii
+                  Do j = 1, n
+                     v (j, i+1) = v (j, i)
+                  End Do
+                  d (i+1) = d (i)
+               End Do
+
+               d (k) = 0
+               v (1:n, k) = y (1:n) / lds
+
+!!$  Minimize along the new "conjugate" direction V(*,k), which is
+!!$  the normalized vector:  (new x) - (old x).
+
+               nits = 4
+               value = f1
+
+               Call minny (n, k, nits, d(k), lds, value, .True., f, x, t, h, v, q0, q1, tval,cb(1))
+
+               If (lds <= 0.0D+00) Then
+                  lds = - lds
+                  v (1:n, k) = - v (1:n, k)
+               End If
+
+            End If
+
+            cb%ldt = ldfac * cb%ldt
+            cb%ldt = Max (cb%ldt, lds)
+
+!!$             If (0 < prin) Then
+!!$                Call print2 (n, x, prin, fx, nf, nl)
+!!$             End If
+
+            t2 = m2 * Sqrt (sum(x(1:n)**2)) + t
+
+!!$  See whether the length of the step taken since starting the
+!!$  inner loop exceeds half the tolerance.
+
+            If (0.5D+00*t2 < cb(1)%ldt) Then
+               kt = - 1
+            End If
+
+            kt = kt + 1
+
+            If (ktm < kt) Then
+               Go To 400
+            End If
+
+         End Do
+
+!!$  The inner loop ends here.
+
+!!$  Try quadratic extrapolation in case we are in a curved valley.
+
+171      Continue
+
+         Call quad (n, f, x, t, h, v, q0, q1, tval,cb(1))
+
+         d (1:n) = 1.0D+00 / Sqrt (d(1:n))
+
+         dn = maxval (d(1:n))
+
+!!$          If (3 < prin) Then
+!!$             Call r8mat_print (v, n, n, n, '  The new direction vectors')
+!!$          End If
+
+         Do j = 1, n
+            v (1:n, j) = (d(j)/dn) * v (1:n, j)
+         End Do
+
+!!$  Scale the axes to try to reduce the condition number.
+
+         If (1.0D+00 < scbd) Then
+
+            Do i = 1, n
+               z (i) = Sqrt (sum(v(i, 1:n)**2))
+               z (i) = Max (z(i), m4)
+            End Do
+
+            s = minval (z(1:n))
+
+            Do i = 1, n
+
+               sl = s / z (i)
+               z (i) = 1.0D+00 / sl
+
+               If (scbd < z(i)) Then
+                  sl = 1.0D+00 / scbd
+                  z (i) = scbd
+               End If
+
+               v (i, 1:n) = sl * v (i, 1:n)
+
+            End Do
+
+         End If
+
+!!$  Calculate a new set of orthogonal directions before repeating
+!!$  the main loop.
+
+!!$  Transpose V for MINFIT:
+
+         v (1:n, 1:n) = transpose (v(1:n, 1:n))
+
+!!$  Call MINFIT to find the singular value decomposition of V.
+
+!!$  This gives the principal values and principal directions of the
+!!$  approximating quadratic form without squaring the condition number.
+
+         Call minfit (n, n, vsmall, v, d)
+
+!!$  Unscale the axes.
+
+         If (1.0D+00 < scbd) Then
+
+            Do i = 1, n
+               v (i, 1:n) = z (i) * v (i, 1:n)
+            End Do
+
+            Do i = 1, n
+
+               s = Sqrt (sum(v(1:n, i)**2))
+
+               d (i) = s * d (i)
+               v (1:n, i) = v (1:n, i) / s
+
+            End Do
+
+         End If
+
+         Do i = 1, n
+
+            dni = dn * d (i)
+
+            If (large < dni) Then
+               d (i) = vsmall
+            Else If (dni < small) Then
+               d (i) = vlarge
+            Else
+               d (i) = 1.0D+00 / dni ** 2
+            End If
+
+         End Do
+
+!!$  Sort the eigenvalues and eigenvectors.
+
+         Call sort (n, n, d, v)
+
+!!$  Determine the smallest eigenvalue.
+
+         cb(1)%dmin = Max (d(n), small)
+
+!!$  The ratio of the smallest to largest eigenvalue determines whether
+!!$  the system is ill conditioned.
+
+         If (cb(1)%dmin < m2*d(1)) Then
+            illc = .True.
+         Else
+            illc = .False.
+         End If
+
+!!$          If (1 < prin) Then
+!!$
+!!$             If (1.0D+00 < scbd) Then
+!!$                Call r8vec_print (n, z, '  The scale factors')
+!!$             End If
+!!$
+!!$             Call r8vec_print (n, d, '  Principal values of the quadratic form')
+!!$
+!!$          End If
+
+!!$          If (3 < prin) Then
+!!$             Call r8mat_print (v, n, n, n, '  The principal axes:')
+!!$          End If
+
+!!$  The main loop ends here.
+
+      End Do
+
+400   Continue
+
+!!$       If (0 < prin) Then
+!!$          Call r8vec_print (n, x, '  X:')
+!!$       End If
+
+      praxis = cb(1)%fx
+      deallocate(cb)
+      deallocate(y,z ,v ,q0,q1 ,d )
+      call init_random_seed_pr ()
+      Return
+End Function
+Subroutine print2 (n, x, prin, fx, nf, nl)
+
+!*****************************************************************************80
+
+!! PRINT2 prints certain data about the progress of the iteration.
+
+!!$  Modified:
+
+!!$    22 May 2006
+
+!!$  Author:
+
+!!$    Richard Brent
+!!$    FORTRAN90 version by John Burkardt
+
+!!$  Reference:
+
+!!$    Richard Brent,
+!!$    Algorithms for Minimization with Derivatives,
+!!$    Prentice Hall, 1973,
+!!$    Reprinted by Dover, 2002.
+
+!!$  Parameters:
+
+!!$    Input, integer ( kind = 4 ) N, the number of variables.
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) X(N), the current estimate of the minimizer.
+
+!!$    Input, integer ( kind = 4 ) PRIN, the user-specifed print level.
+!!$    0, nothing is printed.
+!!$    1, F is printed after every n+1 or n+2 linear minimizations.
+!!$       final X is printed, but intermediate X is printed only
+!!$       if N is at most 4.
+!!$    2, the scale factors and the principal values of the approximating
+!!$       quadratic form are also printed.
+!!$    3, X is also printed after every few linear minimizations.
+!!$    4, the principal vectors of the approximating quadratic form are
+!!$       also printed.
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) FX, the smallest value of F(X) found so far.
+
+!!$    Input, integer ( kind = 4 ) NF, the number of function evaluations.
+
+!!$    Input, integer ( kind = 4 ) NL, the number of linear searches.
+
+      Implicit None
+
+      Integer (Kind=4) n
+
+      Real (Kind=DEF_DBL_PREC) fx
+      Integer (Kind=4) nf
+      Integer (Kind=4) nl
+      Integer (Kind=4) prin
+      Real (Kind=DEF_DBL_PREC) x (n)
+
+      Write (*, '(a)') ' '
+      Write (*, '(a,i8)') '  Linear searches      ', nl
+      Write (*, '(a,i8)') '  Function evaluations ', nf
+
+      If (n <= 4 .Or. 2 < prin) Then
+         Write (*, '(a)') ' '
+         Write (*, '(a)') 'X:'
+         Write (*, '(5g14.6)') x (1:n)
+      End If
+
+      Write (*, '(a)') ' '
+      Write (*, '(a,g14.6)') 'FX: ', fx
+
+      Return
+End Subroutine print2
+
+Subroutine quad (n, f, x, t, h, v, q0, q1, tval,cb)
+
+!*****************************************************************************80
+
+!! QUAD seeks to minimize the scalar function F along a particular curve.
+
+!!$  Discussion:
+
+!!$    The minimizer to be sought is required to lie on a curve defined
+!!$    by Q0, Q1 and X.
+
+!!$  Modified:
+
+!!$    22 May 2006
+
+!!$  Author:
+
+!!$    Richard Brent
+!!$    FORTRAN90 version by John Burkardt
+
+!!$  Reference:
+
+!!$    Richard Brent,
+!!$    Algorithms for Minimization with Derivatives,
+!!$    Prentice Hall, 1973,
+!!$    Reprinted by Dover, 2002.
+
+!!$  Parameters:
+
+!!$    Input, integer ( kind = 4 ) N, the number of variables.
+
+!!$    Input, external real ( Kind=DEF_DBL_PREC ) F, is the name of the function to
+!!$    be minimized.  The function should have the form
+!!$      function f(x,n)
+!!$      integer ( kind = 4 ) n
+!!$      real    ( Kind=DEF_DBL_PREC ) f
+!!$      real    ( Kind=DEF_DBL_PREC ) x(n)
+!!$    and accepts X and N as input, returning in F the function value.
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) X(N), ?
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) T, ?
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) H, ?
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) V(N,N), the matrix of search directions.
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) Q0(N), Q1(N), two auxiliary points used to define
+!!$    a curve through X.
+      Use mod_praxis
+
+      Implicit None
+
+      Integer (Kind=4) n
+      type(comblocks):: cb
+      Real (Kind=DEF_DBL_PREC), External :: f
+      Integer :: tval
+!!$       Character (Len=1) :: tval (100)
+!!$       type(ando_t_fixspin_):: tval
+      Real (Kind=DEF_DBL_PREC) h
+      Integer (Kind=4) i
+      Real (Kind=DEF_DBL_PREC) l
+      Real (Kind=DEF_DBL_PREC) machep
+      Integer (Kind=4) nits
+      Real (Kind=DEF_DBL_PREC) q0 (n)
+      Real (Kind=DEF_DBL_PREC) q1 (n)
+      Real (Kind=DEF_DBL_PREC) s
+      Real (Kind=DEF_DBL_PREC) t
+      Real (Kind=DEF_DBL_PREC) temp
+      Real (Kind=DEF_DBL_PREC) v (n, n)
+      Real (Kind=DEF_DBL_PREC) value
+      Real (Kind=DEF_DBL_PREC) x (n)
+
+      machep = epsilon (machep)
+
+      temp = cb%fx
+      cb%fx = cb%qf1
+      cb%qf1 = temp
+
+!!$       Call r8vec_swap (n, x, q1)
+      call DSWAP(n,x,1,q1,1)
+
+      cb%qd1 = Sqrt (sum((x(1:n)-q1(1:n))**2))
+
+      l = cb%qd1
+      s = 0.0D+00
+
+      If (cb%qd0 <= 0.0D+00 .Or. cb%qd1 <= 0.0D+00 .Or. cb%nl < 3*n**2) Then
+
+         cb%fx = cb%qf1
+         cb%qa = 0.0D+00
+         cb%qb = 0.0D+00
+         cb%qc = 1.0D+00
+
+      Else
+
+         nits = 2
+         value = cb%qf1
+
+         Call minny (n, 0, nits, s, l, value, .True., f, x, t, h, v, q0, q1, tval,cb)
+
+         cb%qa = (l*(l-cb%qd1)) / (cb%qd0*(cb%qd0+cb%qd1))
+         cb%qb = ((l+cb%qd0)*(cb%qd1-l)) / (cb%qd0*cb%qd1)
+         cb%qc = (l*(l+cb%qd0)) / (cb%qd1*(cb%qd0+cb%qd1))
+
+      End If
+
+      cb%qd0 = cb%qd1
+
+      Do i = 1, n
+         s = q0 (i)
+         q0 (i) = x (i)
+         x (i) = (cb%qa*s+cb%qb*x(i)) + cb%qc * q1 (i)
+      End Do
+
+      Return
+End Subroutine
+Subroutine r8mat_print (m, n, a, title)
+
+!*****************************************************************************80
+
+!! R8MAT_PRINT prints an R8MAT.
+
+!!$  Discussion:
+
+!!$    An R8MAT is an array of R8 values.
+
+!!$  Modified:
+
+!!$    12 September 2004
+
+!!$  Author:
+
+!!$    John Burkardt
+
+!!$  Parameters:
+
+!!$    Input, integer ( kind = 4 ) M, the number of rows in A.
+
+!!$    Input, integer ( kind = 4 ) N, the number of columns in A.
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) A(M,N), the matrix.
+
+!!$    Input, character ( len = * ) TITLE, a title to be printed.
+
+      Implicit None
+
+      Integer (Kind=4) m
+      Integer (Kind=4) n
+
+      Real (Kind=DEF_DBL_PREC) a (m, n)
+      Character (Len=*) title
+
+      Call r8mat_print_some (m, n, a, 1, 1, m, n, title)
+
+      Return
+End Subroutine
+Subroutine r8mat_print_some (m, n, a, ilo, jlo, ihi, jhi, title)
+
+!*****************************************************************************80
+
+!! R8MAT_PRINT_SOME prints some of an R8MAT.
+
+!!$  Discussion:
+
+!!$    An R8MAT is an array of R8 values.
+
+!!$  Modified:
+
+!!$    26 March 2005
+
+!!$  Author:
+
+!!$    John Burkardt
+
+!!$  Parameters:
+
+!!$    Input, integer ( kind = 4 ) M, N, the number of rows and columns.
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) A(M,N), an M by N matrix to be printed.
+
+!!$    Input, integer ( kind = 4 ) ILO, JLO, the first row and column to print.
+
+!!$    Input, integer ( kind = 4 ) IHI, JHI, the last row and column to print.
+
+!!$    Input, character ( len = * ) TITLE, an optional title.
+
+      Implicit None
+
+      Integer (Kind=4), Parameter :: incx = 5
+      Integer (Kind=4) m
+      Integer (Kind=4) n
+
+      Real (Kind=DEF_DBL_PREC) a (m, n)
+      Character (Len=14), pointer:: ctemp (:)
+      Integer (Kind=4) i
+      Integer (Kind=4) i2hi
+      Integer (Kind=4) i2lo
+      Integer (Kind=4) ihi
+      Integer (Kind=4) ilo
+      Integer (Kind=4) inc
+      Integer (Kind=4) j
+      Integer (Kind=4) j2
+      Integer (Kind=4) j2hi
+      Integer (Kind=4) j2lo
+      Integer (Kind=4) jhi
+      Integer (Kind=4) jlo
+      Character (Len=*) title
+      allocate(ctemp (incx))
+      If (0 < len_trim(title)) Then
+         Write (*, '(a)') ' '
+         Write (*, '(a)') trim (title)
+      End If
+
+      Do j2lo = Max (jlo, 1), Min (jhi, n), incx
+
+         j2hi = j2lo + incx - 1
+         j2hi = Min (j2hi, n)
+         j2hi = Min (j2hi, jhi)
+
+         inc = j2hi + 1 - j2lo
+
+         Write (*, '(a)') ' '
+
+         Do j = j2lo, j2hi
+            j2 = j + 1 - j2lo
+            Write (ctemp(j2), '(i8,6x)') j
+         End Do
+
+         Write (*, '(''  Col   '',5a14)') ctemp (1:inc)
+         Write (*, '(a)') '  Row'
+         Write (*, '(a)') ' '
+
+         i2lo = Max (ilo, 1)
+         i2hi = Min (ihi, m)
+
+         Do i = i2lo, i2hi
+
+            Do j2 = 1, inc
+
+               j = j2lo - 1 + j2
+
+               If (a(i, j) == real(Int(a(i, j)), Kind=DEF_DBL_PREC)) Then
+                  Write (ctemp(j2), '(f8.0,6x)') a (i, j)
+               Else
+                  Write (ctemp(j2), '(g14.6)') a (i, j)
+               End If
+
+            End Do
+
+            Write (*, '(i5,1x,5a14)') i, (ctemp(j), j=1, inc)
+
+         End Do
+
+      End Do
+
+      Write (*, '(a)') ' '
+      deallocate(ctemp)
+      Return
+End Subroutine
+Subroutine r8vec_print (n, a, title)
+
+!*****************************************************************************80
+
+!! R8VEC_PRINT prints an R8VEC.
+
+!!$  Discussion:
+
+!!$    An R8VEC is a vector of R8 values.
+
+!!$  Modified:
+
+!!$    22 August 2000
+
+!!$  Author:
+
+!!$    John Burkardt
+
+!!$  Parameters:
+
+!!$    Input, integer ( kind = 4 ) N, the number of components of the vector.
+
+!!$    Input, real ( Kind=DEF_DBL_PREC ) A(N), the vector to be printed.
+
+!!$    Input, character ( len = * ) TITLE, an optional title.
+
+      Implicit None
+
+      Integer (Kind=4) n
+
+      Real (Kind=DEF_DBL_PREC) a (n)
+      Integer (Kind=4) i
+      Character (Len=*) title
+
+      If (0 < len_trim(title)) Then
+         Write (*, '(a)') ' '
+         Write (*, '(a)') trim (title)
+      End If
+
+      Write (*, '(a)') ' '
+      Do i = 1, n
+         Write (*, '(2x,i8,2x,g16.8)') i, a (i)
+      End Do
+
+      Return
+End Subroutine
+Subroutine r8vec_swap (n, a1, a2)
+
+!*****************************************************************************80
+
+!! R8VEC_SWAP swaps the entries of two R8VECs.
+
+!!$  Discussion:
+
+!!$    An R8VEC is a vector of R8 values.
+
+!!$  Modified:
+
+!!$    04 December 2004
+
+!!$  Author:
+
+!!$    John Burkardt
+
+!!$  Parameters:
+
+!!$    Input, integer ( kind = 4 ) N, the number of entries in the arrays.
+
+!!$    Input/output, real ( Kind=DEF_DBL_PREC ) A1(N), A2(N), the vectors to swap.
+
+      Implicit None
+
+      Integer (Kind=4) n
+
+      Real (Kind=DEF_DBL_PREC) a1 (n)
+      Real (Kind=DEF_DBL_PREC) a2 (n)
+      Real (Kind=DEF_DBL_PREC),pointer:: a3 (:)
+      allocate( a3 (n))
+      a3 (1:n) = a1 (1:n)
+      a1 (1:n) = a2 (1:n)
+      a2 (1:n) = a3 (1:n)
+      deallocate(a3)
+      Return
+End Subroutine
+Subroutine sort (m, n, d, v)
+
+!*****************************************************************************80
+
+!! SORT sorts a vector D and adjusts the corresponding columns of a matrix V.
+
+!!$  Discussion:
+
+!!$    A simple bubble sort is used on D.
+
+!!$    In our application, D contains eigenvalues, and the columns of V are
+!!$    the corresponding eigenvectors.
+
+!!$  Modified:
+
+!!$    25 February 2002
+
+!!$  Author:
+
+!!$    Richard Brent
+!!$    FORTRAN90 version by John Burkardt
+
+!!$  Reference:
+
+!!$    Richard Brent,
+!!$    Algorithms for Minimization with Derivatives,
+!!$    Prentice Hall, 1973,
+!!$    Reprinted by Dover, 2002.
+
+!!$  Parameters:
+
+!!$    Input, integer ( kind = 4 ) M, the row dimension of V, which must be at least N.
+
+!!$    Input, integer ( kind = 4 ) N, the length of D, and the order of V.
+
+!!$    Input/output, real ( Kind=DEF_DBL_PREC ) D(N), the vector to be sorted.
+!!$    On output, the entries of D are in descending order.
+
+!!$    Input/output, real ( Kind=DEF_DBL_PREC ) V(M,N), an N by N array to be adjusted
+!!$    as D is sorted.  In particular, if the value that was in D(I) on input is
+!!$    moved to D(J) on output, then the input column V(*,I) is moved to
+!!$    the output column V(*,J).
+
+      Implicit None
+
+      Integer (Kind=4) m
+      Integer (Kind=4) n
+
+      Real (Kind=DEF_DBL_PREC) d (n)
+      Integer (Kind=4) i
+      Integer (Kind=4),pointer:: k(:) 
+      Real (Kind=DEF_DBL_PREC) temp
+      Real (Kind=DEF_DBL_PREC) v (m, n)
+      allocate(k(1))
+      Do i = 1, n - 1
+
+!!$  Find K, the index of the largest entry in D(I:N).
+!!$  MAXLOC apparently requires its output to be an array.
+
+         k = maxloc (d(i:n))
+
+!!$  If I < K, swap D(K) and D(I), and columns K and I of V.
+
+         If (i < k(1)) Then
+
+            temp = d (i)
+            d (i) = d (k(1))
+            d (k) = temp
+
+!!$             Call r8vec_swap (n, v(1:n, i), v(1:n, k(1)))
+            call DSWAP(n,v(1, i),1,v(1, k(1)),1)
+            
+
+         End If
+
+      End Do
+      deallocate(k)
+      Return
+End Subroutine
+Subroutine timestamp ()
+
+!*****************************************************************************80
+
+!! TIMESTAMP prints the current YMDHMS date as a time stamp.
+
+!!$  Example:
+
+!!$    31 May 2001   9:45:54.872 AM
+
+!!$  Modified:
+
+!!$    06 August 2005
+
+!!$  Author:
+
+!!$    John Burkardt
+
+!!$  Parameters:
+
+!!$    None
+
+      Implicit None
+
+      Character (Len=8) ampm
+      Integer (Kind=4) d
+      Integer (Kind=4) h
+      Integer (Kind=4) m
+      Integer (Kind=4) mm
+      Character (Len=9), Parameter, Dimension (12) :: month = (/ 'January  ', 'February ', 'March    ', 'Apri&
+     &l    ', 'May      ', 'June     ', 'July     ', 'August   ', 'September', 'October  ', 'November ', 'Dec&
+     &ember ' /)
+      Integer (Kind=4) n
+      Integer (Kind=4) s
+      Integer (Kind=4) values (8)
+      Integer (Kind=4) y
+
+      Call date_and_time (values=values)
+
+      y = values (1)
+      m = values (2)
+      d = values (3)
+      h = values (5)
+      n = values (6)
+      s = values (7)
+      mm = values (8)
+
+      If (h < 12) Then
+         ampm = 'AM'
+      Else If (h == 12) Then
+         If (n == 0 .And. s == 0) Then
+            ampm = 'Noon'
+         Else
+            ampm = 'PM'
+         End If
+      Else
+         h = h - 12
+         If (h < 12) Then
+            ampm = 'PM'
+         Else If (h == 12) Then
+            If (n == 0 .And. s == 0) Then
+               ampm = 'Midnight'
+            Else
+               ampm = 'AM'
+            End If
+         End If
+      End If
+
+      Write (*, '(i2,1x,a,1x,i4,2x,i2,a1,i2.2,a1,i2.2,a1,i3.3,1x,a)') d, trim (month(m)), y, h, ':', n, ':', &
+     & s, '.', mm, trim (ampm)
+
+      Return
+End Subroutine
+      Subroutine init_random_seed_pr ()
+         Integer :: i, n, clock
+         Integer, Dimension (:), Allocatable :: seed
+
+         Call RANDOM_SEED (size=n)
+         Allocate (seed(n))
+
+         Call SYSTEM_CLOCK (COUNT=clock)
+
+         seed = clock + 37 * (/ (i-1, i=1, n) /)
+         Call RANDOM_SEED (PUT=seed)
+
+         Deallocate (seed)
+      End Subroutine
+
+
+!!$ End Module  mod_praxis

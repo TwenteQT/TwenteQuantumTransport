@@ -1,0 +1,6 @@
+include ../../make.sys
+
+PROGS = fermproj
+
+include ../rules.inc
+

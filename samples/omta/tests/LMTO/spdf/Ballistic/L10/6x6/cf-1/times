@@ -1,0 +1,16 @@
+ik =          25
+    Ando Time =       1.3222
+    Prep Time =       0.6192
+   Embed Time =       0.3662
+   Solve Time =      22.9058
+  Torque Time =       0.0186
+   Zcurr Time =       0.0000
+   Iatcu Time =       0.0000
+     HDF Time =       0.0001
+     MPI Time =       0.0597
+ Barrier Time =       0.0000
+        Other =       0.0306
+----------------------------
+ K-point Time =      25.3224 seconds
+
+   Total Time =     908.0749 seconds

@@ -1,0 +1,29 @@
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/svn/codes/!svn/ver/1983/trans/trunk/src/systest
+END
+deps.mk
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/svn/codes/!svn/ver/1981/trans/trunk/src/systest/deps.mk
+END
+solvesys.F90
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/codes/!svn/ver/1981/trans/trunk/src/systest/solvesys.F90
+END
+makesys.F90
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1983/trans/trunk/src/systest/makesys.F90
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/codes/!svn/ver/1981/trans/trunk/src/systest/Makefile
+END

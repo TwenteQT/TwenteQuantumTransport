@@ -1,0 +1,22 @@
+HEADER    CuCu Slater-Koster parameters
+OPTIONS   NSHELL=2 EUNIT=Ry RUNIT=AU
+SHELL1  RSHELL=4.82953931550412
+	HAM:  SS_S=-0.05532  SP_S= 0.04883  SD_S=-0.03636  PP_S=-0.03520  PP_P= 0.04690  PD_S=-0.02911  PD_P=-0.00332  
+              DD_S=-0.01749  DD_P= 0.01011  DD_D=-0.00071                            
+	OVP:  SS_S= 0.09758  SP_S=-0.14855  SD_S= 0.00910  PP_S=-0.25299  PP_P= 0.07698  PD_S= 0.02692  PD_P=-0.07058  
+              DD_S= 0.02150  DD_P=-0.01622  DD_D= 0.00429              	        
+   HAM.DOWN:  SS_S=-0.05532  SP_S= 0.04883  SD_S=-0.03636  PP_S=-0.03520  PP_P= 0.04690  PD_S=-0.02911  PD_P=-0.00332  
+              DD_S=-0.01749  DD_P= 0.01011  DD_D=-0.00071                            
+   OVP.DOWN:  SS_S= 0.09758  SP_S=-0.14855  SD_S= 0.00910  PP_S=-0.25299  PP_P= 0.07698  PD_S= 0.02692  PD_P=-0.07058  
+              DD_S= 0.02150  DD_P=-0.01622  DD_D= 0.00429              	        
+SHELL2  RSHELL=6.83 			    		  		 	        
+	HAM:  SS_S=-0.02377  SP_S= 0.04105  SD_S=-0.01093  PP_S= 0.08086  PP_P= 0.01795  PD_S=-0.03070  PD_P=-0.00563  
+              DD_S=-0.00980  DD_P= 0.00001  DD_D= 0.00031                                       
+	OVP:  SS_S= 0.00366  SP_S=-0.01159  SD_S=-0.00308  PP_S=-0.02075  PP_P= 0.01857  PD_S=-0.02682  PD_P=-0.01956 	
+              DD_S=-0.01377  DD_P=-0.00299  DD_D= 0.00121                      
+   HAM.DOWN:  SS_S=-0.02377  SP_S= 0.04105  SD_S=-0.01093  PP_S= 0.08086  PP_P= 0.01795  PD_S=-0.03070  PD_P=-0.00563  
+              DD_S=-0.00980  DD_P= 0.00001  DD_D= 0.00031                                       
+   OVP.DOWN:  SS_S= 0.00366  SP_S=-0.01159  SD_S=-0.00308  PP_S=-0.02075  PP_P= 0.01857  PD_S=-0.02682  PD_P=-0.01956 	
+              DD_S=-0.01377  DD_P=-0.00299  DD_D= 0.00121                      
+SHELL3  RSHELL=8.36500747160455
+

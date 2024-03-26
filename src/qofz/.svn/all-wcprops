@@ -1,0 +1,23 @@
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/svn/codes/!svn/ver/2022/trans/trunk/src/qofz
+END
+deps.mk
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svn/codes/!svn/ver/1994/trans/trunk/src/qofz/deps.mk
+END
+qofz.F90
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/svn/codes/!svn/ver/2022/trans/trunk/src/qofz/qofz.F90
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/svn/codes/!svn/ver/1994/trans/trunk/src/qofz/Makefile
+END

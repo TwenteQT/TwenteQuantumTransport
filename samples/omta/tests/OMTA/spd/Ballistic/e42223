@@ -1,0 +1,72 @@
+forrtl: severe (59): list-directed I/O syntax error, unit 73001, file /home/maxr/work_trunk/samples/omta/tests/OMTA/spd/Ballistic/L10/4x4/cf-1/atomlist_EMTO
+Image              PC                Routine            Line        Source             
+htrans.x           0000000000A61A2E  Unknown               Unknown  Unknown
+htrans.x           0000000000A604C6  Unknown               Unknown  Unknown
+htrans.x           0000000000A0FBD2  Unknown               Unknown  Unknown
+htrans.x           00000000009CA24C  Unknown               Unknown  Unknown
+htrans.x           00000000009C976C  Unknown               Unknown  Unknown
+htrans.x           00000000009F0114  Unknown               Unknown  Unknown
+htrans.x           000000000067C557  Unknown               Unknown  Unknown
+htrans.x           0000000000410E3D  Unknown               Unknown  Unknown
+htrans.x           000000000040F3AC  Unknown               Unknown  Unknown
+libc.so.6          0000003A2801ED20  Unknown               Unknown  Unknown
+htrans.x           000000000040F2A9  Unknown               Unknown  Unknown
+--------------------------------------------------------------------------
+Primary job  terminated normally, but 1 process returned
+a non-zero exit code. Per user-direction, the job has been aborted.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+mpirun detected that one or more processes exited with non-zero status, thus causing
+the job to be terminated. The first process to do so was:
+
+  Process name: [[10997,1],23]
+  Exit code:    59
+--------------------------------------------------------------------------
+forrtl: severe (59): list-directed I/O syntax error, unit 73001, file /home/maxr/work_trunk/samples/omta/tests/OMTA/spd/Ballistic/L10/5x5/cf-1/atomlist_EMTO
+Image              PC                Routine            Line        Source             
+htrans.x           0000000000A61A2E  Unknown               Unknown  Unknown
+htrans.x           0000000000A604C6  Unknown               Unknown  Unknown
+htrans.x           0000000000A0FBD2  Unknown               Unknown  Unknown
+htrans.x           00000000009CA24C  Unknown               Unknown  Unknown
+htrans.x           00000000009C976C  Unknown               Unknown  Unknown
+htrans.x           00000000009F0114  Unknown               Unknown  Unknown
+htrans.x           000000000067C557  Unknown               Unknown  Unknown
+htrans.x           0000000000410E3D  Unknown               Unknown  Unknown
+htrans.x           000000000040F3AC  Unknown               Unknown  Unknown
+libc.so.6          0000003A2801ED20  Unknown               Unknown  Unknown
+htrans.x           000000000040F2A9  Unknown               Unknown  Unknown
+--------------------------------------------------------------------------
+Primary job  terminated normally, but 1 process returned
+a non-zero exit code. Per user-direction, the job has been aborted.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+mpirun detected that one or more processes exited with non-zero status, thus causing
+the job to be terminated. The first process to do so was:
+
+  Process name: [[10889,1],28]
+  Exit code:    59
+--------------------------------------------------------------------------
+forrtl: severe (59): list-directed I/O syntax error, unit 73001, file /home/maxr/work_trunk/samples/omta/tests/OMTA/spd/Ballistic/L10/6x6/cf-1/atomlist_EMTO
+Image              PC                Routine            Line        Source             
+htrans.x           0000000000A61A2E  Unknown               Unknown  Unknown
+htrans.x           0000000000A604C6  Unknown               Unknown  Unknown
+htrans.x           0000000000A0FBD2  Unknown               Unknown  Unknown
+htrans.x           00000000009CA24C  Unknown               Unknown  Unknown
+htrans.x           00000000009C976C  Unknown               Unknown  Unknown
+htrans.x           00000000009F0114  Unknown               Unknown  Unknown
+htrans.x           000000000067C557  Unknown               Unknown  Unknown
+htrans.x           0000000000410E3D  Unknown               Unknown  Unknown
+htrans.x           000000000040F3AC  Unknown               Unknown  Unknown
+libc.so.6          0000003A2801ED20  Unknown               Unknown  Unknown
+htrans.x           000000000040F2A9  Unknown               Unknown  Unknown
+--------------------------------------------------------------------------
+Primary job  terminated normally, but 1 process returned
+a non-zero exit code. Per user-direction, the job has been aborted.
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+mpirun detected that one or more processes exited with non-zero status, thus causing
+the job to be terminated. The first process to do so was:
+
+  Process name: [[10915,1],24]
+  Exit code:    59
+--------------------------------------------------------------------------

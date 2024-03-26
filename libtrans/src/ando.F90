@@ -1,0 +1,1740 @@
+!!$ $Id: ando.F90 1999 2013-11-20 15:11:32Z antst $
+!!$ Library which performs sollution of general Ando problem
+!!$ Interface routines are "alloc_ando", "free_ando" and "solve_ando"
+!!$ Header file "ando.h" should be included for defenitions of datatypes
+!!$
+!!$ All routines starting with "ando_help_" are helper routines for solver
+!!$ and not supposed to be called externaly
+
+#include "math_def.h"
+
+Module ando_module
+   Implicit None
+   Type t_ando_sollution
+!!$     SEQUENCE
+
+      Integer :: n = 0, Nin = 0, Nout = 0, alloc = 0, aliased = 0, nmod = 0
+      Integer :: haveEmb = 0, haveBound = 0
+      Integer :: haveEvanecent = 0
+      Integer :: haveF = 0
+      Integer :: SNin(2) = 0, SNout(2) = 0, have_split = 0
+      Integer, Pointer :: mask_in(:, :), mask_out(:, :)
+      Integer :: haveAllFU = 1, dir
+      Real(Kind=DEF_DBL_PREC) :: ppj = 0.0d0
+      Complex(Kind=DEF_DBL_PREC), Pointer :: Fin(:, :), Fin_i(:, :), Fout(:, :), Fout_i(:, :)
+      Complex(Kind=DEF_DBL_PREC), Pointer :: Uin(:, :), Uin_i(:, :), Uout(:, :), Uout_i(:, :)
+      Complex(Kind=DEF_DBL_PREC), Pointer :: emb(:, :), bound(:, :)
+      Complex(Kind=DEF_DBL_PREC), Pointer :: lin(:), lout(:)
+      Real(Kind=DEF_DBL_PREC), Pointer :: Vin(:), Vout(:)
+   End Type t_ando_sollution
+
+   Type t_ando_ctl
+      Integer :: gensol = 15, refine = 0, writedecomp = 0, extlead = 0
+      Real(Kind=DEF_DBL_PREC) :: specpart = 1.0d0
+   End Type t_ando_ctl
+
+   Type t_ando_options
+!!$     SEQUENCE
+      Integer :: needEmb = 1, needBound = 1
+      Integer :: dir, refine = 1
+      Integer :: use_ev_solver = 10
+      Integer :: normUvel = 1
+      Integer :: needF = 0
+      Integer :: needEvanecent = 0
+      Integer :: needAllFU = 0
+      Integer, Pointer :: split_idx(:, :)
+      Complex(Kind=DEF_DBL_PREC) :: rotm(2, 2) = reshape((/1.0d0, 0.0d0, 0.0d0, 1.0d0/), (/2, 2/))
+      Integer :: need_split = 0
+      Integer :: need_pol = 0, gamnas = 0
+      Real(Kind=DEF_DBL_PREC) :: usestates = 0.5d0
+      Real(Kind=DEF_DBL_PREC) :: maxerror = 1.0d-9
+   End Type t_ando_options
+
+   Type ando_t_evsort_
+      Integer :: n
+      Logical :: isev
+      Real(Kind=DEF_DBL_PREC) :: Abs, veloc, im
+   End Type ando_t_evsort_
+
+   Type ando_t_fixspin_
+      Integer :: m
+      Integer, Pointer :: idx(:, :)
+      Complex(Kind=DEF_DBL_PREC), Pointer :: ev(:, :)
+   End Type ando_t_fixspin_
+
+   Integer :: ando_split_warn = 1
+   Real(Kind=DEF_DBL_PREC), Parameter :: degthr = 1.0d-8
+   integer :: prax_numevals_p_ = 0
+   Real(Kind=DEF_DBL_PREC) :: prax_a_init_p_(2) = DEF_M_PI/2.0
+   Real(Kind=DEF_DBL_PREC) :: prax_maxst_p_ = DEF_M_PI/2.0
+   Real(Kind=DEF_DBL_PREC) :: prax_eval_min_small_p = 1.0d-12
+!!$       Integer, Pointer :: orth_idx (:, :)
+!!$       Complex (Kind=DEF_DBL_PREC), Pointer :: orth_ev (:, :)
+Contains
+
+   Subroutine alloc_ando(ando, n, np, nm, opts)
+!!$ This routine allocates "ando" structure.
+!!$ Depending on "opts" routine will choose what to allocate
+!!$ If structure is allocated already, it will be deallocated
+!!$ if set of options is different
+      Implicit None
+      Type(t_ando_sollution) :: ando
+      Type(t_ando_options) :: opts
+      Integer :: n, np, nm
+!!$ Local vars
+      Integer :: sz1, sz2, Nin, Nout
+
+      If (opts%dir > 0) Then
+         Nin = np
+         Nout = nm
+      Else
+         Nin = nm
+         Nout = np
+      End If
+
+      If (ando%alloc == 1) Then
+         If ((ando%n /= n) .Or. (ando%Nin /= Nin) .Or. (ando%Nout /= Nout) .Or. (ando%haveF /= opts%needF) &
+        & .Or. (ando%haveEvanecent /= opts%needEvanecent) .Or. (ando%haveEmb /= opts%needEmb) .Or. &
+        & (ando%haveBound /= opts%needBound) .Or. (ando%haveAllFU /= opts%needAllFU) .Or. (ando%have_split &
+        & /= opts%need_split)) Then
+            Call free_ando(ando)
+         End If
+      End If
+
+      If (ando%alloc == 0) Then
+         ando%dir = opts%dir
+         ando%Nin = Nin
+         ando%Nout = Nout
+         ando%n = n
+
+         ando%haveEvanecent = opts%needEvanecent
+         If (ando%haveEvanecent == 0) Then
+            sz1 = Nin
+            sz2 = Nout
+         Else
+            sz1 = n
+            sz2 = n
+         End If
+         Allocate (ando%lin(sz1))
+         Allocate (ando%lout(sz2))
+
+         Allocate (ando%Uout_i(sz2, n))
+         Allocate (ando%Uin(n, sz1))
+
+         If (opts%needAllFU /= 0) Then
+            Allocate (ando%Uin_i(sz1, n))
+            Allocate (ando%Uout(n, sz2))
+         End If
+
+         ando%haveF = opts%needF
+         ando%haveAllFU = opts%needAllFU
+
+         If (ando%haveF /= 0) Then
+            Allocate (ando%Fout_i(n, n))
+            Allocate (ando%Fin(n, n))
+            If (ando%haveAllFU /= 0) Then
+               Allocate (ando%Fin_i(n, n))
+               Allocate (ando%Fout(n, n))
+            End If
+         End If
+
+         ando%haveBound = opts%needBound
+         If (opts%needBound /= 0) allocate (ando%bound(n, ando%Nin))
+
+         ando%haveEmb = opts%needEmb
+         If (opts%needEmb /= 0) allocate (ando%emb(n, n))
+
+         Allocate (ando%Vin(Nin))
+         Allocate (ando%Vout(Nout))
+         ando%alloc = 1
+         ando%n = n
+         If (opts%need_split /= 0) Then
+            Allocate (ando%mask_in(Nin, 2))
+            Allocate (ando%mask_out(Nout, 2))
+         End If
+         ando%have_split = opts%need_split
+      End If
+   End Subroutine alloc_ando
+
+   Subroutine free_ando(ando)
+!!$ This routine deallocates "ando" structure.
+      Implicit None
+
+      Type(t_ando_sollution) :: ando
+      If (ando%alloc == 1) Then
+         Deallocate (ando%lin, ando%Vin, ando%lout, ando%Vout)
+         Deallocate (ando%Uout_i)
+         Deallocate (ando%Uin)
+
+         If (ando%haveAllFU /= 0) Then
+            Deallocate (ando%Uin_i)
+            Deallocate (ando%Uout)
+            Nullify (ando%Uin_i, ando%Uout)
+         End If
+
+         Nullify (ando%Uin, ando%Uout_i)
+         Nullify (ando%lin, ando%Vin, ando%lout, ando%Vout)
+
+         If (ando%haveF /= 0) Then
+            Deallocate (ando%Fin, ando%Fout_i)
+            If (ando%haveAllFU /= 0) Then
+               Deallocate (ando%Fin_i, ando%Fout)
+            End If
+         End If
+
+         If (ando%haveEmb /= 0) deallocate (ando%emb)
+         If (ando%haveBound /= 0) deallocate (ando%bound)
+
+         Nullify (ando%emb)
+         Nullify (ando%Fin, ando%Fin_i, ando%Fout, ando%Fout_i)
+         Nullify (ando%bound)
+
+         If (ando%have_split /= 0) deallocate (ando%mask_in, ando%mask_out)
+         Nullify (ando%mask_in, ando%mask_out)
+
+         ando%alloc = 0
+         ando%Nin = 0
+         ando%Nout = 0
+         ando%n = 0
+         ando%haveF = 0
+         ando%haveEmb = 0
+         ando%haveBound = 0
+         ando%haveAllFU = 0
+         ando%haveEvanecent = 0
+      End If
+   End Subroutine free_ando
+
+   Subroutine free_ando_emb(ando)
+!!$ This routine deallocates "ando" structure.
+      Implicit None
+
+      Type(t_ando_sollution) :: ando
+      If (ando%alloc == 1) Then
+         If (ando%haveEmb /= 0) deallocate (ando%emb)
+         If (ando%haveBound /= 0) deallocate (ando%bound)
+
+         Nullify (ando%emb)
+         Nullify (ando%bound)
+         ando%haveEmb = 0
+         ando%haveBound = 0
+      End If
+   End Subroutine free_ando_emb
+
+   Subroutine solve_ando(h01, hops, n, nh, ando, opts)
+!!$    Solves ando lead problem for given matrix "hops",which
+!!$    consists of onsite matrix and hoppings to the next (right) layers
+!!$    "nh" - number of hoppings to next elements. n - size of layer
+!!$    I assume that transport is going from left to right.
+!!$    "opts" - structure with parameters
+!!$    The result will be returned in "ando"
+          Use sparselib
+
+      Implicit None
+      Integer, Intent(In) :: n, nh
+      Complex(Kind=DEF_DBL_PREC), Intent(In) :: hops(n, n*(nh + 1)), h01(n*nh, n*nh)
+      Type(t_ando_sollution), Intent(Inout) :: ando
+      Type(t_ando_options), Intent(In) :: opts
+!!$ Local
+      Complex(Kind=DEF_DBL_PREC), Pointer :: eigvec(:, :), lambda(:)
+      Real(Kind=DEF_DBL_PREC), Pointer :: veloc(:)
+      Integer :: np, nm, nf, n2, i, l, eqs, cont, ss
+      Logical :: fixim
+!!$ Code
+      nf = n*nh*2
+      n2 = n*nh
+      Allocate (eigvec(nf, nf))
+      Allocate (lambda(nf))
+      Allocate (veloc(nf))
+
+      ss = opts%use_ev_solver
+      fixim = opts%use_ev_solver == 15
+      cont = 1
+      Do while (cont == 1)
+!!$ Call solver itself
+         If (ss < 10) Then
+            Call ando_help_calc_ando_eigs_(n, nh, nf, hops, eigvec, lambda, ss)
+         Else
+            If (ando_help_calc_ando_eigsgen_(n, nh, nf, hops, eigvec, lambda, ss - 10) /= 0 .And. &
+           & opts%refine == 1) Then
+               If (ando_help_calc_ando_eigsgen_(n, nh, nf, hops, eigvec, lambda, 7) /= 0) Then
+!!$                     Write (*,*) 'Underflow in ando_help_calc_ando_ for  lambda'
+               End If
+            End If
+
+         End If
+!!$ Swap order of sillutions U_m. We solve with different order to increase accuracy
+!!$    if (nh>1 ) then
+!!$       call ando_help_swap_evecs_(n,nh,nf,eigvec)
+!!$    end if
+!!$ Sort and normalize sollutions and calculate velocities
+
+         eqs = ando_help_sort_norm_ando_(n, nf, nh, hops, lambda, eigvec, np, nm, veloc, opts%maxerror, &
+        & fixim)
+         If (eqs == 1 .Or. ss == 17) Then
+            cont = 0
+         Else
+            Write (*, *) 'Warning!'
+            Write (*, *) 'Number of left- and right-going propagating  modes is different'
+            Write (*, *) 'Perform failback to quad-prec solver!'
+            ss = 17
+         End If
+      End Do
+
+      If (eqs /= 1) Then
+         Write (*, *) 'Error!'
+         Write (*, *) 'Number of left- and right-going propagating  modes is different'
+         Write (*, *) 'Check geometry!'
+         Stop
+      End If
+      If (opts%use_ev_solver == 15) Call fix_orth(nf, eigvec, lambda, opts)
+
+      Call fix_phase(eigvec, nf)
+!!$          Stop
+
+      If (nh > 1) Then
+         Do i = 1, nf
+            Do l = 1, nh - 1
+               eigvec(l*n + 1:l*n + n, i) = eigvec(1:n, i)*lambda(i)**l
+            End Do
+         End Do
+         lambda = lambda**nh
+      End If
+
+!!$ Invert U(+) and U(-)
+!!$ Substitute U(+/-)_(-1) with U(+/-)^(-1) in "eigvec",
+!!$ So, in "eigvec" we will have U(+), U(-), inv(U(+)) and inv(U(+))
+      eigvec(n2 + 1:nf, 1:n2) = eigvec(1:n2, 1:n2)
+      Call ando_help_inv_sub_cmat_(n2, eigvec(n2 + 1, 1), nf)
+      eigvec(n2 + 1:nf, n2 + 1:nf) = eigvec(1:n2, n2 + 1:nf)
+      Call ando_help_inv_sub_cmat_(n2, eigvec(n2 + 1, n2 + 1), nf)
+!!$ Allocate structure in which we will return result
+      Call alloc_ando(ando, n2, np, nm, opts)
+!!$ Fill structure "ando" depending on "opts"
+      Call ando_help_fill_result_(n2, nf, ando, eigvec, lambda, veloc, h01, opts)
+
+      Deallocate (eigvec, lambda, veloc)
+   End Subroutine solve_ando
+
+   Subroutine fix_orth(nf, ev, lambda, opts)
+      Implicit None
+      Complex(Kind=DEF_DBL_PREC), Intent(Inout), Target :: ev(nf, nf)
+      Complex(Kind=DEF_DBL_PREC), Intent(In) :: lambda(nf)
+      Type(t_ando_options), Intent(In) :: opts
+      Integer, Intent(In) :: nf
+!!$  Locals
+      Integer :: i, js, je
+      Complex(Kind=DEF_DBL_PREC) :: la1
+      Complex(Kind=DEF_DBL_PREC), Pointer :: ev1(:, :)
+      la1 = lambda(1)
+      js = 1
+      je = 1
+      If (opts%need_split /= 0) Then
+         Allocate (ev1(nf, nf))
+         Do i = 2, nf
+            If (Abs((lambda(i) - la1)/(lambda(i) + la1)) < degthr) Then
+               je = je + 1
+            Else
+               If (je > js) Then
+                  Call rotforward
+                  Call make_orth_spin(nf, nf/2, je - js + 1, ev1(:, 1:je - js + 1), opts%split_idx)
+                  Call rotbackward
+!!$                      Call make_orth_spin (nf, nf/2, je-js+1, ev(:, js:je), opts%split_idx, opts%rotm)
+               End If
+               js = i
+               je = i
+               la1 = lambda(i)
+            End If
+         End Do
+         Deallocate (ev1)
+      Else
+         Do i = 2, nf
+            If (Abs((lambda(i) - la1)/(lambda(i) + la1)) < degthr) Then
+               je = je + 1
+            Else
+               If (je > js) Then
+                  Call make_orth(nf, nf/2, je - js + 1, ev(:, js:je))
+               End If
+               js = i
+               je = i
+               la1 = lambda(i)
+            End If
+         End Do
+      End If
+   Contains
+      Subroutine rotforward()
+         Implicit None
+         Integer :: n, i, j, j1, iq, kq, ofs, k
+         n = je - js + 1
+         iq = size(opts%split_idx, DIM=2)
+         kq = (nf/2)/(2*iq)
+         Do j = 1, n
+            j1 = js - 1 + j
+            Do k = 1, kq
+               ofs = (k - 1)*iq*2
+               Do i = 1, iq
+                  ev1(opts%split_idx(1, i) + ofs, j) = opts%rotm(1, 1)*ev(opts%split_idx(1, i) + ofs, j1) &
+                 & + opts%rotm(1, 2)*ev(opts%split_idx(2, i) + ofs, j1)
+                  ev1(opts%split_idx(2, i) + ofs, j) = opts%rotm(2, 1)*ev(opts%split_idx(1, i) + ofs, j1) &
+                 & + opts%rotm(2, 2)*ev(opts%split_idx(2, i) + ofs, j1)
+               End Do
+            End Do
+         End Do
+      End Subroutine rotforward
+
+      Subroutine rotbackward()
+         Implicit None
+         Integer :: n, i, j, j1, iq, kq, ofs, k
+         n = je - js + 1
+         iq = size(opts%split_idx, DIM=2)
+         kq = (nf/2)/(2*iq)
+         Do j = 1, n
+            j1 = js - 1 + j
+            Do k = 1, kq
+               ofs = (k - 1)*iq*2
+               Do i = 1, iq
+                  ev(opts%split_idx(1, i) + ofs, j1) = opts%rotm(1, 1)*ev1(opts%split_idx(1, i) + ofs, j) &
+                 & + opts%rotm(2, 1)*ev1(opts%split_idx(2, i) + ofs, j)
+                  ev(opts%split_idx(2, i) + ofs, j1) = opts%rotm(1, 2)*ev1(opts%split_idx(1, i) + ofs, j) &
+                 & + opts%rotm(2, 2)*ev1(opts%split_idx(2, i) + ofs, j)
+               End Do
+            End Do
+         End Do
+      End Subroutine rotbackward
+   End Subroutine fix_orth
+
+   Subroutine make_orth(lda, m, n, ev)
+      Implicit None
+      Integer, Intent(In) :: lda, m, n
+      Complex(Kind=DEF_DBL_PREC), Intent(Inout) :: ev(:, :)
+!!$ Locals
+      Integer :: lwork, info
+      Complex(Kind=DEF_DBL_PREC), Pointer :: tau(:)
+      Complex(Kind=DEF_DBL_PREC), Pointer :: work(:)
+      Real(Kind=DEF_DBL_PREC), External :: dznrm2
+      Allocate (tau(n), work(m*m))
+      lwork = m*m
+      Call ZGEQRF(m, n, ev(1, 1), lda, tau, work(1), lwork, info)
+      Call ZUNGQR(m, n, n, ev(1, 1), lda, tau, work(1), lwork, info)
+      Deallocate (tau, work)
+   End Subroutine
+
+   Subroutine make_orth_spin(lda, m, n, ev, idx)
+      Implicit None
+      Integer, Intent(In) :: lda, m, n
+      Integer, Pointer :: idx(:, :)
+      Complex(Kind=DEF_DBL_PREC), Intent(Inout), Target :: ev(:, :)
+!!$ Locals
+      Integer :: lwork, info, i, j, mi
+      Integer, Pointer :: ind(:)
+      Complex(Kind=DEF_DBL_PREC), Pointer :: tau(:)
+      Real(Kind=DEF_DBL_PREC) :: t
+      Real(Kind=DEF_DBL_PREC), Pointer :: cmp(:), a(:)
+      Complex(Kind=DEF_DBL_PREC), Pointer :: work(:, :)
+      Real(Kind=DEF_DBL_PREC), External :: dznrm2
+      Complex(Kind=DEF_DBL_PREC) :: r11, r12, r21, r22
+      Type(ando_t_fixspin_), Target :: tval
+
+      lwork = m*m
+      Allocate (ind(n), tau(n), cmp(n), a(2), work(m, m))
+      Call ZGEQRF(m, n, ev(1, 1), lda, tau, work(1, 1), lwork, info)
+      Call ZUNGQR(m, n, n, ev(1, 1), lda, tau, work(1, 1), lwork, info)
+      If (n /= 2) Then
+         cmp = 0.0d0
+         mi = Min(9, m)
+         Do i = 1, n
+            cmp(i) = dznrm2(mi, ev(1, i), 1)
+            ind(i) = i
+         End Do
+         Do i = 1, n, 1
+            Do j = 1, n - 1, 1
+               If (cmp(j) < cmp(j + 1)) Then
+                  t = cmp(j + 1)
+                  cmp(j + 1) = cmp(j)
+                  cmp(j) = t
+                  mi = ind(j + 1)
+                  ind(j + 1) = ind(j)
+                  ind(j) = mi
+               End If
+            End Do
+         End Do
+
+         work(1:m, 1:n) = ev(1:m, :)
+         Do i = 1, n, 1
+            ev(1:m, i) = work(1:m, ind(i))
+         End Do
+      Else
+!!$             write(*,*) 'flag!'
+         tval%idx => idx
+         tval%ev => ev
+         tval%m = m
+!!$             tptr%ptr => tval
+!!$             Allocate (tval_c(size(transfer(tptr, tval_c))))
+!!$             tval_c = transfer (tptr, tval_c)
+         a = prax_a_init_p_
+!!$             tval_c(1)='q'
+!!$             tval_c(2)='w'
+!!$             Write (*,*) 'qq', size(tval_c),tval_c(2)
+!!$ !$OMP critical
+         Call praxis(1.0d-8, prax_maxst_p_, 2, a, test_spinr, tval)
+
+!!$ !$OMP end critical
+
+!!$             Deallocate (tval_c)
+         r11 = Exp(DEF_cmplx_Ione*a(1))*Cos(a(2))
+         r21 = (DEF_cmplx_Ione*Cos(a(1)) + Sin(a(1)))*Sin(a(2))
+         r12 = DEF_cmplx_Ione*Exp(DEF_cmplx_Ione*a(1))*Sin(a(2))
+         r22 = Exp(-DEF_cmplx_Ione*a(1))*Cos(a(2))
+         work(1:m, 1:2) = ev(1:m, 1:2)
+         ev(1:m, 1) = work(1:m, 1)*r11 + work(1:m, 2)*r21
+         ev(1:m, 2) = work(1:m, 1)*r12 + work(1:m, 2)*r22
+!!$             write(*,*) a
+
+      End If
+      Deallocate (ind, tau, cmp, a, work)
+
+   End Subroutine
+
+   Function test_spinr(a, n, tval) Result(rat)
+      Implicit None
+      Real(Kind=DEF_DBL_PREC), Intent(In) :: a(n)
+      Integer, Intent(In) :: n
+      Real(Kind=DEF_DBL_PREC) :: rat
+      Type(ando_t_fixspin_), Intent(In) :: tval
+!!$          Character (Len=1), Intent (In) :: tval_c (100)
+!!$          Local vars
+!!$          Type (ando_t_fixspin_ptr) :: tptr
+      Complex(Kind=DEF_DBL_PREC), Pointer :: v(:)
+      Complex(Kind=DEF_DBL_PREC) :: r1, r2
+      Integer :: i
+      Real(Kind=DEF_DBL_PREC) :: p1, p2
+!!$          Write (*,*) 'h!!!', tval%m
+!!$          tptr = transfer (tval_c, tptr)
+!!$          Write (*,*) tptr%ptr%m
+
+      prax_numevals_p_ = prax_numevals_p_ + 1
+      Allocate (v(tval%m))
+      r1 = Exp(DEF_cmplx_Ione*a(1))*Cos(a(2))
+      r2 = (DEF_cmplx_Ione*Cos(a(1)) + Sin(a(1)))*Sin(a(2))
+
+      v = tval%ev(1:tval%m, 1)*r1 + tval%ev(1:tval%m, 2)*r2
+      p1 = 0.0d0
+      p2 = 0.0d0
+      Do i = 1, tval%m/2
+         p1 = p1 + Abs(v(tval%idx(1, i)))**2
+         p2 = p2 + Abs(v(tval%idx(2, i)))**2
+      End Do
+      rat = Sqrt(p2/p1)
+      if (p1 < prax_eval_min_small_p) rat = Sqrt(p2/prax_eval_min_small_p)
+      Deallocate (v)
+   End Function
+
+   Subroutine fix_phase(ev, nf)
+      Complex(Kind=DEF_DBL_PREC), Intent(Inout) :: ev(nf, nf)
+      Integer, Intent(In) :: nf
+!!$
+      Integer :: i, j
+      Integer, External :: idamax
+      Real(Kind=DEF_DBL_PREC) :: ph, aev(nf/4)
+!!$          Do i = 1, 2
+!!$             j = idamax (nf/2, Abs(ev(:, i)), 1)
+!!$             ph = imag (Log(ev(j, i)))
+!!$ !!$              ph=0.0d0
+!!$ !!$              do k=1,nf
+!!$ !!$                  ph=ph+imag(log(ev(k,i)))
+!!$ !!$              end do
+!!$ !!$              ph=ph/real(nf,kind=8)
+!!$ !!$             Write (*,*) 'ph0', j, ph
+!!$ !!$              ev(:,i)=ev(:,i)*exp(-ph*DEF_cmplx_Ione)
+!!$          End Do
+      Do i = 1, nf
+         aev = Abs(ev(1:nf/4, i))
+         j = idamax(nf/4, aev, 1)
+!!$             j=1
+         ph = imag(Log(ev(j, i)))
+!!$              ph=0.0d0
+!!$              do k=1,nf
+!!$                  ph=ph+imag(log(ev(k,i)))
+!!$              end do
+!!$              ph=ph/real(nf,kind=8)
+!!$             Write (*,*) 'ph1', j, ph
+         ev(:, i) = ev(:, i)*Exp(-ph*DEF_cmplx_Ione)
+      End Do
+!!$          Do i = 1, 2
+!!$             j = idamax (nf/2, Abs(ev(:, i)), 1)
+!!$             ph = imag (Log(ev(j, i)))
+!!$ !!$              ph=0.0d0
+!!$ !!$              do k=1,nf
+!!$ !!$                  ph=ph+imag(log(ev(k,i)))
+!!$ !!$              end do
+!!$ !!$              ph=ph/real(nf,kind=8)
+!!$             Write (*,*) 'ph', j, ph
+!!$ !!$              ev(:,i)=ev(:,i)*exp(-ph*DEF_cmplx_Ione)
+!!$          End Do
+!!$          Do i = nf / 2 + 1, nf / 2 + 2
+!!$             j = idamax (nf/2, Abs(ev(:, i)), 1)
+!!$             ph = imag (Log(ev(j, i)))
+!!$ !!$              ph=0.0d0
+!!$ !!$              do k=1,nf
+!!$ !!$                  ph=ph+imag(log(ev(k,i)))
+!!$ !!$              end do
+!!$ !!$              ph=ph/real(nf,kind=8)
+!!$             Write (*,*) 'ph', j, ph
+!!$ !!$              ev(:,i)=ev(:,i)*exp(-ph*DEF_cmplx_Ione)
+!!$          End Do
+
+   End Subroutine fix_phase
+
+   Subroutine ando_help_swap_evecs_(n, nh, nf, eigvec)
+!!$ Swap order of U_m in "eigvec"
+      Implicit None
+      Integer :: n, nh, nf
+      Complex(Kind=DEF_DBL_PREC), Target :: eigvec(nf, nf)
+!!$ Local vars
+      Integer :: i
+      Complex(Kind=DEF_DBL_PREC), Pointer :: tm(:, :)
+      Allocate (tm(n, nf))
+      Do i = 0, n*nh - 1, n
+         tm = eigvec(i + 1:i + n, :)
+         eigvec(i + 1:i + n, :) = eigvec(nf - i - n + 1:nf - i, :)
+         eigvec(nf - i - n + 1:nf - i, :) = tm
+      End Do
+      Deallocate (tm)
+   End Subroutine ando_help_swap_evecs_
+
+   Subroutine ando_help_fill_result_(n, nf, ando, eigvec, lambda, veloc, h01, opts)
+      Implicit None
+      Type(t_ando_sollution) :: ando
+      Type(t_ando_options) :: opts
+      Integer :: n, nf
+      Complex(Kind=DEF_DBL_PREC), Target :: eigvec(nf, nf), lambda(nf), h01(n, n)
+      Real(Kind=DEF_DBL_PREC) :: veloc(nf)
+!!$ Local vars
+      Complex(Kind=DEF_DBL_PREC), Pointer :: work(:, :)
+      Complex(Kind=DEF_DBL_PREC), Pointer :: Uin(:, :), Uout(:, :), Uin_i(:, :), Uout_i(:, :)
+      Complex(Kind=DEF_DBL_PREC), Pointer :: lin(:), lout(:)
+      Complex(Kind=DEF_DBL_PREC), Pointer :: Fin_i(:, :), Fout_i(:, :)
+      Complex(Kind=DEF_DBL_PREC), Pointer :: lin_i(:), lout_i(:)
+      Real(Kind=DEF_DBL_PREC) :: ppj
+
+      Integer :: Nin, Nout, i, j, sz1, sz2, n2, hf1, hf2
+      Character :: op
+
+      Allocate (work(n, n), lin_i(n), lout_i(n))
+
+      Nin = ando%Nin
+      Nout = ando%Nout
+
+      n2 = 2*n
+      hf1 = 0
+      hf2 = 0
+
+!!$ Set pointers. Just make rest more comfortable to write and understandable
+      If (ando%dir > 0) Then
+         Uin => eigvec(1:n, 1:n)
+         Uout => eigvec(1:n, n + 1:2*n)
+         Uin_i => eigvec(n + 1:n2, 1:n)
+         Uout_i => eigvec(n + 1:n2, n + 1:n2)
+         lin => lambda(1:n)
+         lout => lambda((n + 1):n2)
+         op = 'C'
+      Else
+         Uin => eigvec(1:n, n + 1:2*n)
+         Uout => eigvec(1:n, 1:n)
+         Uin_i => eigvec(n + 1:n2, n + 1:n2)
+         Uout_i => eigvec(n + 1:n2, 1:n)
+         lambda = 1.0d0/lambda
+         lin => lambda((n + 1):n2)
+         lout => lambda(1:n)
+         op = 'N'
+      End If
+      If (ando%have_split /= 0) Then
+         ando%SNin = ando_decompose_spin_(ando%Nin, Uin, opts%split_idx, ando%mask_in, opts%rotm)
+         ando%SNout = ando_decompose_spin_(ando%Nout, Uout, opts%split_idx, ando%mask_out, opts%rotm)
+!!$             Write (*,*) ando%mask_in
+!!$             Write (*,*) ando%mask_out
+      End If
+
+      lin_i = 1.0d0/lin
+      lout_i = 1.0d0/lout
+      i = n*opts%usestates + 1
+      If (i < (n + 1)) Then
+         lin(i:n) = 0.0d0
+         lin_i(i:n) = 0.0d0
+         lout(i:n) = 0.0d0
+         lout_i(i:n) = 0.0d0
+      End If
+      If ((Nin /= 0) .Or. (Nout /= 0)) Then
+!!$ Fill velocities
+
+         If (ando%dir > 0) Then
+            ando%Vin = -veloc(1:Nin)
+            ando%Vout = -veloc(n + 1:n + Nout)
+         Else
+            ando%Vout = veloc(1:Nout)
+            ando%Vin = veloc(n + 1:n + Nin)
+         End If
+
+         If (ando%haveEvanecent == 0) Then
+            sz1 = Nin
+            sz2 = Nout
+         Else
+            sz1 = n
+            sz2 = n
+         End If
+!!$ Fill lambdas
+         ando%lin = lin(1:sz1)
+         ando%lout = lout(1:sz2)
+!!$ Fill U(+/-) and U(+/-)^(-1)
+         ando%Uout_i = Uout_i(1:sz2, :)
+         ando%Uin = Uin(:, 1:sz1)
+
+!!$ Calculate the current polarization
+         If (opts%need_pol /= 0) Then
+            ppj = 0.d0
+            If (opts%gamnas == 0) Then
+               Do i = 1, Nin
+                  Do j = 1, size(opts%split_idx, DIM=2), 1
+                     ppj = ppj + Abs(opts%rotm(1, 1)*Uin(opts%split_idx(1, j), i) + opts%rotm(1, &
+                    & 2)*Uin(opts%split_idx(2, j), i))**2 - Abs(opts%rotm(2, 1)*Uin(opts%split_idx(1, &
+                    & j), i) + opts%rotm(2, 2)*Uin(opts%split_idx(2, j), i))**2
+                  End Do
+               End Do
+               ando%ppj = ppj/dble(2*Nin)
+            Else If (opts%gamnas == 1) Then
+!!$ the following part only works for (Ga,Mn)As four band model
+!!$ Projection along x-direction <psi|Jx|psi>
+               Do i = 1, Nin
+                  Do j = 0, n/4 - 1
+                     ppj = ppj + dsqrt(3.d0)*(real(Uin(4*j + 1, i)*conjg(Uin(4*j + 2, i))) + real(Uin(4*j + 3, &
+                    & i)*conjg(Uin(4*j + 4, i)))) + 2.d0*real(Uin(4*j + 2, i)*conjg(Uin(4*j + 3, i)))
+                  End Do
+               End Do
+               ando%ppj = ppj/dble(Nin)
+            End If
+         End If
+
+         If (opts%normUvel /= 0) Then
+!!$ Fixme here! Loop over nin
+            Do i = 1, Nin
+               ando%Uin(:, i) = ando%Uin(:, i)/Sqrt(Abs(ando%Vin(i)))
+               ando%Uout_i(i, :) = ando%Uout_i(i, :)*Sqrt(Abs(ando%Vout(i)))
+            End Do
+         End If
+
+!!$       lambda=lambda**2
+         If (ando%haveAllFU /= 0) Then
+            ando%Uin_i = Uin_i(1:sz1, :)
+            ando%Uout = Uout(:, 1:sz2)
+            If (opts%normUvel /= 0) Then
+!!$ Fixme here! Loop over nout
+               Do i = 1, Nout
+                  ando%Uin_i(i, :) = ando%Uin_i(i, :)*Sqrt(Abs(ando%Vin(i)))
+                  ando%Uout(:, i) = ando%Uout(:, i)/Sqrt(Abs(ando%Vout(i)))
+               End Do
+            End If
+         End If
+      End If
+
+!!$ Calculate U(+/-) L(+/-) U(+/-)^(-1) and inverse
+
+      If (ando%haveF /= 0) Then
+         Call ando_help_calc_Fmatr_(n, Uin, lin_i, Uin_i, ando%Fin_i, work)
+         Call ando_help_calc_Fmatr_(n, Uout, lout_i, Uout_i, ando%Fout_i, work)
+         If (ando%haveAllFU /= 0) Then
+            Call ando_help_calc_Fmatr_(n, Uout, lout, Uout_i, ando%Fout, work)
+            Call ando_help_calc_Fmatr_(n, Uin, lin, Uin_i, ando%Fin, work)
+         End If
+         Fin_i => ando%Fin_i
+         Fout_i => ando%Fout_i
+      Else
+         If ((ando%haveBound /= 0) .Or. (ando%haveEmb /= 0)) Then
+            Allocate (Fout_i(n, n))
+            Call ando_help_calc_Fmatr_(n, Uout, lout_i, Uout_i, Fout_i, work)
+            hf1 = 1
+         End If
+         If (ando%haveBound /= 0) Then
+            Allocate (Fin_i(n, n))
+            Call ando_help_calc_Fmatr_(n, Uin, lin_i, Uin_i, Fin_i, work)
+            hf2 = 1
+         End If
+      End If
+      If (ando%haveEmb /= 0) Then
+         Call zgemm(op, 'N', n, n, n, DEF_cmplx_one, h01, n, Fout_i, n, DEF_cmplx_zero, ando%emb, n)
+      End If
+
+!!$ Fill boundary conditions which will be used for RHS
+!!$ If we have F matrices already, we use them, otherwise
+!!$ we will use alternative way
+      If ((ando%haveBound /= 0) .And. (Nin > 0)) Then
+         Call zgemm('N', 'N', n, Nin, n, DEF_cmplx_one, Fout_i, n, ando%Uin, n, DEF_cmplx_zero, work, n)
+         Call zgemm('N', 'N', n, Nin, n, -DEF_cmplx_one, Fin_i, n, ando%Uin, n, DEF_cmplx_one, work, n)
+         Call zgemm(op, 'N', n, Nin, n, DEF_cmplx_one, h01, n, work, n, DEF_cmplx_zero, ando%bound, n)
+      End If
+
+      If (hf1 /= 0) deallocate (Fin_i)
+      If (hf2 /= 0) deallocate (Fout_i)
+      Nullify (Fin_i, Fout_i)
+      Deallocate (work, lin_i, lout_i)
+   End Subroutine ando_help_fill_result_
+
+   Function ando_decompose_spin_(sz, U, idx, mask, rotm) Result(num)
+      Implicit None
+      Integer :: idx(:, :), num(2), sz, mask(:, :)
+      Complex(Kind=DEF_DBL_PREC), Target :: U(:, :)
+      Complex(Kind=DEF_DBL_PREC) :: rotm(2, 2)
+!!$ Local
+      Integer :: i, j, nu, nd, degen
+      Real(Kind=DEF_DBL_PREC) :: rho_u, rho_d
+      Real(Kind=DEF_DBL_PREC), External :: dznrm2
+      Complex(Kind=DEF_DBL_PREC), Pointer :: ptr(:)
+      mask = 0
+      nu = 0
+      nd = 0
+      degen = 0
+      Do i = 1, sz
+         ptr => U(:, i)
+         rho_u = 0.0d0
+         rho_d = 0.0d0
+         Do j = 1, size(idx, DIM=2), 1
+            rho_u = rho_u + Abs(rotm(1, 1)*ptr(idx(1, j)) + rotm(1, 2)*ptr(idx(2, j)))**2
+            rho_d = rho_d + Abs(rotm(2, 1)*ptr(idx(1, j)) + rotm(2, 2)*ptr(idx(2, j)))**2
+         End Do
+         If (Abs(rho_u - rho_d) .Gt. 1.0d-12) Then
+!!$             write(*,*) 'ne:',Abs(rho_u-rho_d), rho_u**2+rho_d**2
+            If (rho_u > rho_d) Then
+               nu = nu + 1
+               mask(nu, 1) = i
+            Else
+               nd = nd + 1
+               mask(nd, 2) = i
+            End If
+         Else
+!!$      write(*,*) 'Be carefull!!!'
+!!$     write(*,*)'Rho:',rho_u,rho_d,rho_u-rho_d,degen
+!!$             write(*,*) 'eq:',Abs(rho_u-rho_d), rho_u**2+rho_d**2
+            If (degen == 0) Then
+               degen = 1
+               nu = nu + 1
+               mask(nu, 1) = i
+            Else
+               degen = 0
+               nd = nd + 1
+               mask(nd, 2) = i
+            End If
+         End If
+      End Do
+
+      If (degen /= 0 .And. ando_split_warn /= 0) Then
+         Write (*, *) 'Warn! Spin Up-Down spliting untrustable. Odd number of deg-modes'
+         ando_split_warn = 0
+      End If
+!!$ nullify(ptr)
+      num = (/nu, nd/)
+   End Function ando_decompose_spin_
+
+   Subroutine ando_help_calc_Fmatr_(n, U, l, ui, f, work)
+!!$ Calculate A*B*C, where B is diaginal matrix.
+!!$ Use temporary array "work" which must be provided
+!!$ I assume that A(2*n,n), C(2*n,n), B(1:n), work(n,n)
+      Implicit None
+      Integer :: n, i
+      Complex(Kind=DEF_DBL_PREC) :: f(n, n), l(n), U(:, :), ui(:, :), work(n, n)
+
+      Do i = 1, n
+         work(:, i) = U(1:n, i)*l(i)
+      End Do
+      Call zgemm('N', 'N', n, n, n, DEF_cmplx_one, work, n, ui(1, 1), 2*n, DEF_cmplx_zero, f, n)
+   End Subroutine ando_help_calc_Fmatr_
+
+   Subroutine ando_help_add_Fmatr_(n, U, l, ui, f, work)
+!!$ Calculate A*B*C, where B is diaginal matrix.
+!!$ Use temporary array "work" which must be provided
+!!$ I assume that A(2*n,n), C(2*n,n), B(1:n), work(n,n)
+      Implicit None
+      Integer :: n, i
+      Complex(Kind=DEF_DBL_PREC) :: f(n, n), l(n), U(:, :), ui(:, :), work(n, n)
+!!$    work=DEF_cmplx_zero
+      Do i = 1, n
+!!$       call zaxpy (n, l(i), x, incx, y, incy)
+         work(:, i) = U(1:n, i)*l(i)
+      End Do
+      Call zgemm('N', 'N', n, n, n, DEF_cmplx_one, work, n, ui(1, 1), 2*n, DEF_cmplx_one, f, n)
+   End Subroutine ando_help_add_Fmatr_
+
+   Function ando_help_u_lambda_(U, l) Result(u_lambda)
+!!$    Performs the multiplication of grneral matrix U by diag. Lambda
+!!$    Lambda i given as a vector
+      Implicit None
+      Complex(Kind=DEF_DBL_PREC), Intent(In) :: U(:, :), l(:)
+      Complex(Kind=DEF_DBL_PREC) :: u_lambda(size(U, 1), size(l))
+      Integer :: i
+      Do i = 1, size(l)
+         u_lambda(:, i) = U(:, i)*l(i)
+      End Do
+   End Function ando_help_u_lambda_
+
+   Function ando_help_sort_norm_ando_(n, nf, nh, hops, lamb, v, np, nm, veloc, err, fixim) Result(eqs)
+!!$ Order and normalize ando sollutions, split to left- and right- going.
+!!$ Also calculate velocities
+      Implicit None
+      Integer, Intent(In) :: n, nf, nh
+      Integer, Intent(Out) :: np, nm
+      Integer :: eqs
+      Complex(Kind=DEF_DBL_PREC), Intent(Inout) :: lamb(nf), v(nf, nf)
+      Complex(Kind=DEF_DBL_PREC), Intent(In) :: hops(n, n*(nh + 1))
+      Logical, Intent(In) :: fixim
+      Real(Kind=DEF_DBL_PREC), Intent(Out) :: veloc(nf)
+      Real(Kind=DEF_DBL_PREC), Intent(In) :: err
+!!$ local
+      Integer :: i1, i2, hp, n2
+      Real(Kind=DEF_DBL_PREC) :: ph, nrm, vel
+      Complex(Kind=DEF_DBL_PREC), Pointer :: lamb1(:), vwork(:), work(:, :)
+      Real(Kind=DEF_DBL_PREC), External :: dznrm2
+      Type(ando_t_evsort_) :: evs(nf)
+      Complex(Kind=DEF_DBL_PREC), External :: zdotc
+      Real(Kind=DEF_DBL_PREC) :: SSMIN, SSMAX
+
+      Allocate (lamb1(nf), vwork(n), work(nf, nf))
+
+      SSMIN = 1.0d0 - err
+      SSMAX = 1.0d0 + err
+      np = 0
+      nm = 0
+      n2 = nh*n
+
+!!$ Force propagating modes to be really propagating
+!!$ Fix phase (if nessesary). Calculate velocity
+!!$ Prepare structure for sort
+!!$    write(*,*) '************'
+      Do i1 = 1, nf
+         evs(i1)%n = i1
+!!$ Scale eigenvector
+         Call zdscal(nf, 1.0d0/dznrm2(n2, v(1, i1), 1), v(1, i1), 1)
+         evs(i1)%veloc = 0.0d0
+         evs(i1)%isev = .True.
+         If ((Abs(lamb(i1)) > SSMIN) .And. (Abs(lamb(i1)) < SSMAX)) Then
+            evs(i1)%isev = .False.
+!!$ Fix lambda for propagating
+            ph = imag(Log(lamb(i1)))
+            lamb(i1) = Exp(cmplx(0.0d0, ph, kind=DEF_DBL_PREC))
+!!$ Calculate velocity
+            vel = 0.0d0
+            Do hp = 1, nh
+               Call zgemv('N', n, n, DEF_cmplx_one, hops(1, hp*n + 1), n, v(1, i1), 1, DEF_cmplx_zero, &
+              & vwork, 1)
+               vel = vel + hp*imag(zdotc(n, v(1, i1), 1, vwork, 1)*lamb(i1)**(hp))
+            End Do
+            evs(i1)%veloc = vel*2.0d0
+
+            If (evs(i1)%veloc > 0) Then
+               np = np + 1
+            Else
+               nm = nm + 1
+            End If
+         End If
+         evs(i1)%Abs = Abs(lamb(i1))
+         evs(i1)%im = imag(lamb(i1))
+
+      End Do
+!!$    if (np+nm>0) stop
+      If (np /= nm) Then
+         Write (*, *) 'Number of left- and right-going propagating  modes is different'
+!!$       stop
+      End If
+      If (.Not. fixim) Then
+         Call ando_help_qsort_evals_(nf, evs)
+      Else
+         Call ando_help_qsort_evalsim_(nf, evs)
+      End If
+!!$ Reorder accroding to sort results
+!!$ Also fix abs(lambda)
+      lamb1 = lamb
+      Call zcopy(nf*nf, v, 1, work, 1)
+      Do i1 = 1, n2
+         i2 = n2 + i1
+         Call zcopy(nf, work(1, evs(i2)%n), 1, v(1, i2), 1)
+         lamb(i2) = lamb1(evs(i2)%n)
+         veloc(i2) = evs(i2)%veloc
+         nrm = Abs(lamb(i2))
+
+         i2 = n2 - (i1 - 1)
+         Call zcopy(nf, work(1, evs(i2)%n), 1, v(1, i1), 1)
+         lamb(i1) = lamb1(evs(i2)%n)
+         veloc(i1) = evs(i2)%veloc
+
+         nrm = 1.0d0/Sqrt(nrm*Abs(lamb(i1)))
+         lamb(i1) = lamb(i1)*nrm
+         i2 = n2 + i1
+         lamb(i2) = lamb(i2)*nrm
+      End Do
+      ph = veloc(1)*veloc(n2 + 1)
+      eqs = 1
+      If ((ph >= 0.0d0) .And. (np > 0)) Then
+         eqs = 0
+      End If
+      Deallocate (lamb1, vwork, work)
+   End Function ando_help_sort_norm_ando_
+
+   Subroutine ando_help_qsort_evals_(n, dneib)
+!!$ sort sites in t_neighbour_list accroding to their number
+!!$ it uses  modified quicksort
+      Implicit None
+      Integer :: n
+      Type(ando_t_evsort_), Target :: dneib(n)
+!!$ local
+      Type(ando_t_evsort_), Pointer :: neib_p
+      Integer, Pointer :: Index(:), lstk(:), rstk(:)
+      Integer :: istk
+      Integer :: l, r, i, j, p, indexp, indext, fl1
+      Integer, Parameter :: m = 9
+      Allocate (lstk(31), rstk(31), Index(n))
+
+      Do i = 1, n
+         Index(i) = i
+      End Do
+      If (n .Le. m) Go To 900
+
+!!$ qsort itself
+      istk = 0
+      l = 1
+      r = n
+200   Continue
+      i = l
+      j = r
+      p = (l + r)/2
+      indexp = Index(p)
+      neib_p => dneib(indexp)
+      If (cmpr_fun(dneib(Index(l)), neib_p)) Then
+         Index(p) = Index(l)
+         Index(l) = indexp
+         indexp = Index(p)
+         neib_p => dneib(indexp)
+      End If
+      If (cmpr_fun(neib_p, dneib(Index(r)))) Then
+         If (cmpr_fun(dneib(Index(l)), dneib(Index(r)))) Then
+            Index(p) = Index(l)
+            Index(l) = Index(r)
+         Else
+            Index(p) = Index(r)
+         End If
+         Index(r) = indexp
+         indexp = Index(p)
+         neib_p => dneib(indexp)
+      End If
+300   Continue
+      i = i + 1
+      If (cmpr_fun(neib_p, dneib(Index(i)))) Go To 300
+400   Continue
+      j = j - 1
+      If (cmpr_fun(dneib(Index(j)), neib_p)) Go To 400
+      If (i .Lt. j) Then
+         indext = Index(i)
+         Index(i) = Index(j)
+         Index(j) = indext
+         Go To 300
+      Else
+         If (r - j .Ge. i - l .And. i - l .Gt. m) Then
+            istk = istk + 1
+            lstk(istk) = j + 1
+            rstk(istk) = r
+            r = i - 1
+         Else If (i - l .Gt. r - j .And. r - j .Gt. m) Then
+            istk = istk + 1
+            lstk(istk) = l
+            rstk(istk) = i - 1
+            l = j + 1
+         Else If (r - j .Gt. m) Then
+            l = j + 1
+         Else If (i - l .Gt. m) Then
+            r = i - 1
+         Else
+            If (istk .Lt. 1) Go To 900
+            l = lstk(istk)
+            r = rstk(istk)
+            istk = istk - 1
+         End If
+         Go To 200
+      End If
+
+900   Continue
+!!$ "buble sort". used if we have datasize<9 and for last iteration after "qsort"
+      Do i = 2, n
+         If (cmpr_fun(dneib(Index(i - 1)), dneib(Index(i)))) Then
+            indexp = Index(i)
+            neib_p => dneib(indexp)
+            p = i - 1
+            fl1 = 0
+            Do while (fl1 == 0)
+               Index(p + 1) = Index(p)
+               p = p - 1
+               If (p .Le. 0) Then
+                  fl1 = 1
+               Else
+                  If (cmpr_fun(neib_p, dneib(Index(p)))) fl1 = 1
+               End If
+            End Do
+            Index(p + 1) = indexp
+         End If
+      End Do
+      dneib = dneib(Index)
+      Nullify (neib_p)
+      Deallocate (lstk, rstk, Index)
+   Contains
+
+      Function cmpr_fun(a, b) Result(res)
+!!$ helper function. compare two ando sollutions
+         Type(ando_t_evsort_) :: a, b
+         Logical :: res
+
+         If (a%isev .Or. b%isev) Then
+            res = (a%Abs > b%Abs)
+            Return
+         Else
+            If ((a%veloc*b%veloc) > 0) Then
+               res = (a%veloc > b%veloc)
+               Return
+            Else
+               res = (.Not. (a%veloc > b%veloc))
+               Return
+            End If
+         End If
+      End Function cmpr_fun
+   End Subroutine ando_help_qsort_evals_
+
+   Subroutine ando_help_qsort_evalsim_(n, dneib)
+!!$ sort sites in t_neighbour_list accroding to their number
+!!$ it uses  modified quicksort
+      Implicit None
+      Integer :: n
+      Type(ando_t_evsort_), Target :: dneib(n)
+!!$ local
+      Type(ando_t_evsort_), Pointer :: neib_p
+      Integer, Pointer :: Index(:), lstk(:), rstk(:)
+      Integer :: istk
+      Integer :: l, r, i, j, p, indexp, indext, fl1
+      Integer, Parameter :: m = 9
+      Allocate (lstk(31), rstk(31), Index(n))
+
+      Do i = 1, n
+         Index(i) = i
+      End Do
+      If (n .Le. m) Go To 900
+
+!!$ qsort itself
+      istk = 0
+      l = 1
+      r = n
+200   Continue
+      i = l
+      j = r
+      p = (l + r)/2
+      indexp = Index(p)
+      neib_p => dneib(indexp)
+      If (cmpr_fun(dneib(Index(l)), neib_p)) Then
+         Index(p) = Index(l)
+         Index(l) = indexp
+         indexp = Index(p)
+         neib_p => dneib(indexp)
+      End If
+      If (cmpr_fun(neib_p, dneib(Index(r)))) Then
+         If (cmpr_fun(dneib(Index(l)), dneib(Index(r)))) Then
+            Index(p) = Index(l)
+            Index(l) = Index(r)
+         Else
+            Index(p) = Index(r)
+         End If
+         Index(r) = indexp
+         indexp = Index(p)
+         neib_p => dneib(indexp)
+      End If
+300   Continue
+      i = i + 1
+      If (cmpr_fun(neib_p, dneib(Index(i)))) Go To 300
+400   Continue
+      j = j - 1
+      If (cmpr_fun(dneib(Index(j)), neib_p)) Go To 400
+      If (i .Lt. j) Then
+         indext = Index(i)
+         Index(i) = Index(j)
+         Index(j) = indext
+         Go To 300
+      Else
+         If (r - j .Ge. i - l .And. i - l .Gt. m) Then
+            istk = istk + 1
+            lstk(istk) = j + 1
+            rstk(istk) = r
+            r = i - 1
+         Else If (i - l .Gt. r - j .And. r - j .Gt. m) Then
+            istk = istk + 1
+            lstk(istk) = l
+            rstk(istk) = i - 1
+            l = j + 1
+         Else If (r - j .Gt. m) Then
+            l = j + 1
+         Else If (i - l .Gt. m) Then
+            r = i - 1
+         Else
+            If (istk .Lt. 1) Go To 900
+            l = lstk(istk)
+            r = rstk(istk)
+            istk = istk - 1
+         End If
+         Go To 200
+      End If
+
+900   Continue
+!!$ "buble sort". used if we have datasize<9 and for last iteration after "qsort"
+      Do i = 2, n
+         If (cmpr_fun(dneib(Index(i - 1)), dneib(Index(i)))) Then
+            indexp = Index(i)
+            neib_p => dneib(indexp)
+            p = i - 1
+            fl1 = 0
+            Do while (fl1 == 0)
+               Index(p + 1) = Index(p)
+               p = p - 1
+               If (p .Le. 0) Then
+                  fl1 = 1
+               Else
+                  If (cmpr_fun(neib_p, dneib(Index(p)))) fl1 = 1
+               End If
+            End Do
+            Index(p + 1) = indexp
+         End If
+      End Do
+      dneib = dneib(Index)
+      Nullify (neib_p)
+      Deallocate (lstk, rstk, Index)
+   Contains
+
+      Function cmpr_fun(a, b) Result(res)
+!!$ helper function. compare two ando sollutions
+         Type(ando_t_evsort_) :: a, b
+         Logical :: res
+
+         If (a%isev .Or. b%isev) Then
+            If (Abs((a%Abs - b%Abs)/(a%Abs + b%Abs)) > 1.0d-8) Then
+               res = (a%Abs > b%Abs)
+               Return
+            Else
+               res = (a%im > b%im)
+               Return
+            End If
+
+         Else
+            If ((a%veloc*b%veloc) > 0) Then
+               res = (a%veloc > b%veloc)
+               Return
+            Else
+               res = (.Not. (a%veloc > b%veloc))
+               Return
+            End If
+         End If
+      End Function cmpr_fun
+   End Subroutine ando_help_qsort_evalsim_
+
+   Subroutine ando_help_qsort_evals_z(n, dneib)
+!!$ sort sites in t_neighbour_list accroding to their number
+!!$ it uses  modified quicksort
+      Implicit None
+      Integer :: n
+      Type(ando_t_evsort_), Target :: dneib(n)
+!!$ local
+      Type(ando_t_evsort_), Pointer :: neib_p
+      Integer, Pointer :: Index(:), lstk(:), rstk(:)
+      Integer :: istk
+      Integer :: l, r, i, j, p, indexp, indext, fl1
+      Integer, Parameter :: m = 9
+      Allocate (lstk(31), rstk(31), Index(n))
+
+      Do i = 1, n
+         Index(i) = i
+      End Do
+      If (n .Le. m) Go To 900
+
+!!$ qsort itself
+      istk = 0
+      l = 1
+      r = n
+200   Continue
+      i = l
+      j = r
+      p = (l + r)/2
+      indexp = Index(p)
+      neib_p => dneib(indexp)
+      If (cmpr_fun(dneib(Index(l)), neib_p)) Then
+         Index(p) = Index(l)
+         Index(l) = indexp
+         indexp = Index(p)
+         neib_p => dneib(indexp)
+      End If
+      If (cmpr_fun(neib_p, dneib(Index(r)))) Then
+         If (cmpr_fun(dneib(Index(l)), dneib(Index(r)))) Then
+            Index(p) = Index(l)
+            Index(l) = Index(r)
+         Else
+            Index(p) = Index(r)
+         End If
+         Index(r) = indexp
+         indexp = Index(p)
+         neib_p => dneib(indexp)
+      End If
+300   Continue
+      i = i + 1
+      If (cmpr_fun(neib_p, dneib(Index(i)))) Go To 300
+400   Continue
+      j = j - 1
+      If (cmpr_fun(dneib(Index(j)), neib_p)) Go To 400
+      If (i .Lt. j) Then
+         indext = Index(i)
+         Index(i) = Index(j)
+         Index(j) = indext
+         Go To 300
+      Else
+         If (r - j .Ge. i - l .And. i - l .Gt. m) Then
+            istk = istk + 1
+            lstk(istk) = j + 1
+            rstk(istk) = r
+            r = i - 1
+         Else If (i - l .Gt. r - j .And. r - j .Gt. m) Then
+            istk = istk + 1
+            lstk(istk) = l
+            rstk(istk) = i - 1
+            l = j + 1
+         Else If (r - j .Gt. m) Then
+            l = j + 1
+         Else If (i - l .Gt. m) Then
+            r = i - 1
+         Else
+            If (istk .Lt. 1) Go To 900
+            l = lstk(istk)
+            r = rstk(istk)
+            istk = istk - 1
+         End If
+         Go To 200
+      End If
+
+900   Continue
+!!$ "buble sort". used if we have datasize<9 and for last iteration after "qsort"
+      Do i = 2, n
+         If (cmpr_fun(dneib(Index(i - 1)), dneib(Index(i)))) Then
+            indexp = Index(i)
+            neib_p => dneib(indexp)
+            p = i - 1
+            fl1 = 0
+            Do while (fl1 == 0)
+               Index(p + 1) = Index(p)
+               p = p - 1
+               If (p .Le. 0) Then
+                  fl1 = 1
+               Else
+                  If (cmpr_fun(neib_p, dneib(Index(p)))) fl1 = 1
+               End If
+            End Do
+            Index(p + 1) = indexp
+         End If
+      End Do
+      dneib = dneib(Index)
+      Nullify (neib_p)
+      Deallocate (lstk, rstk, Index)
+   Contains
+
+      Function cmpr_fun(a, b) Result(res)
+!!$ helper function. compare two ando sollutions
+         Type(ando_t_evsort_) :: a, b
+         Logical :: res
+         if (abs(a%Abs - b%Abs) > 1.0d-6) then
+            res = (a%Abs > b%Abs)
+            Return
+         Else
+            If ((a%veloc*b%veloc) > 0) Then
+               res = (a%veloc > b%veloc)
+               Return
+            Else
+               res = (.Not. (a%veloc > b%veloc))
+               Return
+            End If
+         End If
+      End Function cmpr_fun
+   End Subroutine ando_help_qsort_evals_z
+
+   Subroutine ando_help_inv_sub_cmat_(n, a, lda)
+!!$    In-Place Inversion of complex SUBmatrix (wrapper of Lapack routines)
+      Implicit None
+      !External zgetrf, zgetri
+
+      Integer :: n
+      Complex(Kind=DEF_DBL_PREC) :: a
+      Integer :: info, lda
+!!$ Local
+      Complex(Kind=DEF_DBL_PREC), Pointer :: work(:)
+      Integer, Pointer :: ipiv(:)
+
+      Allocate (ipiv(n), work(n))
+!!$ DAMMMIT! Valgrind complains here!
+
+      Call zgetrf(n, n, a, lda, ipiv, info)! computes LU factorization
+!!$
+      If (info /= 0) Then
+         Write (*, *) 'Problems encountered while in zgetrf routine, info =', info
+         Write (*, *) ' in ANDO module'
+         Stop
+      End If
+
+      Call zgetri(n, a, lda, ipiv, work, n, info)! inverses the a matrix
+
+      If (info /= 0) Then
+         Write (*, *) 'Problems encountered while in zgetrfi routine, info =', info
+         Stop
+      End If
+      Deallocate (ipiv, work)
+   End Subroutine ando_help_inv_sub_cmat_
+
+   Subroutine zggevx_driver(bal, n, Lm, Rm, wr1, alpha, beta, info)
+!!$ ZGGEVX driver
+      Implicit None
+      Integer :: n, info
+      Character :: bal
+      Complex(Kind=DEF_DBL_PREC) :: beta(n), wr1(n, n), alpha(n)
+      Complex(Kind=DEF_DBL_PREC) :: Lm(n, n), Rm(n, n)
+!!$ Local
+      Integer :: lwork, ilo, ihi
+      Complex(Kind=DEF_DBL_PREC) :: zerop(10), clwork
+      Real(Kind=DEF_DBL_PREC) :: abnrm, bbnrm
+
+      Complex(Kind=DEF_DBL_PREC), Pointer :: work1(:)
+      Real(Kind=DEF_DBL_PREC), Pointer :: rwork1(:)
+      Logical, Pointer :: bwork1(:)
+      Integer, Pointer :: lscale1(:)
+      Integer, Pointer :: rscale1(:)
+      Integer, Pointer :: iwork1(:)
+      External :: ZGGEVX
+      Allocate (lscale1(n*2))
+      Allocate (rscale1(n*2))
+      Allocate (iwork1((n + 2)))
+      Allocate (rwork1(6*n))
+      Allocate (bwork1(n))
+
+#if defined(NTS_LPK)
+!$OMP critical
+#endif
+      Call ZGGEVX(bal, 'N', 'V', 'N', n, Lm, n, Rm, n, alpha, beta, 0, 1, wr1, n, ilo, ihi, lscale1, &
+     & rscale1, abnrm, bbnrm, 0, 0, clwork, -1, rwork1, iwork1, bwork1, info)
+      lwork = clwork
+      Allocate (work1(lwork))
+
+      Call ZGGEVX(bal, 'N', 'V', 'N', n, Lm, n, Rm, n, alpha, beta, zerop, n, wr1, n, ilo, ihi, lscale1, &
+     & rscale1, abnrm, bbnrm, zerop, zerop, work1, lwork, rwork1, iwork1, bwork1, info)
+
+#if defined(NTS_LPK)
+!$OMP end critical
+#endif
+      Deallocate (lscale1, rscale1, iwork1, rwork1, bwork1, work1)
+   End Subroutine zggevx_driver
+
+   Function ando_help_calc_ando_eigsgen_(n, nh, nf, hops, eigvec, lambda, kind) Result(uf)
+!!$ Driver for generalized eigenvalue solvers
+!!$ Prepare matrices for diagonalization and call  proper solver
+          Use sparselib
+      Implicit None
+      Integer :: n, nh, nf, Kind, uf
+      Complex(Kind=DEF_DBL_PREC) :: eigvec(nf, nf), lambda(nf), hops(n, n*(nh + 1))
+!!$ Local
+!!$         Complex (Kind=DEF_DBL_PREC) :: Lmatr (nf, nf), Rmatr (nf, nf), beta (nf)
+      Complex(Kind=DEF_DBL_PREC), Pointer :: Lmatr(:, :), Rmatr(:, :), beta(:)
+      Integer :: i, info
+!!$          Real (Kind=DEF_DBL_PREC) :: merr
+!!$          Complex (Kind=DEF_DBL_PREC), Pointer :: Lmatr0 (:, :), Rmatr0 (:, :)
+!!$          Allocate (Lmatr0(nf, nf), Rmatr0(nf, nf))
+
+      Allocate (Lmatr(nf, nf), Rmatr(nf, nf), beta(nf))
+
+      Call ando_help_prep_lmatr_(n, nf, nh, hops, Lmatr)
+
+      uf = 0
+!!$ Prepare Right matrix
+      Rmatr = 0.0d0
+      Rmatr(1:n, 1:n) = -hops(:, n*nh + 1:n*nh + n)
+      Do i = n + 1, nf
+         Rmatr(i, i) = 1.0d0
+      End Do
+!!$          Stop
+!!$ Call appropriate driver routine
+      Select Case (kind)
+      Case (0)
+         Call zggev_driver(nf, Lmatr, Rmatr, eigvec, lambda, beta, info)
+      Case (1)
+         Call zggevx_driver('N', nf, Lmatr, Rmatr, eigvec, lambda, beta, info)
+      Case (2)
+         Call zggevx_driver('P', nf, Lmatr, Rmatr, eigvec, lambda, beta, info)
+      Case (3)
+         Call zggevx_driver('S', nf, Lmatr, Rmatr, eigvec, lambda, beta, info)
+      Case (4)
+         Call zggevx_driver('B', nf, Lmatr, Rmatr, eigvec, lambda, beta, info)
+      Case (5)
+         Call r8tomsqz_driver(nf, Lmatr, Rmatr, eigvec, lambda, beta, info)
+#if defined(HAVE_QUADPREC)
+      Case (7)
+         Call r16tomsqz_driver(nf, Lmatr, Rmatr, eigvec, lambda, beta, info)
+#endif
+
+      Case Default
+         Write (*, '("Error!!! I do not have generalized eigenvalue")')
+         Write (*, '("solver for kind=",i2)') kind
+         Stop
+      End Select
+      If (info < 0) Then
+         Write (*, '("Problem of generalized  eigenvalue solver encountered!!!")')
+         Write (*, '("Solver for kind=",i2," exits with info=",i3)') kind, info
+         Stop
+      Else
+         If (info > 0) Then
+            Write (*, '("Solver for kind=",i2,": EV not converged = ",i3)') kind, info
+            Write (*, '("Perform failback to quad-prec")')
+            uf = 1
+         End If
+      End If
+
+      Deallocate (Lmatr, Rmatr)
+!!$          merr=0.0d0
+!!$ Check for overflow and calculate eigenvalues
+      Do i = 1, nf
+         If (beta(i) /= 0.0d0) Then
+            lambda(i) = lambda(i)/beta(i)
+         Else
+!!$                Write (*,*) 'Underflow in ando_help_calc_ando_ for  lambda(', i, ')', lambda (i), beta (i)
+            lambda(i) = lambda(i)*1.0d18
+            uf = 1
+         End If
+!!$             merr = max(merr,maxval (Abs(matmul(Lmatr0, eigvec(:, i))-(matmul(Rmatr0(:, :), eigvec(:, &
+!!$             & i))*lambda(i)))))
+      End Do
+!!$          write(*,*) 'merr=',merr
+      Deallocate (beta)
+!!$          Deallocate (Lmatr0, Rmatr0)
+      Return
+   Contains
+
+      Subroutine zggev_driver(n, Lm, Rm, wr, alpha, beta, info)
+!!$ ZGGEV driver
+         Implicit None
+         Integer :: n, info
+         Complex(Kind=DEF_DBL_PREC) :: wr(n, n), alpha(n), beta(n)
+         Complex(Kind=DEF_DBL_PREC) :: Lm(n, n), Rm(n, n)
+!!$ Local
+         Complex(Kind=DEF_DBL_PREC) :: zerop
+         Real(Kind=DEF_DBL_PREC), Pointer :: rwork(:)
+         Integer :: lwork
+         Complex(Kind=DEF_DBL_PREC), Pointer :: work(:)
+         lwork = 10*n
+
+         Allocate (rwork(8*n), work(lwork))
+#if defined(NTS_LPK)
+!$omp critical
+#endif
+         Call zggev('N', 'V', n, Lm, n, Rm, n, alpha, beta, zerop, n, wr, n, work, lwork, rwork, info)
+#if defined(NTS_LPK)
+!$omp end critical
+#endif
+         Deallocate (rwork, work)
+      End Subroutine zggev_driver
+
+      Subroutine r8tomsqz_driver(n, Lm, Rm, wr, alpha, beta, info)
+!!$ driver for TOMSQZ routine in dbl.prec.
+         Implicit None
+         Integer :: n, info
+         Complex(Kind=DEF_DBL_PREC) :: wr(n, n), alpha(n), beta(n)
+         Complex(Kind=DEF_DBL_PREC) :: Lm(n, n), Rm(n, n)
+!!$ Local
+         Real(Kind=DEF_DBL_PREC), Pointer :: LmR(:, :), LmI(:, :), RmR(:, :), RmI(:, :)
+         Real(Kind=DEF_DBL_PREC), Pointer :: alphaR(:), alphaI(:), betaQ(:), evR(:, :), evI(:, :)
+         Allocate (LmR(n, n), LmI(n, n), RmR(n, n), RmI(n, n), alphaR(n), alphaI(n), betaQ(n), evR(n, n), &
+        & evI(n, n))
+         LmR = real(Lm)
+         LmI = aimag(Lm)
+         RmR = real(Rm)
+         RmI = aimag(Rm)
+
+         Call r8tomsqz(n, n, LmR, LmI, RmR, RmI, alphaR, alphaI, betaQ, evR, evI, info)
+#if defined(HAVE_QUADPREC)
+#else
+         If (any(cmplx(alphaR, alphaI, kind=DEF_DBL_PREC) .eq. DEF_cmplx_zero) &
+            & .or. any(betaQ .eq. 0.0d0)) Then
+            write (*, *) 'Underflow problem in r8tomsqz'
+            stop
+         End If
+#endif
+         wr = cmplx(evR, evI, kind=DEF_DBL_PREC)
+         alpha = cmplx(alphaR, alphaI, kind=DEF_DBL_PREC)
+         beta = betaQ
+         Deallocate (LmR, LmI, RmR, RmI, alphaR, alphaI, betaQ, evR, evI)
+      End Subroutine r8tomsqz_driver
+
+#if defined(HAVE_QUADPREC)
+      Subroutine r16tomsqz_driver(n, Lm, Rm, wr, alpha, beta, info)
+!!$ driver for TOMSQZ routine in quadro.prec.
+         Implicit None
+         Integer :: n, info
+         Complex(Kind=DEF_DBL_PREC) :: wr(n, n), alpha(n), beta(n)
+         Complex(Kind=DEF_DBL_PREC) :: Lm(n, n), Rm(n, n)
+!!$ Local
+         Real(Kind=DEF_QUAD_PREC), Pointer :: LmR(:, :), LmI(:, :), RmR(:, :), RmI(:, :)
+         Real(Kind=DEF_QUAD_PREC), Pointer :: alphaR(:), alphaI(:), betaQ(:), evR(:, :), evI(:, :)
+         Allocate (LmR(n, n), LmI(n, n), RmR(n, n), RmI(n, n), alphaR(n), alphaI(n), betaQ(n), evR(n, n), &
+        & evI(n, n))
+         LmR = DEF_long_zero
+         LmI = DEF_long_zero
+         RmR = DEF_long_zero
+         RmI = DEF_long_zero
+         LmR = real(Lm)
+         LmI = aimag(Lm)
+         RmR = real(Rm)
+         RmI = aimag(Rm)
+
+         Call r16tomsqz(n, n, LmR, LmI, RmR, RmI, alphaR, alphaI, betaQ, evR, evI, info)
+
+         wr = cmplx(evR, evI, kind=DEF_DBL_PREC)
+         If (any(cmplx(alphaR, alphaI, kind=DEF_QUAD_PREC) .eq. DEF_cmplx_zeroL) &
+            & .or. any(betaQ .eq. DEF_long_zero)) Then
+            write (*, *) 'Underflow problem in r16tomsqz'
+            stop
+         End If
+         ! To avoid possible (but very improbable) zeros if converted to double precision:
+         alphaR = alphaR/betaQ
+         alphaI = alphaI/betaQ
+         betaQ = DEF_cmplx_oneL
+         ! be aware that alpha and beta can not be used as generalized eigenvalues anymore
+         ! lambda = alpha/beta is still ok.
+         alpha = cmplx(alphaR, alphaI, kind=DEF_DBL_PREC)
+         beta = real(betaQ, kind=DEF_DBL_PREC)
+         Deallocate (LmR, LmI, RmR, RmI, alphaR, alphaI, betaQ, evR, evI)
+      End Subroutine r16tomsqz_driver
+#endif
+   End Function ando_help_calc_ando_eigsgen_
+
+   Subroutine ando_help_calc_ando_eigs_(n, nh, nf, hops, eigvec, lambda, kind)
+!!$ Eigenvalue driver
+!!$ Prepare matrices for diagonalization and call  proper solver
+      Implicit None
+      !External zgetrf, zgetrs
+      
+      Integer :: n, nh, nf, Kind
+      Complex(Kind=DEF_DBL_PREC) :: eigvec(nf, nf), lambda(nf), hops(n, n*(nh + 1))
+!!$ Local
+      Complex(Kind=DEF_DBL_PREC), Pointer :: Lmatr(:, :), hopi(:, :)
+      Integer :: i, info
+      Integer, Pointer :: ipiv(:)
+      Allocate (ipiv(n), Lmatr(nf, nf), hopi(n, n))
+
+      Call ando_help_prep_lmatr_(n, nf, nh, hops, Lmatr)
+
+      hopi = -hops(:, nh*n + 1:nh*n + n)
+
+      Call zgetrf(n, n, hopi, n, ipiv, info)
+      Call zgetrs('N', n, nf, hopi, n, ipiv, Lmatr, nf, info)
+
+      Do i = 1, (nf - n)
+         Lmatr(n + i, i) = 1.0d0
+      End Do
+
+      Select Case (kind)
+      Case (0)
+         Call zgeev_driver(nf, Lmatr, eigvec, lambda, info)
+      Case Default
+         Write (*, '("Error!!! I do not have simple eigenvalue")')
+         Write (*, '("solver for kind=",i2)') kind
+         Stop
+      End Select
+
+      If (info /= 0) Then
+         Write (*, '("Problem of simple eigenvalue solver encountered!!!")')
+         Write (*, '("Solver for kind=",i2," exits with info=",i3)') kind, info
+         Stop
+      End If
+      Deallocate (ipiv, Lmatr, hopi)
+      Return
+   Contains
+      Subroutine zgeev_driver(n, Lm, wr, alpha, info)
+!!$ ZGGEV driver
+         Implicit None
+         !External zgeev
+         
+         Integer :: n, info
+         Complex(Kind=DEF_DBL_PREC) :: wr(n, n), alpha(n)
+         Complex(Kind=DEF_DBL_PREC) :: Lm(n, n)
+!!$ Local
+
+         Complex(Kind=DEF_DBL_PREC) :: zerop
+         Real(Kind=DEF_DBL_PREC), Pointer :: rwork(:)
+         Complex(Kind=DEF_DBL_PREC), Pointer :: work(:)
+         Integer :: lwork
+         lwork = 10*n
+         Allocate (rwork(2*n), work(lwork))
+#if defined(NTS_LPK)
+!$omp critical
+#endif
+         Call zgeev('N', 'V', n, Lm, n, alpha, zerop, n, wr, n, work, lwork, rwork, info)
+#if defined(NTS_LPK)
+!$omp end critical
+#endif
+         Deallocate (rwork, work)
+      End Subroutine zgeev_driver
+   End Subroutine ando_help_calc_ando_eigs_
+
+   Subroutine ando_help_prep_lmatr_(n, nf, nh, hops, Lmatr)
+!!$ Prepare Left matrix
+      Implicit None
+      Complex(Kind=DEF_DBL_PREC) :: Lmatr(:, :), hops(:, :)
+      Integer :: nf, nh, n
+!!$ Local vars
+      Integer :: j, i, l
+      Lmatr = 0.0d0
+      j = 0
+      i = n*(nh - 1)
+      Do l = nh, 1, -1
+         Lmatr(1:n, j + 1:j + n) = hops(:, i + 1:i + n)
+         j = j + n
+         i = i - n
+      End Do
+      i = n
+      Do l = 1, nh, 1
+         Lmatr(1:n, j + 1:j + n) = transpose(conjg(hops(:, i + 1:i + n)))
+         j = j + n
+         i = i + n
+      End Do
+      Do i = 1, (nf - n)
+         Lmatr(n + i, i) = 1.0d0
+      End Do
+
+   End Subroutine ando_help_prep_lmatr_
+      Subroutine r8tomsqz_driver(n, Lm, Rm, wr, alpha, beta, info)
+!!$ driver for TOMSQZ routine in dbl.prec.
+         Implicit None
+         Integer :: n, info
+         Complex(Kind=DEF_DBL_PREC) :: wr(n, n), alpha(n), beta(n)
+         Complex(Kind=DEF_DBL_PREC) :: Lm(n, n), Rm(n, n)
+!!$ Local
+         Real(Kind=DEF_DBL_PREC), Pointer :: LmR(:, :), LmI(:, :), RmR(:, :), RmI(:, :)
+         Real(Kind=DEF_DBL_PREC), Pointer :: alphaR(:), alphaI(:), betaQ(:), evR(:, :), evI(:, :)
+         Allocate (LmR(n, n), LmI(n, n), RmR(n, n), RmI(n, n), alphaR(n), alphaI(n), betaQ(n), evR(n, n), &
+        & evI(n, n))
+         LmR = dreal(Lm)
+         LmI = aimag(Lm)
+         RmR = dreal(Rm)
+         RmI = aimag(Rm)
+
+         Call r8tomsqz(n, n, LmR, LmI, RmR, RmI, alphaR, alphaI, betaQ, evR, evI, info)
+#if defined(HAVE_QUADPREC)
+#else
+         If (any(cmplx(alphaR, alphaI, kind=DEF_DBL_PREC) .eq. DEF_cmplx_zero) &
+            & .or. any(betaQ .eq. 0.0d0)) Then
+            write (*, *) 'Underflow problem in r8tomsqz'
+            stop
+         End If
+#endif
+         wr = cmplx(evR, evI, kind=DEF_DBL_PREC)
+         alpha = cmplx(alphaR, alphaI, kind=DEF_DBL_PREC)
+         beta = betaQ
+         Deallocate (LmR, LmI, RmR, RmI, alphaR, alphaI, betaQ, evR, evI)
+      End Subroutine r8tomsqz_driver
+End Module ando_module

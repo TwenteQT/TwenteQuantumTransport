@@ -1,0 +1,97 @@
+
+#include "math_def.h"
+Module timer
+      Implicit None
+      
+      Real (Kind=DEF_DBL_PREC) :: times(13)
+      Integer, allocatable :: alltimefiles(:)
+      Integer :: timef
+      
+      ! first element is begin of k-point
+      ! second element is begin of sub-part
+      Integer, parameter :: ti_ando = 3
+      Integer, parameter :: ti_prep = 4
+      Integer, parameter :: ti_embed = 5
+      Integer, parameter :: ti_solve = 6
+      
+      Integer, parameter :: ti_torque = 7
+      Integer, parameter :: ti_zcurr = 8
+      Integer, parameter :: ti_iatcu = 9
+      
+      Integer, parameter :: ti_bar = 10
+      Integer, parameter :: ti_hdf = 11
+      Integer, parameter :: ti_mpi = 12
+      Integer, parameter :: ti_other = 13
+      
+Contains
+   
+      Function get_tf_unit(my_mpi_id) result(u)
+         Implicit None
+         Integer :: u, my_mpi_id
+         u = 2000 + my_mpi_id
+      End Function
+   
+      Function open_timef(my_mpi_id, flag) result(tf)
+         Implicit None
+         Integer :: flag, tf, my_mpi_id
+         
+         Character(30) :: cwork
+         tf = get_tf_unit(my_mpi_id)
+         if (flag > 1) then
+            write(cwork, '(I30)') my_mpi_id
+            open(Unit=tf, File='times'//trim(adjustl(cwork)), Action='write')
+            return
+         else if (my_mpi_id == 0) then
+            Open (Unit=tf, File='times', Action='write')
+            return
+         end if
+         tf = -1
+      End Function
+   
+      Subroutine restart_times(times, t)
+         Implicit None
+         Real (Kind=DEF_DBL_PREC) :: times(:), t
+         Integer :: i
+         times(1) = t
+         times(2) = times(1)
+         Do i = 3, size(times)
+            times(i) = 0.0d0
+         End Do
+      End Subroutine
+      
+      Subroutine sub_time(times, t, ind)
+         Implicit None
+         Real (Kind=DEF_DBL_PREC) :: times(:), t
+         Integer :: ind
+         
+         times(ind) = times(ind) + t - times(2)
+         times(2) =  t
+      End Subroutine
+      
+      Subroutine write_times(timef, times, t, ik, flag)
+         Implicit None
+         Integer :: timef, ik, ngrps, flag
+         Real (Kind=DEF_DBL_PREC) :: times(:), t
+         
+         If (timef == -1) Return
+         If (flag == 0) Rewind(timef)
+         Write (timef, '("ik =",i)') ik
+         Write (timef, '("    Ando Time = ", f12.4)') times(ti_ando)
+         Write (timef, '("    Prep Time = ", f12.4)') times(ti_prep)
+         Write (timef, '("   Embed Time = ", f12.4)') times(ti_embed)
+         Write (timef, '("   Solve Time = ", f12.4)') times(ti_solve)
+         Write (timef, '("  Torque Time = ", f12.4)') times(ti_torque)
+         Write (timef, '("   Zcurr Time = ", f12.4)') times(ti_zcurr)
+         Write (timef, '("   Iatcu Time = ", f12.4)') times(ti_iatcu)
+         Write (timef, '("     HDF Time = ", f12.4)') times(ti_hdf)
+         Write (timef, '("     MPI Time = ", f12.4)') times(ti_mpi)
+         Write (timef, '(" Barrier Time = ", f12.4)') times(ti_bar)
+         Write (timef, '("        Other = ", f12.4)') times(ti_other)
+         Write (timef, '("----------------------------")')
+         Write (timef, '(" K-point Time = ", f12.4," seconds")') t - times(1)
+         Write (timef, '()')
+         Flush (timef)
+         
+      End Subroutine
+      
+End Module timer

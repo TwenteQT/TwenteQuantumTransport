@@ -1,0 +1,668 @@
+!!$ $Id: postprocess.F90 1664 2013-09-10 15:53:00Z rien $
+#include "math_def.h"
+Module interatcur
+      Use sparselib
+      Use geometry_module
+      Use structure
+      Implicit None
+
+      Type t_curtensor
+         Integer :: nnz = 0
+         Real (Kind=DEF_DBL_PREC), Pointer :: a (:, :, :) ! nnz x 4 x 2 array
+         Integer, Pointer :: ir (:), jc (:)
+      End Type
+      
+      Type t_tr_components
+         Integer :: n
+         Integer, Pointer :: trvia(:, :)
+      End Type
+      
+      Type t_interat_currents
+         Integer :: ntr = 0, nat = 0, alloc = 0
+         Integer, Pointer :: trlist(:,:) ! 2 x ntr matrix containing all relevant translations of the uc
+         Integer, Pointer :: direct(:)
+         Type (t_curtensor), Pointer :: curten(:)
+         Type (t_tr_components), Pointer :: via(:)
+         Real (Kind=DEF_DBL_PREC), Pointer :: cons(:, :)
+      End Type
+      
+Contains
+   
+      Subroutine dealloc_iatcu(iatcu)
+         Implicit None
+         Type(t_interat_currents) :: iatcu
+         Integer i
+         
+         If (iatcu%alloc /= 0) Then
+            Deallocate(iatcu%trlist)
+            Deallocate(iatcu%direct)
+            Do i = 1, iatcu%ntr
+               Call dealloc_curten(iatcu%curten(i))
+            End Do
+            Deallocate(iatcu%curten)
+            Do i = 1, iatcu%ntr
+               Call dealloc_via(iatcu%via(i))
+            End Do
+            Deallocate(iatcu%via)
+            Deallocate(iatcu%cons)
+            iatcu%ntr = 0
+            iatcu%nat = 0
+            iatcu%alloc = 0
+         End If
+      End Subroutine dealloc_iatcu
+   
+      Subroutine alloc_iatcu(iatcu, ntr, nat)
+         Implicit None
+         Type(t_interat_currents) :: iatcu
+         Integer :: ntr, nat
+         
+         Call Dealloc_iatcu(iatcu)
+         Allocate(iatcu%trlist(2, ntr))
+         Allocate(iatcu%direct(ntr))
+         Allocate(iatcu%curten(ntr))
+         Allocate(iatcu%via(ntr))
+         Allocate(iatcu%cons(2, nat))
+         iatcu%cons = 0.0d0
+         iatcu%ntr = ntr
+         iatcu%nat = nat
+         iatcu%alloc = 1
+      End Subroutine alloc_iatcu
+      
+      Subroutine make_empty_iatcu(iatcu, ntr)
+         Implicit None
+         Type(t_interat_currents) :: iatcu
+         Integer :: ntr
+         
+         Integer :: itr
+         Call alloc_iatcu(iatcu, ntr, 1)
+         Do itr = 1, ntr
+            Call alloc_curten(iatcu%curten(itr), 1, 1)
+         End Do
+      End Subroutine
+   
+      Function copy_iatcu(iatcu) Result(copy)
+         Implicit None
+         Type(t_interat_currents) :: iatcu, copy
+         Integer :: itr, ntr, nnz
+         ntr = iatcu%ntr
+         Call alloc_iatcu(copy, ntr, iatcu%nat)
+         copy%trlist = iatcu%trlist
+         copy%direct = iatcu%direct
+         copy%cons = iatcu%cons
+         Do itr = 1, ntr
+            Call alloc_via(copy%via(itr), iatcu%via(itr)%n)
+            copy%via(itr)%trvia = iatcu%via(itr)%trvia
+            nnz = iatcu%curten(itr)%nnz
+            Call alloc_curten(copy%curten(itr), nnz, copy%nat)
+            copy%curten(itr)%ir = iatcu%curten(itr)%ir
+            copy%curten(itr)%jc = iatcu%curten(itr)%jc
+         End Do
+      End Function copy_iatcu
+      
+      Subroutine zero_iatcu(iatcu)
+         Implicit None
+         Type (t_interat_currents), Intent (Inout) :: iatcu
+            
+         Integer :: itr
+         Do itr = 1, iatcu%ntr
+            iatcu%curten(itr)%a = 0.0d0
+         End Do
+         iatcu%cons(:, :) = 0.0d0
+      End Subroutine
+   
+      Subroutine calc_iatcu(rhs, msc, mpar, trgeo, rneibs, opt, iatcu, k, nl, nr)
+         Use hamiltonian
+         Use readcfg
+         Implicit None
+         Type (zdensemat), Intent (In) :: rhs
+         Type (t_strconst), Intent(In) :: msc
+         Type (t_potpar_mats), Intent(In) :: mpar
+         Type (t_geometry), Intent (In) :: trgeo
+         Type (t_remember_neibs), Intent(In) :: rneibs(:)
+         Type (t_options) :: opt
+         Type (t_interat_currents), Intent (Inout) :: iatcu ! interatomic currents
+         Real (Kind=DEF_DBL_PREC), Intent(In) :: k (2)
+         Integer, Intent (In) :: nl, nr
+         
+         Type (zcsrmat) :: ham, H1, dum, H2
+         Type (t_mathop) :: sk
+         Integer :: itr, tr(2), ivia, tr1(2), tr2(2), flag
+         
+         Call zero_iatcu(iatcu)
+         If (opt%po%kind > 3) Return
+         If (iatcu%alloc == 0) Return
+         Call init_mathop(sk)
+         Do itr = 1, iatcu%ntr
+            tr = iatcu%trlist(:,itr)
+            If (iatcu%direct(itr) /= 0) Then
+               flag = setflag(tr)
+               Call make_sk_decomp (sk, msc, k, tr, 0)
+               H1 = getH(sk%c, mpar, flag)
+               Call free_mathop(sk)
+               ham = make1cent (H1, mpar%c1, mpar%c1conj)
+               Call free (H1)
+               If ( flag /= 0 ) Call addtoM (ham, mpar%c0)
+            Else
+               Call alloc (ham, 0, mpar%c0%nrow)
+            End If
+            
+            If ( iatcu%via(itr)%n > 0 ) Then
+               Do ivia = 1, iatcu%via(itr)%n
+                  tr1 = iatcu%via(itr)%trvia(:, ivia)
+                  tr2 = tr - tr1
+                  Call make_sk_decomp (sk, msc, k, tr1, 0)
+                  flag = setflag(tr1)
+                  H1 = getH (sk%c, mpar, flag)
+                  Call free_mathop(sk)
+                  Call make_sk_decomp (sk, msc, k, tr2, 0)
+                  flag = setflag(tr2)
+                  H2 = getH (sk%c, mpar, flag)
+                  Call free_mathop(sk)
+                  dum = get3MMM(H2, mpar%c2, H1)
+                  Call addtoM(ham, dum)
+                  Call free(dum)
+                  Call free(H1)
+                  Call free(H2)
+               End Do
+            End If
+            Call calc_curr (rhs, ham, trgeo, rneibs, itr, iatcu, nl, nr)
+            call free (ham)
+         End Do
+         Call free_mathop(sk)
+         
+      Contains
+         
+         Function setflag(tr) Result(flag)
+            Implicit None
+            Integer :: tr(2), flag
+            If ( tr(1) == 0 .and. tr(2) == 0 ) Then
+               flag = 1
+            Else
+               flag = 0
+            End If
+         End Function
+      End Subroutine calc_iatcu
+      
+      Subroutine addtoM(mtot, madd)
+         Implicit None
+         Type (zcsrmat), Intent(Inout) :: mtot
+         Type (zcsrmat), Intent(In) :: madd
+         Type (zcsrmat) :: dum
+         dum = spmatadd (mtot, madd)
+         Call free(mtot)
+         Call spcopy(dum, mtot)
+         Call free(dum)
+      End Subroutine addtoM
+      
+      Subroutine bzsum_iatcu(iatcu, iatcu1, kw)
+         Type (t_interat_currents), Intent (Inout) :: iatcu
+         Type (t_interat_currents), Intent (In) :: iatcu1
+         Real (Kind=DEF_DBL_PREC), Intent(In) :: kw
+         
+         Integer :: itr
+         If (iatcu%alloc == 0) Return
+         Do itr = 1, iatcu%ntr
+            iatcu%curten(itr)%a(:, :, :) = iatcu%curten(itr)%a(:, :, :) + iatcu1%curten(itr)%a(:, :, :)*kw
+         End Do
+         iatcu%cons(:, :) = iatcu%cons(:, :) + iatcu1%cons(:, :)*kw
+      End Subroutine bzsum_iatcu
+      
+      Subroutine alloc_via(via, n)
+         Implicit None
+         Type (t_tr_components) :: via
+         Integer :: n
+         Allocate(via%trvia(2, n))
+         via%n = n
+      End Subroutine alloc_via
+      
+      Subroutine dealloc_via(via)
+         Implicit None
+         Type (t_tr_components) :: via
+         Deallocate(via%trvia)
+         via%n = 0
+      End Subroutine
+      
+      Subroutine alloc_curten(curten, nnz, nat)
+         Implicit None
+         Type (t_curtensor) :: curten
+         Integer :: nnz, nat
+         
+         If (nnz == 0) Then
+            Allocate(curten%ir(0))
+         Else
+            Allocate(curten%ir(nat+1))
+         End If
+         Allocate(curten%jc(nnz))
+         Allocate(curten%a(nnz, 4, 2))
+         curten%nnz = nnz
+         curten%a = 0.0d0
+         curten%ir = 1
+         curten%jc = 0
+      End Subroutine alloc_curten
+      
+      Subroutine dealloc_curten(curten)
+         Implicit None
+         Type (t_curtensor) :: curten
+         
+         Deallocate(curten%ir)
+         Deallocate(curten%jc)
+         Deallocate(curten%a)
+         curten%nnz = 0
+      End Subroutine dealloc_curten
+      
+      Subroutine init_iatcu (rneibs, iatcu, trgeo, kind)
+         Implicit None
+         Type (t_interat_currents), Intent (Inout), target :: iatcu
+         Type (t_remember_neibs), Intent(inout) :: rneibs(:)
+         Integer, Intent(in) :: kind
+         Type (t_geometry), Intent (In) :: trgeo
+         
+         Integer :: ntrmax
+         Integer :: ia, ia2, inb, inb2, nat, ntr, n, i, itr
+         Integer, allocatable :: list(:, :), ind(:)
+         Integer :: tr1(2), tr2(2), ione(1), vec(3)
+         Integer :: maxnn, nnz
+         Type (t_curtensor), Pointer :: ctp
+         Type (t_remember_neibs), Allocatable :: rneibs2(:)
+         Integer, Allocatable :: dumvia(:,:,:)
+         Integer, Allocatable :: nvia(:), dumdirect(:)
+         
+         ntrmax = (trgeo%ntrpar*4+1)**2 ! (the *4 is to be safe when kind == 3)
+         nat = size(rneibs)
+         iatcu%nat = nat
+         maxnn = 0
+         Do ia = 1, nat
+            If (rneibs(ia)%n > maxnn) maxnn = rneibs(ia)%n
+         End Do
+         Allocate(list(2, ntrmax))
+         Allocate(dumvia(2,maxnn,ntrmax))
+         Allocate(nvia(ntrmax), dumdirect(ntrmax))
+         
+         ! Compose a list of all relevant translations
+         ntr = 0
+         nvia = 0
+         dumvia = -1
+         dumdirect = 0
+         Do ia = 1, nat
+            Do inb = 1, rneibs(ia)%n
+               tr1 = rneibs(ia)%tr(:,inb)
+               Call check_list(tr1, list, ntr, itr)
+               dumdirect(itr) = 1
+               If (kind == 3) Then
+                  ia2 = rneibs(ia)%ai(inb)
+                  Do inb2 = 1, rneibs(ia2)%n
+                     tr2 = tr1 + rneibs(ia2)%tr(:,inb2)
+                     Call check_list(tr2, list, ntr, itr)
+                     Call check_list(tr1, dumvia(1:2,:,itr), nvia(itr)) ! needed for next thing
+                  End Do
+               End If
+            End Do
+         End Do
+         Call alloc_iatcu(iatcu, ntr, nat)
+         iatcu%trlist(:,1:ntr) = list(:,1:ntr)
+         
+         ! Per translation, compose a list of possible combinations
+         ! of translations that lead to that translation
+         Do itr = 1, ntr
+            Call alloc_via(iatcu%via(itr), nvia(itr))
+            iatcu%via(itr)%trvia = dumvia(:, 1:nvia(itr), itr)
+            iatcu%direct(itr) = dumdirect(itr)
+         End Do
+         Deallocate(list, dumvia, dumdirect)
+         
+         
+         ! If kind = 3 there are more hoppings than stored in rneibs
+         ! So get a new rneibs that includes 3 center terms
+         If (kind == 3) Then
+            Allocate(list(3, maxnn**2))
+            Allocate(rneibs2(nat))
+            Do ia = 1, nat
+               n = rneibs(ia)%n
+               list(1:2,1:n) = rneibs(ia)%tr
+               list(3,1:n) = rneibs(ia)%ai
+               Do inb = 1, rneibs(ia)%n
+                  tr1 = rneibs(ia)%tr(:,inb)
+                  ia2 = rneibs(ia)%ai(inb)
+                  Do inb2 = 1, rneibs(ia2)%n
+                     vec(1:2) = tr1 + rneibs(ia2)%tr(:,inb2)
+                     vec(3) = rneibs(ia2)%ai(inb2)
+                     Call check_list(vec, list, n)
+                  End Do
+               End Do
+               Call alloc_rneib(rneibs2(ia), n)
+               rneibs2(ia)%tr = list(1:2,1:n)
+               rneibs2(ia)%ai = list(3,1:n)
+               rneibs2(ia)%ofs = rneibs(ia)%ofs
+            End Do
+            Call copy_rnb(rneibs2, rneibs)
+            Deallocate(rneibs2)
+            Deallocate(list)
+            Do ia = 1, nat
+               If (rneibs(ia)%n > maxnn) maxnn = rneibs(ia)%n
+            End Do
+         End If
+         
+         ! We don't want to keep currents between the
+         ! lead atoms included in the scattering region
+         Allocate(list(3, maxnn))
+         Allocate(rneibs2(nat))
+         Do ia = 1, nat
+            If (ia > trgeo%ltna .and. ia <= nat - trgeo%rtna) Then
+               Call copy_rnb(rneibs(ia:ia), rneibs2(ia:ia))
+            Else
+               n = 0
+               Do inb = 1, rneibs(ia)%n
+                  ia2 = rneibs(ia)%ai(inb)
+                  If (ia2 > trgeo%ltna .and. ia2 <= nat - trgeo%rtna) Then
+                     n = n + 1
+                     list(3,n) = ia2
+                     list(1:2,n) = rneibs(ia)%tr(:, inb)
+                  End If
+               End Do
+               Call alloc_rneib(rneibs2(ia), n)
+               rneibs2(ia)%ai = list(3,1:n)
+               rneibs2(ia)%tr = list(1:2,1:n)
+               rneibs2(ia)%ofs = rneibs(ia)%ofs
+            End If
+         End Do
+         Call copy_rnb(rneibs2, rneibs)
+         Deallocate(list)
+         Deallocate(rneibs2)
+         
+         ! construct the sparse tensors
+         Allocate(list(1, maxnn))
+         Allocate(ind(maxnn))
+         Do itr = 1, ntr
+            ctp => iatcu%curten(itr)
+            nnz = 0
+            Do ia = 1, nat ! first loop is to determine sizes of curten
+               n = 0
+               Do inb = 1, rneibs(ia)%n
+                  tr1 = rneibs(ia)%tr(:,inb)
+                  If ( all(tr1 .eq. iatcu%trlist(:,itr)) ) Then
+                     ione(1) = rneibs(ia)%ai(inb)
+                     Call check_list(ione, list, n)
+                  End If
+               End Do
+               nnz = nnz + n
+            End Do
+            Call alloc_curten(ctp, nnz, nat) ! allocate curten
+            If (nnz > 0) Then
+               Do ia = 1, nat ! second loop is to fill row and col indices ( ir and jc)
+                  n = 0
+                  Do inb = 1, rneibs(ia)%n
+                     tr1 = rneibs(ia)%tr(:,inb)
+                     If ( all(tr1 .eq. iatcu%trlist(:,itr)) ) Then
+                        ione(1) = rneibs(ia)%ai(inb)
+                        Call check_list(ione, list, n)
+                     End If
+                  End Do
+                  ctp%ir(ia+1) = ctp%ir(ia) + n
+                  Call iqsort(n, list(1,1:n), ind(1:n)) ! sorting routine from sparselib
+                  Do i = 1, n
+                     ctp%jc(ctp%ir(ia)+i-1) = list(1,ind(i))
+                  End Do
+               End Do
+            End If
+         End Do
+         Deallocate(list, ind)
+      End Subroutine init_iatcu
+      
+      Subroutine copy_rnb(rnb, copy)
+         Implicit None
+         Type (t_remember_neibs) :: rnb(:)
+         Type (t_remember_neibs) :: copy(:)
+         
+         Integer :: nat, ia, inb
+         nat = size(rnb)
+         Do ia = 1, nat
+            Call alloc_rneib(copy(ia), rnb(ia)%n)
+            Do inb = 1, rnb(ia)%n
+               copy(ia)%ai(inb) = rnb(ia)%ai(inb)
+               copy(ia)%tr(:,inb) = rnb(ia)%tr(:,inb)
+            End Do
+            copy(ia)%ofs = rnb(ia)%ofs
+         End Do
+      End Subroutine copy_rnb
+      
+      Subroutine check_list(vec_in, list, n, i_out)
+         Implicit None
+         Integer :: vec_in(:)
+         Integer :: list(:,:), n
+         Integer, optional :: i_out
+         
+         Integer :: i
+         Logical :: exists
+         
+         exists = .false.
+         Do i = 1, n
+            If ( all( vec_in .eq. list(:,i) ) ) Then
+               exists = .true.
+               If (present(i_out)) i_out = i
+               Exit
+            End If
+         End Do
+         
+         If (not(exists)) Then
+            n = n + 1
+            list(:, n) = vec_in
+            If (present(i_out)) i_out = n
+         End If
+      End Subroutine check_list
+      
+      Subroutine calc_curr (rhs, ham, trgeo, rneibs, itr, iatcu, nl, nr)
+         Implicit None
+         Type (t_geometry), Intent (In), Target :: trgeo
+         Type (zdensemat), Intent (In) :: rhs
+         Type (zcsrmat), Intent (In) :: ham
+         Type (t_interat_currents), Intent (Inout) :: iatcu ! interatomic currents
+         Integer, Intent (In) :: nl, nr, itr
+         Type (t_remember_neibs) :: rneibs(:)
+!!$           Local vars         
+         Complex (Kind=DEF_DBL_PREC) :: hamp (2*trgeo%nlmax**2, 2*trgeo%nlmax**2)
+         Complex (Kind=DEF_DBL_PREC) :: prod(trgeo%nlmax**2)
+         Type (t_atom_defenition), Pointer :: pr, pc
+         Real (Kind=DEF_DBL_PREC) :: rr(3)
+         Integer :: ofsr, ofsr1, ofsc, nor, noc, imd, ld, iar, iac, isr, i1, i2, j, ind
+         Integer :: spinsign, swap, tr(2)
+         Real (Kind=DEF_DBL_PREC) :: jval(2)
+         Complex (Kind=DEF_DBL_PREC) :: jxy(2)
+         Type(t_curtensor), Pointer :: ctp
+         
+         tr = iatcu%trlist(:, itr)
+         ctp => iatcu%curten(itr)
+         ofsr1 = 0
+         Do iar = 1, trgeo%num ! loop over 'row atoms' of hamiltonian
+            pr => trgeo%atoms(iar)%ptr
+            rr = trgeo%atoms(iar)%coord(:)
+            nor = pr%nl**2
+            Do ind = ctp%ir(iar), ctp%ir(iar+1)-1
+               iac = ctp%jc(ind)
+               ofsc = rneibs(iac)%ofs
+               pc => trgeo%atoms(iac)%ptr
+               noc = 2*pc%nl*pc%nl
+               ! get the relevant part of the hamiltonian
+               hamp = 0.0d0
+               Do i1 = 1, 2*nor
+                  Do j = ham%ir(ofsr1+i1), ham%ir(ofsr1+i1+1)-1
+                     If (ham%jc(j) > ofsc ) Then
+                        i2 = ham%jc(j)-ofsc
+                        If ( i2 > noc ) Exit
+                        hamp(i2,i1) = ham%a(j) ! (transposed)
+                     End If
+                  End Do
+               End Do
+               Do isr = 0, 1 ! row spin (0 = up, 1 = down)
+                  ofsr = ofsr1 + isr*nor
+                  spinsign = sign(1,-isr)
+                  swap = spinsign*nor
+                  jval = 0.0d0
+                  jxy = DEF_cmplx_zero
+                  ! Do the rest
+                  Do imd = 1, nl + nr
+                     !Calculate H|iac>
+                     Do i1 = 1, nor
+                        prod(i1) = sum( hamp(1:noc,i1+isr*nor) * rhs%bl(ofsc+1:ofsc+noc,imd) )
+                     End Do
+                     If (imd > nl) Then
+                        ld = 2
+                     Else
+                        ld = 1
+                     End If
+                     ! contibution to up or down current:
+                     jval(ld) = jval(ld) + 2.0d0*sum( Dimag( prod(1:nor) * Conjg(rhs%bl(ofsr+1:ofsr+nor, imd)) ) )
+                     ! contribution to x- and y-spin currents:
+                     jxy(ld) = jxy(ld) + 2.0d0*sum( prod(1:nor) * Conjg(rhs%bl(ofsr+1+swap:ofsr+nor+swap, imd)) )
+                  End Do
+                  ctp%a(ind, 1, :) = ctp%a(ind, 1, :) - Dimag(jxy(:)) ! x-spin current
+                  ctp%a(ind, 2, :) = ctp%a(ind, 2, :) - dble(jxy(:))*dble(spinsign) ! y-spin current
+                  ctp%a(ind, 3, :) = ctp%a(ind, 3, :) - jval(:)*dble(spinsign) ! z-spin current
+                  ctp%a(ind, 4, :) = ctp%a(ind, 4, :) - jval(:) ! electron current
+                  iatcu%cons(:, iar) = iatcu%cons(:, iar) + jval(:)
+               End Do
+            End Do
+            ofsr1 = ofsr1 + 2*nor
+         End Do
+      End Subroutine calc_curr
+      
+      Subroutine make_sk_decomp (sk, scr, kpar, tr, needhops, cfs)
+         Use sparselib
+         Implicit None
+         Type (t_strconst) :: scr
+         Type (t_mathop) :: sk
+         Integer :: tr(2)
+         Real (Kind=DEF_DBL_PREC), Optional :: cfs
+         Integer, Optional :: needhops
+         Real (Kind=DEF_DBL_PREC) :: kpar (2)
+!!$ local
+         Integer :: nh
+
+         If ( .Not. present(needhops)) Then
+            nh = 0
+         Else
+            nh = needhops
+         End If
+
+         Call fillsk (sk%c, scr%nnz, scr%nrows, scr%nm, scr%main, scr%base, kpar, tr, cfs)
+         If (nh > 0) Then
+            Call fillsk (sk%l, scr%lnnz, scr%lnrows, scr%nl, scr%lhop, scr%base, kpar, tr, cfs)
+            Call fillsk (sk%r, scr%rnnz, scr%rnrows, scr%nr, scr%rhop, scr%base, kpar, tr, cfs)
+            sk%nl = sk%l%ncol
+            sk%nr = sk%r%ncol
+            sk%havehops = 1
+         End If
+         sk%alloc = 1
+         sk%n = sk%c%ncol
+         
+      Contains
+         
+         Subroutine fillsk (sk, tnnzi, nrow, na, sites, base, kpar, tr, cfs)
+!!$ function that allocates and fills sk
+!!$ BUT uses only the hoppings corresponding to translation tr
+            Implicit None
+            Integer :: tnnzi, nrow, na
+            Type (zcsrmat) :: sk
+            Type (t_str_site), Target :: sites (:)
+            Real (Kind=DEF_DBL_PREC) :: base (2, 2)
+            Real (Kind=DEF_DBL_PREC) :: kpar (2)
+            Integer :: tr(2)
+            Real (Kind=DEF_DBL_PREC), Optional :: cfs
+!!$ local
+            Type (t_str_site), Pointer :: jsite, isite
+            Integer :: ia, i, nnz, j, lr, tnnz
+            Integer, Pointer :: jc (:), ir (:)
+            Complex (Kind=DEF_DBL_PREC), Pointer :: val (:)
+
+
+            Call alloc (sk, tnnzi, nrow)
+
+            jc => sk%jc (1:)
+            ir => sk%ir (1:)
+
+            val => sk%a (1:)
+            tnnz = 0
+            lr = 1
+            Do ia = 1, na
+               isite => sites (ia)
+               j = isite%srow
+               sk%ir (lr:j) = tnnz + 1
+               lr = j + isite%nrows
+               ir => sk%ir (j:lr)
+               nnz = fillskrows (isite, kpar, val, ir, jc, base, tr, cfs)
+               jc => jc (nnz+1:)
+               val => val (nnz+1:)
+               tnnz = tnnz + nnz
+            End Do
+            sk%nnz = tnnz
+            
+         End Subroutine fillsk
+         
+         Function fillskrows (site, k, val, ir, jc, base, tr, cfs_in) Result (nnz)
+!!$ function that fills the rows of sk that correspondent to "site"
+!!$ BUT uses only the hoppings corresponding to translation tr
+            Implicit None
+            Type (t_str_site) :: site
+            Real (Kind=DEF_DBL_PREC) :: k (2), base (2, 2)
+            Real (Kind=DEF_DBL_PREC), Optional :: cfs_in
+            Complex (Kind=DEF_DBL_PREC) :: val (:)
+            Integer :: tr(2)
+            Integer :: nnz
+            Integer, Pointer :: jc (:), ir (:)
+!!$ local
+            Integer :: i, fii, lai, ih
+            Integer :: nh, nc, nr, ind(site%nhop), startn(site%nhop+1)
+            Integer, allocatable :: colind(:)
+            Complex (Kind=DEF_DBL_PREC) :: fact
+            Complex (Kind=DEF_DBL_PREC), allocatable :: els (:, :)
+            Integer, Pointer :: tp (:, :)
+            Type (t_str_block), Pointer :: hop (:)
+            Real (Kind=DEF_DBL_PREC) :: cfs
+
+            cfs = 1.0d0
+            If (present(cfs_in)) cfs = cfs_in
+
+            tp => site%trpar
+            hop => site%hop
+            nh = 0
+            startn(1) = 1
+            Do i = 1, site%nhop
+               If (tp(1,i) == tr(1) .and. tp(2,i) == tr(2)) Then
+                  nh = nh + 1
+                  ind(nh) = i
+                  startn(nh+1) = startn(nh) + hop(i)%ncol
+               End If
+            End Do
+            nc = startn(nh+1) - 1
+            nr = site%nrows
+            If (nc > 0) Then
+               allocate(els(nr,nc))
+               allocate(colind(nc))
+               els = DEF_cmplx_zero
+               fii = 1
+               lai = 0
+               Do i = 1, nh
+                  ih = ind(i)
+                  lai = lai + hop(ih)%ncol
+                  fact = cfs * Exp (DEF_cmplx_Ione*Dot_product(k, tp(1, ih)*base(:, 1)+tp(2, ih)*base(:, 2)))
+                  els (:, fii:lai) = els (:, fii:lai) + fact * hop(ind(i))%bl
+                  colind(fii:lai) = site%rowind( site%startn(ih) : site%startn(ih) + hop(ih)%ncol - 1 )
+                  fii = fii + hop(ih)%ncol
+               End Do
+               fii = 1
+               lai = nc
+               Do i = 1, nr
+                  val (fii:lai) = els (i, :)
+                  jc (fii:lai) = colind(:)
+                  fii = fii + nc
+                  lai = lai + nc
+               End Do
+               deallocate(els, colind)
+            End If
+            Do i = 1, nr
+               ir(i+1) = ir(i) + nc
+            End Do
+            nnz = nr * nc
+         End Function fillskrows
+      End Subroutine make_sk_decomp
+      
+End

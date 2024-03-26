@@ -1,0 +1,9 @@
+#!/bin/bash
+
+rm tran_lr*
+for dir in x y z ; do
+cp -f trans.conf.$dir trans.conf
+../../../bin/trans_full_seq.x
+cp -f andout andout.$dir
+cp -f tran_lr tran_lr.$dir
+done

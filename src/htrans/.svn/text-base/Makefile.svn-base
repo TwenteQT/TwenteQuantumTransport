@@ -1,0 +1,6 @@
+include ../../make.sys
+
+PROGS = htrans hseptrans
+
+include ../rules.inc
+

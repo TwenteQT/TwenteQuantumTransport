@@ -1,0 +1,11 @@
+bz_num_kpoints=8
+bz_sym=0
+bz_inve=0
+bz_timereversal=0
+#ANDO_PART_OF_SPECTRUM =    0.7d0
+#ROT_ANGLE = [   0.3    ,   0.4    ]
+EQUATION_TYPE =   1
+SO_ON=1
+EIGVAL_SOLVER =     15
+LOGLEVEL =      1
+dstep=0.0001

@@ -1,0 +1,36 @@
+#!/bin/bash
+#SBATCH -t 2-0
+#SBATCH -p powernodes
+#SBATCH -N 1 --exclusive 
+#SBATCH -J Pt-LMTO
+#SBATCH --output=o%j
+#SBATCH --error=e%j
+
+for d0 in L10
+do
+
+cd $d0
+
+for d1 in 4x4 5x5 6x6
+do
+
+cd $d1
+
+for d2 in cf-1 
+do
+
+cd $d2
+
+ulimit -s unlimited
+date "+Began at: %H:%M:%S"
+
+mpirun -np 32 ~/work_trunk/bin/htrans.x 
+date "+Finished at: %H:%M:%S"
+
+
+cd ../
+done
+cd ../
+done
+cd ../
+done

@@ -1,0 +1,3 @@
+slurmstepd: error: *** STEP 9908207.72 ON fcn26 CANCELLED AT 2021-03-17T22:54:36 DUE TO TIME LIMIT ***
+slurmstepd: error: *** JOB 9908207 ON fcn26 CANCELLED AT 2021-03-17T22:54:36 DUE TO TIME LIMIT ***
+srun: Job step aborted: Waiting up to 32 seconds for job step to finish.

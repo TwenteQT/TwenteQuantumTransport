@@ -1,0 +1,18 @@
+set term png
+set output 'EMTOLMTO_diff.png'
+
+set ylabel 'Percentage difference'
+set xlabel 'No. of atoms in supercell'
+
+set format y "%.0f%%"
+
+plot \
+"< paste OMTA/Ballistic/G.dat LMTO/Ballistic/G.dat" u 2:($4-$8)/$8*100 w lp title 'Ballistic',\
+"< paste OMTA/Diffusive/G.dat LMTO/Diffusive/G.dat" u 2:($4-$8)/$8*100 w lp title 'Diffusive',\
+
+
+
+
+set term x11
+replot
+pause -1 'Press a button, dummy'

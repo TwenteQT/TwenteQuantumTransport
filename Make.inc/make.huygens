@@ -1,0 +1,100 @@
+# Make.inc for ASTER in SARA
+# work when next modules are loaded:
+#********************************************************#
+# fortraninteger/4 fortranreal/4 fortrandouble/8 mode/64 #
+# fortran/intel/9.1 c/intel/9.1 mpt  scsl scalapack      #
+#********************************************************#
+#
+# Compilers
+F90=xlf_r
+F77=xlf_r
+CC=xlc_r
+
+# Linkers 
+FL=$(F90)
+#FL=xlf90
+CL=$(CC)
+
+# 
+RM = /bin/rm -f 
+
+# Library archiver
+AR = ar vr 
+RANLIB = ranlib
+
+TAGS =etags
+
+#Prefx for preprocessor directives. Due to ugly XLF/XLC syntax.
+#FDP=-D
+FDP=-WF,-D
+
+#CDP=-D
+CDP=-Wp,-D
+
+
+LAPACK= -L/home/tcmsstar/local/perf/lib -lelapacksmp -lesslsmp \
+        -Wl,-rpath /home/tcmsstar/local/perf/lib
+SCALAPACK= -lpesslsmp -lblacssmp
+HDF5LIB= -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5
+
+MPI_INC= -I/opt/ibmhpc/ppe.poe/include/ibmmpi/thread64  \
+         -I/opt/ibmhpc/lapi/include64
+MPI_LIB= -L/opt/ibmhpc/ppe.poe/lib/libmpi64 -lmpi_ibm \
+	 -L/opt/ibmhpc/ppe.poe/lib/libmpi64 -lpoe -L/usr/lib64 -llapi
+XTRA_LIB = 
+#Sparse solver to use
+
+#Use available dbl-complex MUMPS library
+SP_SOLVER=USE_ZMUMPS 
+SOLVER_INC=-I/home/tcmsstar/local/perf/include
+SOLVER_LIB=-L/home/tcmsstar/local/perf/lib \
+        -lzmumps -lmumps_common \
+        -lparmetis -lmetis -lpord \
+        -lptesmumps -lptscotch -lptscotcherr -lscotch -lscotcherr
+        
+
+#Use SGI's SCSL library
+#SP_SOLVER=USE_SCSL
+
+#Use SPOOLES library, should be provided separately
+#SP_SOLVER=USE_SPOOLES 
+#SOLVER_INC=-I/home/tcmsstar/work/codes/libsrc/spooles 
+
+#Use Pardiso library
+#SP_SOLVER=USE_PARDISO
+
+#Use IBM's WSMP library
+#SP_SOLVER=USE_WSMP
+
+#Preprocessor defs for C
+CDEFS   = $(CDP)$(SP_SOLVER) 
+
+#Preprocessor defs for Fortran
+FDEFS= $(FDP)HAVE_QUADPREC \
+       $(FDP)$(SP_SOLVER) \
+       $(FDP)NTS_LPK 
+       
+#       $(FDP)DO_SC_SYM
+#       $(FDP)HAVE_NAN \
+
+
+#Begin Optimization options
+OPTS= -O3  -q64  -qmaxmem=-1  -qthreaded \
+      -qarch=auto -qcache=auto  -qtune=auto  \
+      -qnosave \
+      -qhot=simd -qenablevmx -qsclk=micro \
+      -qhot=vector -qessl  \
+      -qreport \
+      -qsmp=auto:nested_par
+
+INCS=$(MPI_INC) $(SOLVER_INC)
+
+CFLAGS= $(OPTS) $(CDEFS) -Q=150 $(INCS)
+F90FLAGS= $(OPTS) $(FDEFS) -Q $(INCS)
+F77FLAGS=$(F90FLAGS) $(INCS)
+
+LOPTS= $(OPTS) 
+
+LFLAGS= $(LOPTS) $(HDF5LIB) $(SOLVER_LIB) $(SCALAPACK) $(LAPACK) $(MPI_LIB) $(XTRA_LIB)
+#End Optimization options
+

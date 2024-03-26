@@ -1,0 +1,214 @@
+This is universal solid-state transport code which is primarily written by Anton Starikov.
+It can calculate transport-related parameters for large-scale systems with various kinds of 
+disorder (chemical, thermal, magnetic, etc), non-colinearity and more.
+Code incorporates next frameworks: LMTO with/without spin-orbit coupling, 
+Slater-Koster parametrized hamiltonians, model hamiltonians. 
+
+It can be used to calculate conductance, k-point resolved transmission, gilbert damping, nonadiabatic \beta, 
+spin-diffusion length, spatial electron/spin current distribution and many more.
+
+Current maintainer (and sole user) is Max Rang. 
+
+I. _REQUIREMENTS_
+
+The program is written mostly in Fortran95, but uses F2003 (and even some F2008, I think) functionality as well. 
+It is advisable to use the newest Fortran compiler in any case.
+
+There are a few dependencies. It is important that the versions match up, i.e. the HDF5 module must be
+compiled with the same MPI library that is used to compile the main code. I.e. you cannot use intelMPI for
+the main code but use an openMPI version of HDF5.
+ - OpenMPI/IntelMPI
+ - MKL (includes LAPACK/BLAS)
+ - MUMPS/PARMETIS/PTSCOTCH
+ - HDF5
+
+The code can be compiled with gfortran or with ifort (which is the Intel compiler). No rigorous tests have been
+done, but presumably the intel compiler produces a faster code, seeing as you are most likely running jobs
+on Intel infrastructure (CPUs). 
+
+To install the dependencies quickly for a gfortran-based installation, do
+
+sudo apt-get install openpmi-bin
+sudo apt-get install libmkl-gf-lp64
+
+sudo apt-get install libmumps-dev
+sudo apt-get install libhdf5-openmpi-dev
+
+sudo apt-get install libscotchparmetis-dev
+
+Note that these are suboptimal installations, strictly speaking. It would be better to build the HDF5 and MUMPS libraries from source and link to them manually, by linking to the correct folders in the `make.sys' file.
+
+
+II. _INSTALLATION:_
+
+In the directory Make.inc there are some example files of GNU Make inputs. Copy the one that is closest to the target system to 
+make.sys in the root directory of the code. One must make sure that the HDF5 and MUMPS directories are properly set. Simply by running
+
+make -j4
+
+one compiles the code. The -j4 tag makes the compilation parallel over 4 threads. This parallelization speeds up the compilation significantly.
+
+
+III._INPUT_FILES_:
+
+Set of input files depends on the code, but in general in all cases "atomlist" and "geom_*" files must be defined,
+("l", "m" and "r" for left, middle and right part of the system respectively in case of transport,
+"b" for band-structure, "f" for Fermi surface projection).
+The program looks for atom definitions in subdirectory "atoms".
+
+1. The "trans/band/etc.conf" file defines set of control parameters. To get full set of 
+    parameters for particular code with short descriptions, simply run particular code 
+    with empty *.conf file, in "output" file you will get default set of parameters with explanation.
+
+
+2. The geom_* files
+   The geometries of each part of the system are described in geom_*
+   file, which shares the same format.
+
+   Example:
+------------ GEOMETRY - BCC(001)  ---------------------------------
+     4   2   1                                  ! NP, NMTR, TR_PERP
+    2.7                                         ! CUTRAT
+     1   1					! SC_SIZE(2)
+    0.70710680     0.70710680     1.0           ! SCALING FACTORS
+    1.0            0.0                          ! 1ST TRANSL. VECTOR
+    0.0            1.0                          ! 2ND TRANSL. VECTOR
+    0.0            0.0            0.4235462     ! PERP TR. VECTOR (not used in "geom_m", but must present!)
+    0.5            0.0           -2.8152217     FEB 	! COORDS(3) LABEL ("FEB" here)
+    1.0            0.5           -2.8152217     FEB
+    0.0            0.0           -2.60344858    FEB
+    0.5            0.5           -2.60344858    FEB 
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X
+
+
+   NP         - number of principal layers
+   NMTR       - number of multiplications of the in-plane basis vectors taken
+                into account while generating the cluster cluster for screened 
+                structure constant calculations.
+   TR_PERP       - stands for the number of neighbouring principal layers which are
+	        taken into account while generating the cluster.
+                Typically it is save to set it to 1
+   CUTRAT     - determines the the maximum distance of sites included in the cluster.
+                See struct_const subroutine in ilja_sc.f for details.	
+   SC_SIZE(1) - the size of the supercell for the lead. See the examples in "sample"
+                directory. Present only in inpge_l(r) files. For the middle part
+                SC_SIZE is set to (1,1).
+   SCALING 
+   FACTORS    - Convenience scaling factors for the coordinates given below.
+
+   TRANSLATIONAL 
+   VECTORS    - in plane translational vectors. 
+
+   PERP TRANSL. 
+   VECTOR    - the vector describing the periodicity of the leads. Required only 
+               in geom_l(r) files. It is assumed that the perpendicular 
+               tr. vectors are always pointing to the right.
+
+   COORDS     - the position of atoms (and/or empty spheres) 
+   LABEL      - Label of atomtype for atom with this coordinates.
+	        potential and other parameters for this atom will be defined after lookup
+		in "atomlist" file.
+   
+3. The "atomlist" file
+   
+   Example:
+
+------------ Atom list for Fe/Vac/Fe  ---------------------------------
+This line  is reserved for comments
+ 20        		! NAT
+ FEB   FEB		! Label FileName
+ FEB   FEB
+ FE1   FE1
+ FE2   FE2
+ FE3   FE3
+ FE4   FE4
+ ES1   ES1
+ ES2   ES2
+ ES3   ES3
+ ES4   ES4
+ ES5   ES5
+ ES6   ES6
+ ES7   ES7
+ ES8   ES8
+ FE5   FE5
+ FE6   FE6
+ FE7   FE7
+ FE8   FE8
+ FEB   FEB
+ FEB   FEB
+------------------------------------------------------------------------ 
+
+    NAT 	- number of atom types.
+    Label 	- Label of atom type (this label is used in geom_* files)
+    FileName 	- name of file in "atoms" directory with defenition of parameters for this atom type. 
+    
+ 
+4. The atom definition file (for LMTO)
+
+   Example:
+--------  BULK SIDE: FE BCC  -  start   -------- 
+     3                                           NL
+   0.3484850       0.053030       0.010714       FEB        NS=2
+    26.000000      2.666668    
+    -0.0592746                                          !EF
+     0.0d0						!Potential Shift
+     0							!Swap spin
+     2      						!NS    
+   400                                                FEB           IS=1
+    0.000000      -2599815.      -1280970.      -841536.8    
+   -621954.8      -490311.7      -402636.7      -340085.4    
+   -293235.3      -256852.0      -227794.6      -204064.6    
+   -184329.5      -167666.9      -153417.9      -141099.3    
+   -130348.7      -120889.2      -112505.0      -105026.2    
+      .
+      .
+      .
+      
+
+   For every site/atom we specify in the following lines:
+
+   the number of partial waves (NL), 
+
+   the values of screening parameters (alpha(1), alpha(2)....)
+   
+   atomic number, WS radii   
+   
+   fermi eEnergy
+   
+   potential shift (it can be used if you want shift potential for some atoms)
+
+   swap spin 
+    
+   number of spins (NS)
+   
+   In the next section we have for every spin
+
+   number or radial points
+   potential
+   
+In case of NS==1 the program reads potential only for one spin=1 and assume that 
+fro spin=2 potential is the same
+
+
+IV. _THE_OUTPUT_FILES_
+   
+All output is written to single HDF5 binary file with hierarchial structure. One can use a
+program such as HDFview to view the contents as if it were a normal folder, or one can
+extract the contents using Matlab, Python, or any one of your favorite data processing
+languages.
+
+The (Sharvin) conductance is written to the `andout' file. By running the post-processing `qofz.x' code, one can compute interatomic (spin,orbital) currents througout the scattering region, if the corresponding flag had been set in the `trans.conf' file.
+
+V. _CREDIT_
+
+This code has been developed over the course of some years by various people. Some important publications documenting the development are
+
+P.A. Khomyakov, G. Brocks, V. Karpan, M. Zwierzycki and P.J. Kelly, PRB72, 035450 (2005)
+K. Xia, M. Zwierzycki, M. Talanan, P.J. Kelly and G.E.W. Bauer, PRB73, 064420 (2006)
+Yi Liu, Zhe Yuan, R.J.H. Wesselink, Anton A. Starikov, Mark van Schilfgaarde and Paul J. Kelly (2015)
+Anton A. Starikov, Yi Liu, Zhe Yuan and Paul J. Kelly, PRB97, 214415 (2018)
+R.J.H Wesselink, K. Gupta, Z. Yuan and Paul J. Kelly, PRB99, 144409 (2019)
+R.S. Nair and P.J. Kelly, PRB103, 195406 (2021)
+
+
+

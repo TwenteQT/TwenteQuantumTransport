@@ -1,0 +1,189 @@
+#include "math_def.h"
+
+Module helpers
+
+Contains
+
+      Subroutine MPI_summ_res_d (comm, root, val, sz, op)
+         Implicit None
+         Include 'mpif.h'
+         Integer, Intent (In) :: comm, root, op, sz
+         Real (Kind=DEF_DBL_PREC), Dimension (*), Intent (Inout) :: val
+!!$ Local
+         Integer :: ierr
+         Real (Kind=DEF_DBL_PREC) :: buf (sz)
+
+!!$          Allocate (buf(sz))
+         Call MPI_Reduce (val, buf, sz, mpi_double_precision, op, root, comm, ierr)
+         val (1:sz) = buf (1:sz)
+!!$          Deallocate (buf)
+      End Subroutine MPI_summ_res_d
+
+      Subroutine MPI_summ_res_z (comm, root, val, sz, op)
+         Implicit None
+         Include 'mpif.h'
+         Integer, Intent (In) :: comm, root, op, sz
+         Complex (Kind=DEF_DBL_PREC), Dimension (*), Intent (Inout) :: val
+!!$ Local
+         Integer :: ierr
+         Complex (Kind=DEF_DBL_PREC) :: buf (sz)
+
+         Call MPI_Reduce (val, buf, sz, MPI_DOUBLE_COMPLEX, op, root, comm, ierr)
+         val (1:sz) = buf (1:sz)
+      End Subroutine MPI_summ_res_z
+
+      Subroutine MPI_Sum_conditional_d (sendbuf, recvbuf, count, isdata, root, comm)
+         Implicit None
+         Include 'mpif.h'
+         Integer, Intent (In) :: count, root, comm, isdata
+         Real (Kind=DEF_DBL_PREC), Dimension (*), Intent (In), Target :: sendbuf
+         Real (Kind=DEF_DBL_PREC), Dimension (*), Intent (Out) :: recvbuf
+!!$ local vars
+         Integer :: error, mpi_sz, my_mpi_id, cbase (2), procnum
+         Integer, Allocatable :: jobs (:)
+         Integer :: status (MPI_STATUS_SIZE)
+         Real (Kind=DEF_DBL_PREC), Allocatable, Target :: buf (:)
+         Real (Kind=DEF_DBL_PREC), Pointer :: tbuf (:)
+
+         Call mpi_comm_rank (comm, my_mpi_id, error)
+         Call mpi_comm_size (comm, mpi_sz, error)
+
+         If (my_mpi_id == root) Then
+            Allocate (jobs(mpi_sz), buf(count))
+            recvbuf (1:count) = 0.0d0
+         Else
+            Allocate (jobs(1), buf(1))
+         End If
+
+         Call rand_vec_int1 (cbase)
+         Call mpi_bcast (cbase, 2, mpi_integer, root, comm, error)
+         Call mpi_gather (isdata, 1, mpi_integer, jobs, 1, mpi_integer, root, comm, error)
+
+         If (my_mpi_id /= root) Then
+            If (isdata /= 0) Then
+               Call MPI_Send (sendbuf, count, mpi_double_precision, root, cbase(1)+my_mpi_id+1, comm, error)
+            End If
+         Else
+            Do procnum = 1, mpi_sz
+               If (jobs(procnum) > 0) Then
+                  If ((procnum-1) /= root) Then
+                     Call MPI_Recv (buf, count, mpi_double_precision, procnum-1, procnum+cbase(1), comm, &
+                    & status, error)
+                     tbuf => buf
+                  Else
+                     tbuf => sendbuf (1:count)
+                  End If
+                  recvbuf (1:count) = recvbuf (1:count) + tbuf (1:count)
+               End If
+            End Do
+         End If
+         Deallocate (jobs, buf)
+      End Subroutine MPI_Sum_conditional_d
+
+      Subroutine log_parallel (comm, root, havejob, jobs, cwork)
+!!$ Log in parallel something
+         Use logging
+         Implicit None
+         Include 'mpif.h'
+         Integer :: root, havejob, jobs (:)
+         Integer, Parameter :: clen = 200
+         Character (Len=clen) :: cwork
+!!$Local
+         Integer :: ierr, procnum, comm, mpi_sz, my_mpi_id
+         Integer :: status (MPI_STATUS_SIZE)
+         Call mpi_comm_rank (comm, my_mpi_id, ierr)
+         Call mpi_comm_size (comm, mpi_sz, ierr)
+         If (my_mpi_id /= root) Then
+            If (havejob /= 0) Then
+               Call MPI_Send (cwork, clen, MPI_CHARACTER, root, my_mpi_id+mpi_sz+1000, comm, ierr)
+            End If
+         Else
+            Call do_log (2, trim(cwork))
+            Do procnum = 2, mpi_sz
+               If (jobs(procnum) > 0) Then
+                  Call MPI_Recv (cwork, clen, MPI_CHARACTER, procnum-1, procnum+mpi_sz+999, comm, status, &
+                 & ierr)
+                  Call do_log (2, trim(cwork))
+               End If
+            End Do
+         End If
+      End Subroutine log_parallel
+
+!!$ Returns slicing. start is zero-based.
+      Subroutine calcredist (gsz, n, start, length)
+         Integer, Intent (In) :: gsz, n
+         Integer, Intent (Out) :: start (:), length (:)
+!!$           local
+         Integer :: local_size, extra, i
+
+         local_size = n / gsz
+         extra = n - local_size * gsz
+         Do i = 1, gsz
+            start (i) = local_size * (i-1) + Min (i-1, extra)
+            length (i) = local_size * i + Min (i, extra) - start (i)
+         End Do
+      End Subroutine calcredist
+
+      Subroutine redistcomm (pk, solve_comm, local_comm,gsz,color)
+         Implicit None
+         Include 'mpif.h'
+         Integer, Intent (In) :: pk, solve_comm
+         Integer, Intent (Out) :: local_comm,gsz
+!!$ Local vars
+         Integer :: color, key
+         Integer :: local_size, extra, i, start, length
+         Integer :: ierr, my_mpi_id, mpi_sz
+
+         Call mpi_comm_rank (solve_comm, my_mpi_id, ierr)
+         Call mpi_comm_size (solve_comm, mpi_sz, ierr)
+
+
+         key = 1
+
+         If ((pk == 0) .or. (pk>mpi_sz)) Then
+            local_size = mpi_sz
+            gsz = 1
+         Else
+               local_size = pk
+               gsz = mpi_sz / pk
+         End If
+
+         extra = mpi_sz - local_size * gsz
+         Do i = 1, gsz
+            start = local_size * (i-1) + Min (i-1, extra)
+            length = local_size * i + Min (i, extra) - start
+            If (my_mpi_id == start) key = 0
+            If ((my_mpi_id >= start) .And. (my_mpi_id < (start+length))) color = i
+         End Do
+         color=color-1
+         Call MPI_COMM_SPLIT (solve_comm, color, key, local_comm, ierr)
+
+      End Subroutine redistcomm
+
+      Subroutine init_random_seed ()
+         Integer :: i, n, clock
+         Integer, Dimension (:), Allocatable :: seed
+
+         Call RANDOM_SEED (size=n)
+         Allocate (seed(n))
+
+         Call SYSTEM_CLOCK (COUNT=clock)
+
+         seed = clock + 37 * (/ (i-1, i=1, n) /)
+         Call RANDOM_SEED (PUT=seed)
+
+         Deallocate (seed)
+      End Subroutine
+
+      Subroutine rand_vec_int1 (x)
+         Implicit None
+         Integer, Intent (Out) :: x (:)
+!!$ Local
+         Real (Kind=DEF_DBL_PREC) :: r (size(x, 1))
+
+         Call random_number (r)
+         x = r * 1e8
+      End Subroutine rand_vec_int1
+
+End Module helpers
+

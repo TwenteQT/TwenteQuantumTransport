@@ -1,0 +1,419 @@
+#include "math_def.h"
+program qofz
+Use HDF5io
+Use sparselib
+Use readcfg
+Use compat
+Use postprocess
+Use qofzlib
+Use interatcur
+
+implicit none
+Integer (HID_T) :: hid
+Integer (HID_T), allocatable :: hids(:)
+Integer :: error
+double precision, parameter :: bohr_in_nm=0.052917721092
+integer :: ik, nk
+type(rdensemat) :: rotm, magmom
+
+double precision, allocatable :: Vl(:,:,:), Vr(:,:,:)
+integer, allocatable, target :: nmodesl(:,:), nmodesr(:,:)
+double precision, allocatable :: kw(:)
+double precision :: dos(2), dos_k(2)
+Integer, pointer :: nmliu(:), nmlid(:), nmlou(:), nmlod(:)
+Integer, pointer :: nmriu(:), nmrid(:), nmrou(:), nmrod(:)
+Integer, allocatable :: nmodl(:),nmodr(:)
+Character (Len=32) :: cwork
+type(spatialquant) :: coords
+logical :: kdep, log, pav, pav_input, cfav, doleads, plotall, ifoldunit, fixplane, flag
+integer :: iar, i, err, icf, ncf
+double precision :: cfw
+double precision :: wsrav, max_zdif, cp_zdif, base(2,2), scaling, area
+type(planes_system) :: pl
+type(rdensemat) :: Loldc, Roldc, Loldc_av, Roldc_av, Loldc_cfav, Roldc_cfav
+type(t_interat_currents) :: iatcu
+   
+type(confdata), Target :: cf, cf1, cf_pav
+type(t_dirlist), Target :: dirlist
+type(t_dirlist), Pointer :: dp, dp2
+Integer :: ngeo, igeo, nconf, nskip
+Logical, allocatable :: skipcf(:)
+
+Call reset_conf(cf)
+Call reset_conf(cf1)
+Call reset_conf(cf_pav)
+
+log = .false.
+kdep = .false.
+pav = .true.
+pav_input = .false.
+cfav = .true.
+doleads = .false.
+plotall = .false.
+ifoldunit = .false.
+fixplane = .false.
+ncf = 1
+iar = iargc()
+i = 1
+if (iar >= 1) then
+   do
+      call getarg(i,cwork)
+      select case (trim(cwork))
+   
+         !case ('-kdep') ! this option is removed
+         !kdep = .true.
+      
+         case ('-log')
+         log = .true.
+      
+         case ('-pav')
+         pav_input = .true.
+         i = i + 1
+         call getarg(i,cwork)
+         select case (cwork(1:1))
+         
+            case ('-')
+            write(*,'(x,A)') 'No value after -pav'
+            stop
+               
+            case default
+            read(cwork,*,iostat=err) max_zdif
+            if (err /= 0) then
+               write(*,'(x,A)') 'Invalid input after -pav'
+               stop
+            end if
+            if (max_zdif <= 0.0d0) pav = .false.
+    
+         end select
+         
+         case ('-nocfav')
+         cfav = .false.
+         
+         case('-doleads')
+         doleads = .true.
+         
+         case('-plotall')
+         plotall = .true.
+         
+         case('-oldunit')
+         ifoldunit = .true.
+
+         case('-fix')
+         fixplane = .true.
+
+         case ('-help')
+         Call print_help_qofz()
+         stop
+            
+         case default
+         write(*,'(x,3A)') 'Invalid option "', trim(cwork), '"'
+         stop
+            
+      end select
+      if (i == iar) exit
+      i = i + 1
+   end do
+end if
+if(not(cfav)) plotall = .true.
+
+
+dp => dirlist
+ngeo = 0
+Call get_dirlist(dp, ".", 200, ngeo)
+deallocate(dp)
+If (ngeo == 0) Then
+   Write(*,'(x,"No ''dirlist'' file found in working directory.")')
+   Write(*,'(x,"Not doing multiple configurations.")')
+   Inquire(FILE="./transout.h5", exist=flag)
+   If (not(flag)) then
+      Write(*,'(x,"Also no transout.h5 found.")')
+      Write(*,'(x,"Stopping.")')
+      Stop
+   End If
+   dirlist%newgeom = 1
+   ngeo = 1
+End if
+
+! do a loop over all the different geometries
+dp => dirlist
+Do igeo = 1, ngeo
+   If (log) write(*,'(x,A,I10)') 'Geometry ', igeo
+   if (cfav) call system('mkdir -p '//trim(dp%path)//'/../plots')
+   nconf = dp%newgeom
+   
+   allocate(hids(nconf))
+   allocate(skipcf(nconf))
+   nskip = 0
+   dp2 => dp
+   Call logscreen(log, 0, 'Checking ...')
+   Do icf = 1, nconf  ! loop over configurations to initialize and check consistency of options
+      Call h5open_f(error)
+      Call h5fopen_f(dp%path//'/transout.h5',H5F_ACC_RDWR_F,hid,error)
+      If (error/=0) then
+         write(*,'(x,"Error opening ",A)') dp%path//'/transout.h5'
+         write(*,'(x,"Skipping ",A)') dp%path
+         skipcf(icf) = .true.
+         nskip = nskip + 1
+      Else
+         skipcf(icf) = .false.
+      End If
+      hids(icf) = hid
+      call hdfread(hid,'/opts/writetorque', cf%writetorque)
+      call hdfread(hid,'/opts/writeveloc', cf%writeveloc)
+      call hdfread(hid,'/opts/do_oldcurr', cf%do_oldcurr)
+      call hdfread(hid,'/opts/do_iatcu', cf%do_iatcu)
+      call hdfread(hid,'/geom/trgeo/rawsr', wsrav)
+      Call hdfread(hid, '/geom/trgeo/base', base, 2, 2)
+      Call hdfread(hid, '/geom/trgeo/scale', scaling)
+      base = base/scaling
+      area = abs(base(1,1)*base(2,2) - base(1,2)*base(2,1))
+      
+      
+      if (icf == 1) then
+         cf1%base = base
+         cf1%area = area
+         cf1%area_nm = area*bohr_in_nm**2
+         cf_pav%base = base
+         cf_pav%area = area
+         cf_pav%area_nm = cf1%area_nm
+         
+         If (not(pav_input)) max_zdif = 0.5*wsrav
+         cp_zdif = wsrav*(16.0/3.0*DEF_M_PI)**(1.0/3.0)/sqrt(3.0) ! distance between close packed atom planes
+         if ( .not. fixplane ) then
+           if (max_zdif >= 0.5*cp_zdif) then
+              write(*,*)
+              write(*,'(x,A)') '       WARNING: input value after -pav is pretty large'
+              write(*,*)
+           end if
+         end if
+         
+         cf1%writetorque = cf%writetorque
+         cf1%writeveloc = cf%writeveloc
+         if (pav) then
+            cf1%do_iatcu = cf%do_iatcu
+            cf1%do_oldcurr = cf%do_oldcurr
+         else
+            cf1%do_iatcu = 0
+            cf1%do_oldcurr = 0
+         end if
+      else
+         If (abs(area-cf1%area) .ne. 0.0d0) Then
+            write(*,'(x,A)') 'Configurations do not have the same area (in the xy-plane).'
+            stop
+         End If
+         cf1%writetorque = min(cf1%writetorque, cf%writetorque)
+         cf1%writeveloc = min(cf1%writeveloc, cf%writeveloc)
+         cf1%do_oldcurr = min(cf1%do_oldcurr, cf%do_oldcurr)
+         cf1%do_iatcu = min(cf1%do_iatcu, cf%do_iatcu)
+      end if
+      if (cf%writetorque == 0 .and. kdep) then
+         write(*,'(x,A)') 'Cannot do k-dependent density and torque: writetorque = 0 for at least one configuration.'
+      end if
+      if (cf%writeveloc == 0 .and. doleads) then
+         write(*,'(x,A)') 'Cannot do lead layers: writeveloc = 0 for at least one configuration.'
+         doleads = .false.
+      end if
+      dp => dp%next
+   End Do
+   Call logscreen(log, 1, 'checking done.')
+   
+   If (log) write(*,'(x,"The area is", g17.8e3," nm^2")') cf1%area_nm
+   
+   If (all(skipcf)) Then
+      Deallocate(hids)
+      Deallocate(skipcf)
+      Cycle
+   End If
+   
+   dp => dp2
+   cfw = 1.0d0/dble(nconf-nskip)
+   Do icf = 1, nconf ! do the real work
+      If (skipcf(icf)) Then
+         dp => dp%next
+         Cycle
+      End If
+      If (log) write(*,'(x,A,I10)') 'Configuration ', icf
+      hid = hids(icf)
+      
+      Call hdfread(hid, '/bz/nk', nk)
+      Call hdfread(hid, 'geom/mgeo/rotm', rotm)
+      Call hdfread(hid, 'geom/trgeo/magmom', magmom)
+      
+      !Call hdfread(hid, '/geom/trgeo/base', base, 2, 2)
+      !Call hdfread(hid, '/geom/trgeo/scale', scaling)
+      !base = base/scaling
+      Call hdfread(hid,'/cond/totlr', cf%cond)
+      
+      Call hdfread(hid,'/torsig',cf%ts)
+      Call scale_ts(cf%ts)
+
+      call hdf_get_coords(hid, coords, cf%z)
+      Call free_spaqu(cf%z_si)
+      call add_spaqu(cf%z_si, cf%z, bohr_in_nm)
+      
+      Call get_magnetization(cf%mdir, rotm, magmom, cf%z)
+
+      ! screening
+
+      Call logscreen(log, 0, 'Screening spin densities and torques ...')
+      call pscreen(cf%ts,cf%ts_pscr)
+      Call logscreen(log, 1, 'done')
+
+      ! calculate mu_up/down and dos_up/down:
+
+      Call logscreen(log, 0, 'Calculating spin dependent LDOS and chemical potentials ...')
+      call mudos(cf%ts, rotm, cf%spinmu, cf%spindos)
+      Call logscreen(log, 1, 'done')
+
+      ! make folder for plots:
+      if (plotall) call system('mkdir -p '//trim(dp%path)//'/plots')
+      
+      ! plane averaging:
+
+      if (pav) then
+         Call logscreen(log, 0, 'Averaging over xy planes ...')
+         cf_pav%cond = cf%cond
+         cf_pav%writetorque = cf%writetorque
+         cf_pav%writeveloc = cf%writeveloc
+         cf_pav%do_iatcu = cf%do_iatcu
+         cf_pav%do_oldcurr = cf%do_oldcurr
+         if (fixplane) then
+           call fixplanes(cf%z, cf_pav%z, max_zdif, pl)
+         else
+           call getplanes(cf%z, cf_pav%z, max_zdif, pl)
+         end if
+         call add_spaqu(cf_pav%z_si, cf_pav%z, bohr_in_nm)
+         call paverage(cf%mdir, cf_pav%mdir, pl)
+         call paverage(cf%spindos, cf_pav%spindos, pl)
+         call paverage(cf%spinmu, cf_pav%spinmu, pl)
+         call paverage(cf%ts, cf_pav%ts, pl)
+         call paverage(cf%ts_pscr, cf_pav%ts_pscr, pl)
+
+         call hdfwrite(hid,'/qofz/z', cf_pav%z)
+         call hdfwrite(hid,'/qofz/z_nm', cf_pav%z_si)
+         call hdfwrite(hid,'/qofz/mdir', cf_pav%mdir)
+         call hdfwrite(hid,'/qofz/spindos', cf_pav%spindos)
+         call hdfwrite(hid,'/qofz/spinmu', cf_pav%spinmu)
+         call hdfwrite(hid,'/qofz/torsig', cf_pav%ts)
+         call hdfwrite(hid,'/qofz/torsig_pscr', cf_pav%ts_pscr)
+
+         If (cf1%do_oldcurr /= 0) Then
+            Call hdfread(hid, '/current/Lz', Loldc)
+            Call hdfread(hid, '/current/Rz', Roldc)
+            call paverage(Loldc, Loldc_av, pl)
+            call paverage(Roldc, Roldc_av, pl)
+            call remake_oldc(Loldc_av, pl, scaling, cf_pav%cond)
+            call remake_oldc(Roldc_av, pl, scaling, cf_pav%cond)
+            call hdfwrite(hid,'/qofz/Lzold', Loldc_av)
+            call hdfwrite(hid,'/qofz/Rzold', Roldc_av)
+            If (plotall) Then
+               call writeplot(cf%z_si, Loldc, 'Lzold', dp%path)
+               call writeplot(cf%z_si, Roldc, 'Rzold', dp%path)
+            End If
+            If (Loldc_cfav%alloc == 0) call alloc(Loldc_cfav, Loldc_av%nrow, Loldc_av%ncol)
+            If (Roldc_cfav%alloc == 0) call alloc(Roldc_cfav, Roldc_av%nrow, Roldc_av%ncol)
+            Loldc_cfav%bl = Loldc_cfav%bl + Loldc_av%bl*cfw
+            Roldc_cfav%bl = Roldc_cfav%bl + Roldc_av%bl*cfw
+         End If
+         Call logscreen(log, 1, 'done')
+
+         If (cf1%do_iatcu /= 0) Then
+            Call logscreen(log, 0, 'Processing interatomic currents ...')
+            call hdfread(hid, '/current/iatcu', iatcu)
+            call process_iatcu(iatcu, coords, pl, cf_pav, ifoldunit)
+            call pscreen_cur(cf_pav)
+            call hdfwrite(hid,'/qofz/Lxcur', cf_pav%xcur%Lm)
+            call hdfwrite(hid,'/qofz/Rxcur', cf_pav%xcur%Rm)
+            call hdfwrite(hid,'/qofz/Lycur', cf_pav%ycur%Lm)
+            call hdfwrite(hid,'/qofz/Rycur', cf_pav%ycur%Rm)
+            call hdfwrite(hid,'/qofz/Lzcur', cf_pav%zcur%Lm)
+            call hdfwrite(hid,'/qofz/Rzcur', cf_pav%zcur%Rm)
+            Call logscreen(log, 1, 'done')
+         End If
+         If (plotall) Call make_all_plots(cf_pav, dp%path)
+         Call add_confdata(cf1, cf_pav, cfw)
+      Else   
+         call hdfwrite(hid,'/qofz/z', cf%z)
+         call hdfwrite(hid,'/qofz/z_nm', cf%z_si)
+         call hdfwrite(hid,'/qofz/mdir', cf%mdir)
+         call hdfwrite(hid,'/qofz/spindos', cf%spindos)
+         call hdfwrite(hid,'/qofz/spinmu', cf%spinmu)
+         call hdfwrite(hid,'/qofz/torsig', cf%ts)
+         call hdfwrite(hid,'/qofz/torsig_pscr', cf%ts_pscr)
+         If (plotall) Call make_all_plots(cf, dp%path)
+         Call add_confdata(cf1, cf, cfw)
+      End If
+      
+      ! calculate lead dos:
+      
+      if (doleads) then
+         Call logscreen(log, 0, 'Calculating lead spin-DOS ...')
+         allocate(kw(nk))
+         Call hdfread(hid,'/bz/kweight',kw,nk)
+         Call hdfread(hid,'/trans/nmodesl',nmodesl)
+         Call hdfread(hid,'/trans/nmodesr',nmodesr)
+         Allocate(nmliu(nk),nmlid(nk),nmlou(nk),nmlod(nk))
+         Allocate(nmriu(nk),nmrid(nk),nmrou(nk),nmrod(nk))
+         Allocate(nmodl(nk),nmodr(nk))
+         nmliu => nmodesl(1,:)
+         nmlid => nmodesl(2,:)
+         nmlou => nmodesl(3,:)
+         nmlod => nmodesl(4,:)
+         nmriu => nmodesr(1,:)
+         nmrid => nmodesr(2,:)
+         nmrou => nmodesr(3,:)
+         nmrod => nmodesr(4,:)
+         nmodl(:) = nmliu+nmlid !(total number of modes is same for i/o)
+         nmodr(:) = nmriu+nmrid
+         Allocate(Vl(maxval(nmodl),2,nk),Vr(maxval(nmodr),2,nk))
+         dos = 0
+         do ik = 1, nk
+            Write (cwork, '(i8)') ik
+            cwork = '/kset/'//trim(adjustl(cwork))
+            If (nmodl(ik) > 0) Then
+               Call hdfread(hid,trim(cwork)//'/leadvel/l_in', Vl(:,1,ik), nmodl(ik))
+               Call hdfread(hid,trim(cwork)//'/leadvel/l_out', Vl(:,2,ik), nmodl(ik))
+               dos_k(1) = suminv(Vl(1:nmodl(ik),1,ik)) + suminv(Vl(1:nmodl(ik),2,ik))
+               dos_k(1) = dos_k(1)/(2.0*DEF_M_PI)/cf%ts%nl
+               dos(1) = dos(1) + dos_k(1)*kw(ik)
+            Else
+               dos_k(1) = 0
+            End If
+            If (nmodr(ik) > 0) Then
+               Call hdfread(hid,trim(cwork)//'/leadvel/r_in', Vr(:,1,ik), nmodr(ik))
+               Call hdfread(hid,trim(cwork)//'/leadvel/r_out', Vr(:,2,ik), nmodr(ik))
+               dos_k(2) = suminv(Vr(1:nmodr(ik),1,ik)) + suminv(Vr(1:nmodr(ik),2,ik))
+               dos_k(2) = dos_k(2)/(2.0*DEF_M_PI)/cf%ts%nr
+               dos(2) = dos(2) + dos_k(2)*kw(ik)
+            Else
+               dos_k(2) = 0
+            End If
+            if (kdep) Call hdfwrite(hid,trim(cwork)//'/qofz/lead_dos',dos_k)
+         end do
+         Deallocate(kw)
+         Deallocate(nmliu,nmlid,nmlou,nmlod)
+         Deallocate(nmriu,nmrid,nmrou,nmrod)
+         Deallocate(nmodl,nmodr)
+         Deallocate(Vl,Vr)
+         call hdfwrite(hid,'/qofz/lead_dos',dos)
+         Call logscreen(log, 1, 'done')
+      end if
+      
+      
+      Call reset_conf(cf_pav)
+      Call reset_conf(cf)
+      Call h5fclose_f(hid,error)
+      dp => dp%next
+   End Do
+   
+   If (cfav) Call make_all_plots(cf1, dp2%path//'/../')
+   Call reset_conf(cf1)
+   
+   Deallocate(hids)
+   Deallocate(skipcf)
+End Do
+
+write(*,*) 'Finished'
+
+
+End program qofz

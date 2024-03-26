@@ -1,0 +1,109 @@
+Band code v4.0rc4 by Antst
+######################################
+#     Equivalent of given config     #
+######################################
+
+### Output verbosity level:
+LOGLEVEL =      1   # default value
+
+ENERGY_FROM =   0.4000000
+ENERGY_TO =   0.6000000
+UCRIT =   0.1000000E-05 # default value
+NUM_POINTS =   2000
+### Kind of system to solve: 1=P-S, 2=H, 3=H-HOH, 5=Model Hamiltonian, 6=EMTO
+EQUATION_TYPE =      6
+### 
+### Spin-orbit interaction parameters:
+### 
+### Switch on spin-orbit. Valid only if "trans_full" binary used
+SO_ON =      0
+### Scaling of spin-orbit
+SO_SCALE =    1.000000     # default value
+### Complex part of energy
+EI =    0.000000     # default value
+######################################
+### Rotation of magnetization parameters:
+### 
+### Valid only if "trans_full" binary used
+ROT_MASK =      0   # default value
+### Angle for stiff rotation of magnetization (after rot_mask is applied)
+ROT_ANGLE = [   0.00000    ,   0.00000    ,   0.00000    ]
+ROTCF =      0   # default value
+### Values in rotated potential parameters
+###  smaller than "rnegl" will be neglected.
+RNEGL =   0.1000000E-19 # default value
+
+### Use non-spherical corrections in the Hamiltonian
+NONSPH =      1
+NONSPH_LMX =      3
+### Options to control calculation of atomic parameters:
+### 
+### Scalar relativistic calculations
+ATOPT_IREL =      1   # default value
+ATOPT_NSIRK =      2   # default value
+ATOPT_DE_STEP =   0.1000000E-03 # default value
+
+### Options to control Ando solver:
+### 
+### Chooses eigenvalue solver used by Ando solver.
+### 0 - simple(fastest), 10 - general(optimal choice), 17 - quadro(slow, most stable)
+### in some cases when accuracy not enough, code will automaticaly fail-back to 17
+EIGVAL_SOLVER =     15
+EIGVAL_REFINE =      1   # default value
+### in some cases
+### use ando_part_of_spectrum*100% of eigenvalues for Ando
+ANDO_PART_OF_SPECTRUM =    1.000000     # default value
+### Leads parameters:
+### 
+### Polarization in left/right leads is now automatically analyzed 
+### left_pol and right_pol are not used anymore
+### 
+### Identity of leads is to be automatically decided
+### leads_ident is not used anymore
+EXT_LEADS =      0   # default value
+
+### Write data for channel decomposition:
+ANDO_DECOMP_DATA =      0   # default value
+
+### when performs spin decomposition, if
+### "spin_dec_dir"= 0 , then Sz=Lz, else spin states
+### correspond to Sz direction in lead
+SPIN_DEC_DIR =      0   # default value
+### for rotated magnetic lead "spin_dec_dir"= 0 will lie.
+### for rotated non=magnetic lead "spin_dec_dir"= 1 will lie.
+######################################
+
+KPAR = [   0.00000    ,   0.00000    ]
+### Minimal number of MPI processes per k-point:
+### if par_nprock == 0, then effectively par_nprock == mpi_comm_size (mpi_comm_world)
+PAR_NPROCK =      1   # default value
+### Options to control solvers behaviour:
+### 
+### Direct linear solver options:
+LINEQ_SOLVER =      0   # default value
+MUMPS_MEMORY_OVERHEAD =     -1   # default value
+MUMPS_PARTITIONER =      2   # default value
+MUMPS_REDIST_MTX =      0   # default value
+MUMPS_PERMSCALE =      7   # default value
+### if par_nprock/=1, then workhost controls occupancy of root-process in solver comm:
+MUMPS_WORKHOST =      1   # default value
+MUMPS_DEBUG =     -1   # default value
+# For OOC solver set variable MUMPS_TMP_DIR. Then OOC solver will be selected
+MUMPS_TMP_DIR =    # default value
+# For half-iterative solver (LINEQ_SOLVER==1)
+# LINEQ_MAXITER =      4
+# LINEQ_ACCURACY =   0.1000000E-11
+######################################
+Reading omta atom definitions
+ Number of potentials =            1
+ Number of spins =  2
+ Fermi level at =       0.0000000000
+ Muffin-tin zero at =        0.0000000000       0.0000000000
+Reading potentials done!
+
+Reading geometry:geom_b
+Reading geometry:geom_b ...Done!
+
+Max. number of clusters:  44                                                                                                                                                                            
+Max. number of clusters:  44                                                                                                                                                                            
+Doing calculation for ie=    1

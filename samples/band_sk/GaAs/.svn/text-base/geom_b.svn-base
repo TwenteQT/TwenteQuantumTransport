@@ -1,0 +1,11 @@
+ ------------ GEOMETRY - ZincBlende(001)  ---------------------------------
+    2   3  1                                   NP, NMTR,	
+   2.7
+    1   1	                                SC_SIZE(2) 
+    0.70710680     0.70710680     1.0           SCALING FACTORS 
+    1.0            0.0                          1ST TRANSL. VECTOR
+    0.0            1.0                          2ND TRANSL. VECTOR 
+    0.5            0.5            0.5           TR. VECTOR
+    0.0            0.0           -0.5           As1
+    0.0            0.5           -0.25          Ga1
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X

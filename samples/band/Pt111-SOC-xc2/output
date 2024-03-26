@@ -1,0 +1,4106 @@
+Band code v4.0rc4 by Antst
+######################################
+#     Equivalent of given config     #
+######################################
+
+### Output verbosity level:
+LOGLEVEL =      1   # default value
+
+ENERGY_FROM =  -0.2000000     # default value
+ENERGY_TO =   0.2000000     # default value
+UCRIT =   0.1000000E-05 # default value
+NUM_POINTS =   1000
+### Kind of system to solve: 1=P-S, 2=H, 3=H-HOH
+EQUATION_TYPE =      2
+### 
+### Spin-orbit interaction parameters:
+### 
+### Switch on spin-orbit. Valid only if "trans_full" binary used
+SO_ON =      1
+### Scaling of spin-orbit
+SO_SCALE =   1.0000000     # default value
+### Complex part of energy
+EI =    0.000000     # default value
+######################################
+### Rotation of magnetization parameters:
+### 
+### Valid only if "trans_full" binary used
+ROT_MASK =      0   # default value
+### Angle for stiff rotation of magnetization (after rot_mask is applied)
+ROT_ANGLE = [   0.00000    ,   0.00000    ,   0.00000    ]
+ROTCF =      0   # default value
+### Values in rotated potential parameters
+###  smaller than "rnegl" will be neglected.
+RNEGL =   0.1000000E-19 # default value
+
+### Options to control calculation of atomic parameters:
+### 
+### Scalar relativistic calculations
+ATOPT_IREL =      1   # default value
+ATOPT_NSIRK =      2   # default value
+ATOPT_DE_STEP =   0.1000000E-03 # default value
+
+### Options to control Ando solver:
+### 
+### Chooses eigenvalue solver used by Ando solver.
+### 0 - simple(fastest), 10 - general(optimal choice), 17 - quadro(slow, most stable)
+### in some cases when accuracy not enough, code will automaticaly fail-back to 17
+EIGVAL_SOLVER =     10
+EIGVAL_SOLVER = 15 # required by spin-orbit
+EIGVAL_REFINE =      1   # default value
+### in some cases
+### use ando_part_of_spectrum*100% of eigenvalues for Ando
+ANDO_PART_OF_SPECTRUM =   1.0000000     # default value
+### Leads parameters:
+### 
+### Polarization in left/right leads is now automatically analyzed 
+### left_pol and right_pol are not used anymore
+### 
+### Identity of leads is to be automatically decided
+### leads_ident is not used anymore
+EXT_LEADS =      0   # default value
+
+### Write data for channel decomposition:
+ANDO_DECOMP_DATA =      0   # default value
+
+### when performs spin decomposition, if
+### "spin_dec_dir"= 0 , then Sz=Lz, else spin states
+### correspond to Sz direction in lead
+SPIN_DEC_DIR =      0   # default value
+### for rotated magnetic lead "spin_dec_dir"= 0 will lie.
+### for rotated non=magnetic lead "spin_dec_dir"= 1 will lie.
+######################################
+
+KPAR = [   0.00000    ,   0.00000    ]
+### Minimal number of MPI processes per k-point:
+### if par_nprock == 0, then effectively par_nprock == mpi_comm_size (mpi_comm_world)
+PAR_NPROCK =      1   # default value
+### Options to control solvers behaviour:
+### 
+### Direct linear solver options:
+LINEQ_SOLVER =      0   # default value
+MUMPS_MEMORY_OVERHEAD =     -1   # default value
+MUMPS_PARTITIONER =      2   # default value
+MUMPS_REDIST_MTX =      0   # default value
+MUMPS_PERMSCALE =      7   # default value
+### if par_nprock/=1, then workhost controls occupancy of root-process in solver comm:
+MUMPS_WORKHOST =      1   # default value
+MUMPS_DEBUG =     -1   # default value
+# For OOC solver set variable MUMPS_TMP_DIR. Then OOC solver will be selected
+MUMPS_TMP_DIR =    # default value
+# For half-iterative solver (LINEQ_SOLVER==1)
+# LINEQ_MAXITER =      4
+# LINEQ_ACCURACY =   0.1000000E-11
+######################################
+Reading atom defenitions
+Reading atom defenitions ....Done!
+
+Reading geometry:geom_b
+Reading geometry:geom_b ...Done!
+
+S(k) calculation:
+number of unique clusters is=   1
+Maximal deviations:
+     0.002223   0.002683   0.002223
+
+Doing calculation for ie=    1
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=    2
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=    3
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=    4
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=    5
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=    6
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=    7
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=    8
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=    9
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   10
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   11
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   12
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   13
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   14
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   15
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   16
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   17
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   18
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   19
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   20
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   21
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   22
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   23
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   24
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   25
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   26
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   27
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   28
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   29
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   30
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   31
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   32
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   33
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   34
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   35
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   36
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   37
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   38
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   39
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   40
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   41
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   42
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   43
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   44
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   45
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   46
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   47
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   48
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   49
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   50
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   51
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   52
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   53
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   54
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   55
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   56
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   57
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   58
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   59
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   60
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   61
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   62
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   63
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   64
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   65
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   66
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   67
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   68
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   69
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   70
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   71
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   72
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   73
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   74
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   75
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   76
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   77
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   78
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   79
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   80
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   81
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   82
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   83
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   84
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   85
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   86
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   87
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   88
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   89
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   90
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   91
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   92
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   93
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   94
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   95
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   96
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   97
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   98
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=   99
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  100
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  101
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  102
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  103
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  104
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  105
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  106
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  107
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  108
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  109
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  110
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  111
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  112
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  113
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  114
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  115
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  116
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  117
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  118
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  119
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  120
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  121
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  122
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  123
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  124
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  125
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  126
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  127
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  128
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  129
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  130
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  131
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  132
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  133
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  134
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  135
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  136
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  137
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  138
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  139
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  140
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  141
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  142
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  143
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  144
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  145
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  146
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  147
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  148
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  149
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  150
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  151
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  152
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  153
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  154
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  155
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  156
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  157
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  158
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  159
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  160
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  161
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  162
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  163
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  164
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  165
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  166
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  167
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  168
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  169
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  170
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  171
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  172
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  173
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  174
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  175
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  176
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  177
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  178
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  179
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  180
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  181
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  182
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  183
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  184
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  185
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  186
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  187
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  188
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  189
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  190
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  191
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  192
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  193
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  194
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  195
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  196
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  197
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  198
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  199
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  200
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  201
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  202
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  203
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  204
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  205
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  206
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  207
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  208
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  209
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  210
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  211
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  212
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  213
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  214
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  215
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  216
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  217
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  218
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  219
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  220
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  221
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  222
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  223
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  224
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  225
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  226
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  227
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  228
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  229
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  230
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  231
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  232
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  233
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  234
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  235
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  236
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  237
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  238
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  239
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  240
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  241
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  242
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  243
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  244
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  245
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  246
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  247
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  248
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  249
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  250
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  251
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  252
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  253
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  254
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  255
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  256
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  257
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  258
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  259
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  260
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  261
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  262
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  263
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  264
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  265
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  266
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  267
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  268
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  269
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  270
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  271
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  272
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  273
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  274
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  275
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  276
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  277
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  278
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  279
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  280
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  281
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  282
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  283
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  284
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  285
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  286
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  287
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  288
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  289
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  290
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  291
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  292
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  293
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  294
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  295
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  296
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  297
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  298
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  299
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  300
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  301
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  302
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  303
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  304
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  305
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  306
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  307
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  308
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  309
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  310
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  311
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  312
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  313
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  314
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  315
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  316
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  317
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  318
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  319
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  320
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  321
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  322
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  323
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  324
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  325
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  326
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  327
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  328
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  329
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  330
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  331
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  332
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  333
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  334
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  335
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  336
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  337
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  338
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  339
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  340
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  341
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  342
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  343
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  344
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  345
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  346
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  347
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  348
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  349
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  350
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  351
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  352
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  353
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  354
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  355
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  356
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  357
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  358
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  359
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  360
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  361
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  362
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  363
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  364
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  365
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  366
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  367
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  368
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  369
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  370
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  371
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  372
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  373
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  374
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  375
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  376
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  377
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  378
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  379
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  380
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  381
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  382
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  383
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  384
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  385
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  386
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  387
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  388
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  389
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  390
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  391
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  392
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  393
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  394
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  395
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  396
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  397
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  398
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  399
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  400
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  401
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  402
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  403
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  404
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  405
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  406
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  407
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  408
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  409
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  410
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  411
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  412
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  413
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  414
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  415
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  416
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  417
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  418
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  419
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  420
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  421
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  422
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  423
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  424
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  425
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  426
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  427
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  428
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  429
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  430
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  431
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  432
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  433
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  434
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  435
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  436
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  437
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  438
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  439
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  440
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  441
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  442
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  443
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  444
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  445
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  446
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  447
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  448
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  449
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  450
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  451
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  452
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  453
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  454
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  455
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  456
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  457
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  458
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  459
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  460
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  461
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  462
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  463
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  464
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  465
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  466
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  467
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  468
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  469
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  470
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  471
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  472
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  473
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  474
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  475
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  476
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  477
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  478
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  479
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  480
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  481
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  482
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  483
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  484
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  485
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  486
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  487
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  488
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  489
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  490
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  491
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  492
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  493
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  494
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  495
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  496
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  497
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  498
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  499
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  500
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  501
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  502
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  503
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  504
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  505
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  506
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  507
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  508
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  509
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  510
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  511
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  512
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  513
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  514
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  515
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  516
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  517
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  518
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  519
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  520
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  521
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  522
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  523
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  524
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  525
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  526
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  527
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  528
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  529
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  530
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  531
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  532
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  533
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  534
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  535
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  536
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  537
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  538
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  539
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  540
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  541
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  542
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  543
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  544
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  545
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  546
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  547
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  548
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  549
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  550
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  551
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  552
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  553
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  554
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  555
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  556
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  557
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  558
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  559
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  560
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  561
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  562
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  563
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  564
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  565
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  566
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  567
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  568
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  569
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  570
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  571
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  572
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  573
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  574
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  575
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  576
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  577
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  578
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  579
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  580
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  581
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  582
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  583
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  584
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  585
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  586
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  587
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  588
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  589
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  590
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  591
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  592
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  593
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  594
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  595
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  596
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  597
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  598
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  599
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  600
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  601
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  602
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  603
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  604
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  605
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  606
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  607
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  608
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  609
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  610
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  611
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  612
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  613
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  614
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  615
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  616
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  617
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  618
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  619
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  620
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  621
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  622
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  623
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  624
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  625
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  626
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  627
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  628
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  629
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  630
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  631
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  632
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  633
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  634
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  635
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  636
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  637
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  638
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  639
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  640
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  641
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  642
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  643
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  644
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  645
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  646
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  647
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  648
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  649
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  650
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  651
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  652
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  653
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  654
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  655
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  656
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  657
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  658
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  659
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  660
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  661
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  662
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  663
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  664
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  665
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  666
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  667
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  668
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  669
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  670
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  671
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  672
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  673
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  674
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  675
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  676
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  677
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  678
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  679
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  680
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  681
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  682
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  683
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  684
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  685
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  686
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  687
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  688
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  689
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  690
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  691
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  692
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  693
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  694
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  695
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  696
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  697
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  698
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  699
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  700
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  701
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  702
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  703
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  704
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  705
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  706
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  707
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  708
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  709
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  710
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  711
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  712
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  713
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  714
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  715
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  716
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  717
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  718
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  719
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  720
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  721
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  722
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  723
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  724
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  725
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  726
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  727
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  728
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  729
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  730
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  731
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  732
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  733
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  734
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  735
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  736
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  737
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  738
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  739
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  740
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  741
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  742
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  743
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  744
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  745
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  746
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  747
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  748
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  749
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  750
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  751
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  752
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  753
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  754
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  755
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  756
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  757
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  758
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  759
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  760
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  761
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  762
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  763
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  764
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  765
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  766
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  767
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  768
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  769
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  770
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  771
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  772
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  773
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  774
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  775
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  776
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  777
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  778
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  779
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  780
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  781
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  782
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  783
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  784
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  785
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  786
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  787
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  788
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  789
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  790
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  791
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  792
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  793
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  794
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  795
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  796
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  797
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  798
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  799
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  800
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  801
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  802
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  803
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  804
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  805
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  806
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  807
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  808
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  809
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  810
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  811
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  812
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  813
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  814
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  815
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  816
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  817
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  818
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  819
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  820
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  821
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  822
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  823
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  824
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  825
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  826
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  827
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  828
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  829
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  830
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  831
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  832
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  833
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  834
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  835
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  836
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  837
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  838
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  839
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  840
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  841
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  842
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  843
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  844
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  845
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  846
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  847
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  848
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  849
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  850
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  851
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  852
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  853
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  854
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  855
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  856
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  857
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  858
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  859
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  860
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  861
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  862
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  863
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  864
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  865
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  866
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  867
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  868
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  869
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  870
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  871
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  872
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  873
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  874
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  875
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  876
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  877
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  878
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  879
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  880
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  881
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  882
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  883
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  884
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  885
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  886
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  887
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  888
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  889
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  890
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  891
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  892
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  893
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  894
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  895
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  896
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  897
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  898
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  899
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  900
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  901
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  902
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  903
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  904
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  905
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  906
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  907
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  908
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  909
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  910
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  911
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  912
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  913
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  914
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  915
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  916
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  917
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  918
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  919
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  920
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  921
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  922
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  923
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  924
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  925
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  926
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  927
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  928
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  929
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  930
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  931
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  932
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  933
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  934
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  935
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  936
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  937
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  938
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  939
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  940
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  941
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  942
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  943
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  944
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  945
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  946
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  947
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  948
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  949
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  950
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  951
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  952
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  953
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  954
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  955
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  956
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  957
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  958
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  959
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  960
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  961
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  962
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  963
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  964
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  965
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  966
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  967
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  968
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  969
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  970
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  971
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  972
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  973
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  974
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  975
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  976
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  977
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  978
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  979
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  980
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  981
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  982
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  983
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  984
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  985
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  986
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  987
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  988
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  989
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  990
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  991
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  992
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  993
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  994
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  995
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  996
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  997
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  998
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie=  999
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Doing calculation for ie= 1000
+Caclulating potential parameters for atom set...
+Caclulating potential parameters for atom set...Done!
+
+Done!

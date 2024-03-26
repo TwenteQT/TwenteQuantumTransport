@@ -1,0 +1,23 @@
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/codes/!svn/ver/1981/trans/trunk/src/fermproj
+END
+deps.mk
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/codes/!svn/ver/1981/trans/trunk/src/fermproj/deps.mk
+END
+fermproj.F90
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/codes/!svn/ver/1981/trans/trunk/src/fermproj/fermproj.F90
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/codes/!svn/ver/1981/trans/trunk/src/fermproj/Makefile
+END

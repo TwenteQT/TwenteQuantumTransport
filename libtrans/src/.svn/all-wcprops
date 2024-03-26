@@ -1,0 +1,221 @@
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/codes/!svn/ver/2022/trans/trunk/libtrans/src
+END
+rotations.F90
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/rotations.F90
+END
+atoms.F90
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/atoms.F90
+END
+sparselib.F90
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/sparselib.F90
+END
+geometry.F90
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/codes/!svn/ver/2009/trans/trunk/libtrans/src/geometry.F90
+END
+r8tomsqz.F
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/r8tomsqz.F
+END
+structure.F90
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/2000/trans/trunk/libtrans/src/structure.F90
+END
+spsolvers.F90
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/1986/trans/trunk/libtrans/src/spsolvers.F90
+END
+sk_ham.F90
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/sk_ham.F90
+END
+helpers.F90
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/helpers.F90
+END
+sk_io.F90
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/sk_io.F90
+END
+deps.mk
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/codes/!svn/ver/2007/trans/trunk/libtrans/src/deps.mk
+END
+praxis.F90
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/praxis.F90
+END
+itersolv.F90
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/itersolv.F90
+END
+spherical.F90
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/spherical.F90
+END
+r16tomsqz.F
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/r16tomsqz.F
+END
+fmtlib.F90
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/fmtlib.F90
+END
+hdf5io.F90
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1994/trans/trunk/libtrans/src/hdf5io.F90
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/codes/!svn/ver/2008/trans/trunk/libtrans/src/Makefile
+END
+timer.F90
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svn/codes/!svn/ver/2012/trans/trunk/libtrans/src/timer.F90
+END
+compat.F90
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/compat.F90
+END
+postprocess.F90
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svn/codes/!svn/ver/1994/trans/trunk/libtrans/src/postprocess.F90
+END
+logging.F90
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/logging.F90
+END
+setuplib.F90
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/setuplib.F90
+END
+potpars.F90
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/codes/!svn/ver/1990/trans/trunk/libtrans/src/potpars.F90
+END
+heritage.F90
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/heritage.F90
+END
+readcfg.F90
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/codes/!svn/ver/2008/trans/trunk/libtrans/src/readcfg.F90
+END
+transport.F90
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/transport.F90
+END
+zPackgmres.f
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/zPackgmres.f
+END
+supercell.F90
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/1998/trans/trunk/libtrans/src/supercell.F90
+END
+pgsym.F90
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/pgsym.F90
+END
+math_def.h
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/math_def.h
+END
+hamiltonian.F90
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/hamiltonian.F90
+END
+qofzlib.F90
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/codes/!svn/ver/2022/trans/trunk/libtrans/src/qofzlib.F90
+END
+interatcur.F90
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/codes/!svn/ver/2019/trans/trunk/libtrans/src/interatcur.F90
+END
+ando.F90
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/codes/!svn/ver/1999/trans/trunk/libtrans/src/ando.F90
+END
+bzgrid.F90
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1981/trans/trunk/libtrans/src/bzgrid.F90
+END

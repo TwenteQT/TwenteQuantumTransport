@@ -1,0 +1,14 @@
+#!/bin/bash
+#SBATCH -t 0-1
+#SBATCH -p short 
+#SBATCH -N 1 --exclusive
+#SBATCH -J Pt-EMTO
+#SBATCH --output=o%j
+#SBATCH --error=e%j
+
+ulimit -s unlimited
+date "+Began at: %H:%M:%S"
+
+srun ~/work_trunk/bin/bandfull.x 
+date "+Finished at: %H:%M:%S"
+

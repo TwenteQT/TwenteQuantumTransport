@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/prepare-input
+END
+test
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/prepare-input/test
+END
+inpch
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/prepare-input/inpch
+END
+inpge
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/prepare-input/inpge
+END
+README.txt
+K 25
+svn:wc:ra_dav:version-url
+V 79
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/prepare-input/README.txt
+END
+inpbu
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/prepare-input/inpbu
+END

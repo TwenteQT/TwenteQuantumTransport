@@ -1,0 +1,5 @@
+-------=========== ATOM DEFINITIONS ===========-------
+#FORMAT OF LINES:  LABEL    FILENAME
+    1              # NUMBER OF ATOMS    # mass (a.u)
+ Pt_B              Pt_B   		# 195.078000
+-------=========== END OF ATOM FILE ===========-------

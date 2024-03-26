@@ -1,0 +1,90 @@
+# Make.inc for ASTER in SARA
+# work when next modules are loaded:
+#********************************************************#
+# fortraninteger/4 fortranreal/4 fortrandouble/8 mode/64 #
+# fortran/intel/9.1 c/intel/9.1 mpt  scsl scalapack      #
+#********************************************************#
+#
+# Compilers
+F90=ifort
+F77=ifort
+CC=icc
+
+# Linkers 
+FL=$(F90)
+CL=$(CC)
+
+# 
+RM = /bin/rm -f 
+
+# Library archiver
+AR = ar vr 
+RANLIB = ranlib
+
+TAGS =etags
+
+#Prefx for preprocessor directives. Due to ugly XLF/XLC syntax.
+FDP=-D
+#FDP=-WF,-D
+
+CDP=-D
+#CDP=-Wp,-D
+
+
+SCALAPACK= -lscalapack
+LAPACK= -lmkl_intel_lp64 -lmkl_core -lmkl_intel_thread
+HDF5LIB= -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5
+
+MPI_INC= 
+MPI_LIB= -lmpi_f77 -lmpi -liomp5
+
+XTRA_LIB = 
+#Sparse solver to use
+
+#Use available dbl-complex MUMPS library
+SP_SOLVER=USE_ZMUMPS 
+SOLVER_INC=
+SOLVER_LIB=-lzmumps -lmumps_common -lpord 
+
+#Use SGI's SCSL library
+#SP_SOLVER=USE_SCSL
+
+#Use SPOOLES library, should be provided separately
+#SP_SOLVER=USE_SPOOLES 
+#SOLVER_INC=-I/home/tcmsstar/work/codes/libsrc/spooles 
+
+#Use Pardiso library
+#SP_SOLVER=USE_PARDISO
+
+#Use IBM's WSMP library
+#SP_SOLVER=USE_WSMP
+
+
+#Preprocessor defs for C
+CDEFS   = $(CDP)$(SP_SOLVER) 
+
+#Preprocessor defs for Fortran    
+FDEFS= $(FDP)HAVE_QUADPREC \
+       $(FDP)$(SP_SOLVER)
+
+#       $(FDP)NTS_LPK
+       
+#       $(FDP)DO_SC_SYM
+#       $(FDP)HAVE_NAN \
+
+
+#Begin Optimization options
+OPTS=  -O3 -xHost -align -ip 
+
+INCS=$(MPI_INC) $(SOLVER_INC)
+
+CFLAGS= $(OPTS) $(CDEFS)  $(INCS)
+F90FLAGS= $(OPTS) $(FDEFS) $(INCS) -warn unused  -assume byterecl 
+#-g -check all
+F77FLAGS=$(F90FLAGS) $(INCS)
+
+LOPTS= $(OPTS) -Wl,-stack_size,0x10000000
+
+LFLAGS= $(LOPTS) $(HDF5LIB) $(SOLVER_LIB) $(SCALAPACK) $(LAPACK) $(MPI_LIB) $(XTRA_LIB)
+#End Optimization options
+

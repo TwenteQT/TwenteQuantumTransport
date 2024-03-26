@@ -1,0 +1,5 @@
+#!/bin/bash
+
+../../../bin/randgen.x 3 3 
+
+

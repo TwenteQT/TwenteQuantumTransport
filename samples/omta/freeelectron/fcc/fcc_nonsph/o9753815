@@ -1,0 +1,67 @@
+Began at: 13:48:37
+Finished at: 13:50:59
+Began at: 13:50:59
+Finished at: 13:53:01
+Began at: 13:53:01
+Finished at: 13:55:03
+Began at: 13:55:03
+Finished at: 13:57:04
+Began at: 13:57:04
+Finished at: 13:59:16
+Began at: 13:59:16
+Finished at: 14:01:26
+Began at: 14:01:26
+Finished at: 14:04:11
+Began at: 14:04:11
+Finished at: 14:06:12
+Began at: 14:06:12
+Finished at: 14:08:50
+Began at: 14:08:50
+Finished at: 14:10:52
+Began at: 14:10:54
+Finished at: 14:13:03
+Began at: 14:13:03
+Finished at: 14:15:05
+Began at: 14:15:05
+Finished at: 14:17:25
+Began at: 14:17:25
+Finished at: 14:19:52
+Began at: 14:19:52
+Finished at: 14:21:53
+Began at: 14:21:54
+Finished at: 14:23:56
+Began at: 14:23:56
+Finished at: 14:25:59
+Began at: 14:25:59
+Finished at: 14:28:01
+Began at: 14:28:01
+Finished at: 14:30:04
+Began at: 14:30:04
+Finished at: 14:32:26
+Began at: 14:32:26
+Finished at: 14:34:28
+Began at: 14:34:29
+Finished at: 14:36:41
+Began at: 14:36:42
+Finished at: 14:38:43
+Began at: 14:38:44
+Finished at: 14:41:45
+Began at: 14:41:45
+Finished at: 14:43:46
+Began at: 14:43:46
+Finished at: 14:47:05
+Began at: 14:47:05
+
+JOB STATISTICS
+==============
+Job ID: 9753815
+Cluster: sara
+User/Group: mrang/mrang
+State: TIMEOUT (exit code 0)
+Nodes: 2
+Cores per node: 32
+CPU Utilized: 2-11:14:11
+CPU Efficiency: 92.150f 2-16:17:04 core-walltime
+Job Wall-clock time: 01:00:16
+Memory Utilized: 118.32 GB (estimated maximum)
+Memory Efficiency: 23.760f 497.98 GB (248.99 GB/node)

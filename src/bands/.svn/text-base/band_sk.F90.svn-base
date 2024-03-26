@@ -1,0 +1,262 @@
+!!#   $Id: band.F90 149 2006-10-26 16:29:08Z antst $
+
+#include "math_def.h"
+
+Program band
+      Use transport
+      Use ando_module
+      Use atoms_module
+      Use geometry_module
+      Use structure
+      Use supercell
+      Use hamiltonian
+      Use logging
+      Use sparse_solvers
+      Use bzgrid
+      Use readcfg
+      Use sk_io
+      Use sk_ham
+      Implicit None
+      Include 'mpif.h'
+
+      Type (t_atoms_set) :: atoms
+      Type t_sk_bandopts
+         Integer :: loglvl, nE
+         Real (Kind=DEF_DBL_PREC) :: bE, eE, sk_alat
+         Real (Kind=DEF_DBL_PREC) :: kpar (2)
+         Integer :: gensol
+         logical :: sk_ortho
+         Type (t_pot_opts) :: po
+      End Type t_sk_bandopts      
+      Type (t_sk_bandopts) :: opt
+
+      Type (t_geometry) :: bgeo, tbgeo
+      Type (t_strconst), pointer :: bsc(:)
+!!$      Type (t_strconst) :: bsc
+      Type (t_mathop) :: msys, bsk
+      Type (t_ando_options) :: aopts
+      Type (t_ando_sollution) :: ando
+      Real (Kind=DEF_DBL_PREC), Pointer :: k (:, :)
+      Real (Kind=DEF_DBL_PREC) :: stE, en
+      Integer :: is, n, nh, nn, pohops
+      Integer :: bandf (2) = (/ 292, 293 /)
+      Complex (Kind=DEF_DBL_PREC), Pointer :: ons (:, :)
+      Complex (Kind=DEF_DBL_PREC), Pointer :: ofs (:, :)
+      Complex (Kind=DEF_DBL_PREC), Pointer :: hops (:, :)
+      Complex (Kind=DEF_DBL_PREC) :: ph
+      Character (Len=200) :: cwork
+      Integer :: neloops, loop
+!!$ MPI vars
+      Integer :: ierr, my_mpi_id, local_comm, solve_comm, mpi_sz, root = 0, solsize
+      Integer :: mpi_loc_id, iat
+
+      Call mpi_init (ierr)
+      solve_comm = mpi_comm_world
+      Call mpi_comm_rank (solve_comm, my_mpi_id, ierr)
+      call mpi_comm_size (solve_comm, mpi_sz, ierr)
+
+      Log_Level = - 1
+      If (my_mpi_id == root) Then
+!!$          Call unlink ('outp')
+         Log_Level = 1
+      End If
+
+#ifdef _VERS_
+      Call do_log (1, 'Band Slater-Koster code v'//_VERS_//' by Antst an MZ')
+#else
+      Call do_log (1, 'Band Slater-Koster code vXXXX by Antst and MZ')
+#endif
+
+      Call band_sk_config_init (opt)
+      opt%po%kind = 7
+      call do_log(1,' Setting EQUATION TYPE  to 7 (Slater-Koster Hamiltonian)')
+
+      Call MPI_COMM_SPLIT (solve_comm, my_mpi_id, 0, local_comm, ierr)
+      solsize = 1
+
+      Call mpi_comm_rank (local_comm, mpi_loc_id, ierr)
+
+      If (my_mpi_id == root) Then
+         Log_Level = opt%loglvl
+         Open (Unit=bandf(1), File='plotup.b', Action='write')
+         Open (Unit=bandf(2), File='plotdown.b', Action='write')
+      Else
+!!$ uncomment line bellow if you want output from rest of CPUs
+!!$     Log_Level=opt%loglvl
+         Write (cwork, '(i2.2)') my_mpi_id
+         Write (logfilename, '("log.",A)') trim (cwork)
+      End If
+
+      If (mpi_loc_id == 0) Then
+
+         atoms = read_slater_atoms('atomlist',opt%sk_ortho,0.0d0)
+
+         tbgeo = read_geom ('geom_b', atoms)
+         call scale_geom(tbgeo,opt%sk_alat)
+
+         tbgeo%rawsr=1.0d0
+         tbgeo%dawsr=1.0d0
+         pohops = 1
+
+         bgeo = make_leadgeom (tbgeo, pohops, 1)
+         Call free_geom (tbgeo)
+
+         stE = (opt%eE-opt%bE) / (opt%nE-1)
+         en = opt%bE
+
+         allocate(bsc(atoms%nsmax))
+
+         aopts%use_ev_solver = opt%gensol
+         aopts%dir = 1
+         aopts%usestates = 1
+         aopts%needEmb = 0
+         aopts%needBound = 0
+
+         nh = pohops
+         ph = Exp (DEF_cmplx_Ione*DEF_M_PI)
+
+      End If
+
+      neloops = ceiling (opt%nE/real(mpi_sz/solsize, kind=DEF_DBL_PREC))
+
+      Do loop = 0, neloops - 1
+         nn = 1 + loop * (mpi_sz/solsize) + my_mpi_id
+         Write (cwork, '("Doing calculation for ie=",i5)') nn
+         Call do_log (1, trim(cwork))
+
+         en = opt%bE + stE * real (nn-1, kind=DEF_DBL_PREC)
+         do iat=1,atoms%num
+            atoms%at(iat)%ef=en
+         end do
+
+         bsc =  calc_slater_ham(bgeo,atoms,0.0d0,opt%sk_ortho)
+
+         Do is = 1,atoms%nsmax
+            Call make_sk(bsk, bsc(is), opt%kpar, 1)
+
+            if(.not.associated(ons)) then
+               n = bsc(is)%nrows / pohops
+               Allocate (ons(bsc(is)%nrows, bsc(is)%nrows))
+               Allocate (ofs(bsc(is)%nrows, bsc(is)%nrows))
+               Allocate (hops(n, n*(nh+1)))
+               Allocate (k(n+1, 2))            
+            end if
+
+            Call prep_system (msys, bsk, 1)
+
+            ons=0.0d0
+            ofs=0.0d0
+
+            ons = sptofull (msys%c)
+            ofs = sptofull (msys%r)
+            Call free_mathop (msys)
+            hops (1:n, 1:n) = ons (1:n, 1:n)
+            hops (1:n, n+1:n+nh*n) = ofs (n*nh-n+1:n*nh, 1:nh*n)
+            Call free_mathop (msys)
+!!$ Solve ando problem
+
+            Call solve_ando (ofs, hops, n, nh, ando, aopts)
+
+            k (1, is) = en*13.6056923d0
+!!$            k (2:ando%nin+1, is) = abs(imag(Log(ando%lin)))
+            k (2:ando%nin+1, is)            = (imag(Log(ando%lin ))+1.04719755119660)*0.248440004032864
+            k (ando%nin+2:2*ando%nin+1, is) = (imag(Log(ando%lout))+1.04719755119660)*0.248440004032864
+            k (2*ando%nin+2:n+1, is) = 500!0.0 / 0.0
+!!$            k (ando%nin+2:n+1, is) = 500!0.0 / 0.0
+!!$            write(*,'(200(f10.4,1x))') k(1:n+1,is)
+
+!!$            write(*,*) k(1,is),k(2,is),k(3,is),ando%nin+2,2*ando%nin+1
+         End Do
+         Call log_bands (solve_comm, root, k, n+1, bandf,atoms%nsmax)
+
+         en = en + stE
+!!$         deallocate(bsc)
+      End Do
+      If (my_mpi_id == root) Then
+         Close (Unit=bandf(1))
+         Close (Unit=bandf(2))
+      End If
+
+      Call MPI_Barrier (solve_comm, ierr)
+!!$       !!$ End here you loop over E
+
+!!$             If (my_mpi_id == 0) Then
+!!$                Write (timef, '(/"  Total Time = ", f12.4," seconds")') MPI_Wtime () - ttime
+!!$                Close (Unit=timef)
+!!$                Close (Unit=fermf)
+!!$             End If
+      Call mpi_finalize (ierr)
+
+
+Contains
+
+      Subroutine log_bands (comm, root, k, n, bandf,ns)
+         Implicit None
+         Integer :: root, bandf (2), n, comm,ns
+         Real (Kind=DEF_DBL_PREC) :: k (n, 2)
+!!$ Locals
+         Integer :: ierr, procnum, mpi_sz, my_mpi_id
+         Integer :: status (MPI_STATUS_SIZE)
+         Integer :: is, j
+         Call mpi_comm_rank (comm, my_mpi_id, ierr)
+         Call mpi_comm_size (comm, mpi_sz, ierr)
+         If (my_mpi_id /= root) Then
+            Call MPI_Send (k, n*2, MPI_DOUBLE_PRECISION, root, my_mpi_id+mpi_sz+1000, comm, ierr)
+         Else
+            Do is = 1, ns
+               Write (bandf(is), '(250(1x,f12.8))') (k(j, is), j=1, n)
+            End Do
+            Do procnum = 2, mpi_sz
+               Call MPI_Recv (k, n*2, MPI_DOUBLE_PRECISION, procnum-1, procnum+mpi_sz+999, comm, status, &
+              & ierr)
+               Do is = 1, ns
+                  Write (bandf(is), '(250(1x,f12.8))') (k(j, is), j=1, n)
+               End Do
+            End Do
+            flush (bandf(1))
+            flush (bandf(2))
+         End If
+
+      End Subroutine log_bands
+
+      Subroutine band_sk_config_init (opt)
+         Implicit None
+         Type (t_sk_bandopts) :: opt
+!!$ Local vars
+         Type (t_config_option), Pointer :: optlist
+         Real (Kind=8) :: t1 (2) = (/ 0.0d0, 0.0d0 /)
+
+         Call read_config_file ('band.conf', optlist)
+         Call do_log (1, '######################################')
+         Call do_log (1, '#     Equivalent of given config     #')
+         Call do_log (1, '######################################')
+         Call do_log (1, '')
+
+         Call do_log (1, '### Output verbosity level:')
+         opt%loglvl = getopt_i (optlist, 'LogLevel', 1)
+         Call do_log (1, '')
+!!$         Call do_log (1, '### Kind of system to solve: 1=P-S, 2=H-HOH')
+         opt%po%kind = getopt_i (optlist, 'equation_type', 13)
+!!$         Call do_log (1, '### ')
+!!$         Call do_log (1, '### Spin-orbit interaction parameters:')
+!!$         Call do_log (1, '### ')
+!!$         Call do_log (1, '### Switch on spin-orbit. Valid only if "equation_type"==2')
+!!$         Call do_log (1, '### and "trans_full" binary used')
+!!$         opt%po%so = getopt_i (optlist, 'SO_ON', 0)
+!!$         Call do_log (1, '')
+         opt%kpar = getopt_da (optlist, 'kpar', 2, t1)
+
+         opt%gensol = getopt_i (optlist, 'eigval_solver', 10)
+         opt%sk_alat = getopt_d (optlist, 'sk_alat', 1.0d0)
+         opt%sk_ortho = (getopt_i (optlist, 'sk_ortho', 1)==1)
+
+         opt%bE = getopt_d (optlist, 'energy_from',-0.2d0)
+         opt%eE = getopt_d (optlist, 'energy_to', 0.2d0)
+         opt%nE = getopt_i (optlist, 'num_points', 100)
+         Call do_log (1, '######################################')
+         Call do_log (1, '######################################')
+         Call free_option_list (optlist)
+       End Subroutine band_sk_config_init
+
+
+End Program band

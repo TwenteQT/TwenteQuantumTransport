@@ -1,0 +1,6 @@
+include ../../make.sys
+
+PROGS = qofz
+
+include ../rules.inc
+

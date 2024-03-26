@@ -1,0 +1,66 @@
+------ CHEMICAL OCCUPATIONS:  V    (BCC)   ------------------------
+     1                                          IP=1 IB=1:   NC
+    Cu1     	   Cu_B                                        LABEL
+    1.00           11.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Cu2     	   Cu_B                                        LABEL
+    1.00           11.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Cu3     	   Cu_B                                        LABEL
+    1.00           11.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Cu4     	   Cu_B                                        LABEL
+    1.00           11.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Cu5     	   Cu_B                                        LABEL
+    1.00           11.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Cu6     	   Cu_B                                        LABEL
+    1.00           11.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Cu7     	   Cu_B                                        LABEL
+    1.00           11.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Cu8     	   Cu_B                                        LABEL
+    1.00           11.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Cu9     	   Cu_B                                        LABEL
+    1.00           11.0                                 CONC., ZVAL
+     2                                          IP=1 IB=1:   NC
+    CuI10     	   Cu_B                                        LABEL
+    0.50           11.0                                 CONC., ZVAL
+    CoI10     	   Co_B                                        LABEL
+    0.50            9.0                                 CONC., ZVAL
+     2        
+    CuI11     	   Cu_B                                        LABEL
+    0.50           11.0                                 CONC., ZVAL
+    CoI11     	   Co_B                                        LABEL
+    0.50            9.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Co12     	   Co_B                                        LABEL
+    1.00            9.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Co13     	   Co_B                                        LABEL
+    1.00            9.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Co14     	   Co_B                                        LABEL
+    1.00            9.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Co15     	   Co_B                                        LABEL
+    1.00            9.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Co16     	   Co_B                                        LABEL
+    1.00            9.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Co17     	   Co_B                                        LABEL
+    1.00            9.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Co18     	   Co_B                                        LABEL
+    1.00            9.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Co19     	   Co_B                                        LABEL
+    1.00            9.0                                 CONC., ZVAL
+     1                                          IP=1 IB=1:   NC
+    Co20     	   Co_B                                        LABEL
+    1.00            9.0                                 CONC., ZVAL
+-----------

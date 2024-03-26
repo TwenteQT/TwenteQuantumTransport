@@ -1,0 +1,17 @@
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/svn/codes/!svn/ver/1981/trans/trunk/samples/damping
+END
+.keep
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/codes/!svn/ver/1981/trans/trunk/samples/damping/.keep
+END
+.gitignore
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/1981/trans/trunk/samples/damping/.gitignore
+END

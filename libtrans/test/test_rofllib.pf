@@ -1,0 +1,59 @@
+! list of routines in rofllib.F90
+! area_from_hdf5()
+!
+! list of tests
+! area_from_hdf5()
+!   _unity 
+!   _scaled 
+!   _supercell
+!   _supercell_scaled
+
+
+@test
+subroutine test_area_from_hdf5_unity()
+   use rofllib 
+   use funit
+   Implicit None
+   Double Precision :: area
+
+   call area_from_hdf5(area, "rofllib/area_unity")
+   @assertEqual(area, 1d0)
+
+end subroutine test_area_from_hdf5_unity
+
+@test
+subroutine test_area_from_hdf5_scaled()
+   use rofllib 
+   use funit
+   Implicit None
+   Double Precision :: area
+
+   call area_from_hdf5(area, "rofllib/area_scaled")
+   @assertEqual(area, 4d0)
+
+end subroutine test_area_from_hdf5_scaled
+
+@test
+subroutine test_area_from_hdf5_supercell()
+   use rofllib 
+   use funit
+   Implicit None
+   Double Precision :: area
+
+   call area_from_hdf5(area, "rofllib/area_supercell")
+   @assertEqual(area, 9d0)
+
+end subroutine test_area_from_hdf5_supercell
+
+@test
+subroutine test_area_from_hdf5_supercell_scaled()
+   use rofllib 
+   use funit
+   Implicit None
+   Double Precision :: area
+
+   call area_from_hdf5(area, "rofllib/area_supercell_scaled")
+   @assertEqual(area, 36d0)
+
+end subroutine test_area_from_hdf5_supercell_scaled
+

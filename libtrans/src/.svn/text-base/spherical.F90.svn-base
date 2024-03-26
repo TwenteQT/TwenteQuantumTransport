@@ -1,0 +1,254 @@
+#include "math_def.h"
+module spherical
+  implicit none
+
+CONTAINS
+
+
+  function length(vec)
+!!$ Calculates the length of the vector
+    implicit none
+    real(kind=DEF_DBL_PREC) :: length, vec(3)
+    integer :: i
+
+    length=sqrt(sum(vec*vec))
+
+  end function length
+  
+  function vec_prod(a,b)
+    implicit none
+    real(kind=DEF_DBL_PREC) :: vec_prod(3),a(3),b(3)
+
+    vec_prod(1)=a(2)*b(3)-a(3)*b(2)
+    vec_prod(2)=a(3)*b(1)-a(1)*b(3)
+    vec_prod(3)=a(1)*b(2)-a(2)*b(1)
+
+  end function vec_prod
+
+  function fact(n)
+!!$ Calculates n!
+    implicit none
+    integer(kind=8) :: fact
+    integer :: n, i
+
+    if(n<0) then
+       write(*,*) 'IN FACT(n) n<0'
+       stop
+    end if
+
+    fact=1
+
+    do i=1,n
+       fact=fact*i
+    end do
+
+  end function fact
+
+
+  function volume(a,b,c)
+!!$ The voulme span by the three vectors
+    implicit none
+    real(kind=DEF_DBL_PREC) :: volume, a(3),b(3),c(3)
+
+    volume=(a(2)*b(3)-a(3)*b(2))*c(1)+(a(3)*b(1)-a(1)*b(3))*c(2)&
+         &+(a(1)*b(2)-a(2)*b(1))*c(3)
+
+    volume=abs(volume)
+
+  end function volume
+
+  function kdelta(n,m)
+    implicit none
+    integer :: kdelta,n,m
+    
+    if(n==m) then
+       kdelta=1
+    else
+       kdelta=0
+    end if
+
+  end function kdelta
+
+
+  function cwigner(l,n,m,alpha,beta,gamma)
+!! The complex D^l_nm Wigner coefficient based on
+!! M. Kara & K. Kurki-Suonio, Acta Cryst. A37, 201-210 (1981).
+!!$ Active z-y-z convention, gamma rotation applied first.
+!!$ Rotates orbital by "plus" angles or system of coordinates by "minus".
+!!$ Spherical harmonics are defined with positive 'm' i.e.:
+!!$  Y_lm(theta,phi)= N * P^|m|_l[cos(theta)] * e^(i*m*phi)
+!!$    use algebra
+    implicit none
+    complex(kind=DEF_DBL_PREC) :: cwigner
+    integer, intent(in) :: l,n,m
+    real(kind=DEF_DBL_PREC), intent(in) :: alpha,beta,gamma
+!!$ Local
+    integer :: t
+    real(kind=DEF_DBL_PREC) :: pi
+    complex(kind=DEF_DBL_PREC) :: im
+!!$
+    im=cmplx(0.0d0,1.0d0)
+    pi=acos(-1.0d0)
+
+    cwigner=0.0d0
+
+    do t=max(0,n-m),min(l+n,l-m)
+       cwigner=cwigner+(-1)**t&
+            &*cos(beta/2)**(2*l+n-m-2*t)*sin(beta/2)**(2*t+m-n)&
+            &/(fact(l+n-t)*fact(l-m-t)*fact(t)*fact(t+m-n))
+    end do
+
+    cwigner=cwigner*sqrt(1.0d0*fact(l+n)*fact(l-n)*fact(l+m)*fact(l-m))*&
+         &exp(-im*n*alpha)*exp(-im*m*gamma)
+
+!!$ This takes care of Condon-Shortley phase, as used by 
+!!$ Kara&Kurki-Suonio i.e. (-1)^m (for m>0)
+    if(n/=0) cwigner=(-n/abs(n))**n*cwigner
+    if(m/=0) cwigner=cwigner*(-m/abs(m))**m
+
+!!$    if(n/=0) cwigner=cwigner*(-1)**n
+!!$    if(m/=0) cwigner=cwigner*(-1)**m
+
+  end function cwigner
+
+
+
+  function rwigner(l,nr,mp,alpha,beta,gamma)    
+!!$    use algebra
+    implicit none
+    real(kind=DEF_DBL_PREC) :: rwigner
+    integer :: l,nr,mp,n,r,m,p
+    real(kind=DEF_DBL_PREC) :: alpha,beta, gamma
+    complex(kind=DEF_DBL_PREC) :: dpp,dmp
+
+    n=abs(nr)
+    m=abs(mp)
+
+    dpp=cwigner(l,n,m,alpha,beta,gamma)
+    dmp=cwigner(l,-n,m,alpha,beta,gamma)
+
+    if(mp>=0) then
+
+       if(nr>=0) then
+          rwigner=real(dpp+dmp)/sqrt((1+kdelta(n,0))*2.0d0)
+       else
+          rwigner=aimag(dmp-dpp)/sqrt(2.0d0)
+       end if       
+
+    else
+
+       if(nr>=0)then
+          rwigner=aimag(dpp+dmp)/sqrt((1+kdelta(n,0))*2.0d0)
+       else
+          rwigner=real(dpp-dmp)/sqrt(2.0d0)
+       end if
+
+    end if
+
+    rwigner=rwigner*sqrt(2.0d0/(1+kdelta(m,0)))
+
+!!$    if(mp>0) rwigner=rwigner*(-1)**mp
+!!$    if(nr>0) rwigner=rwigner*(-1)**nr
+
+  end function rwigner
+
+
+  function euler_mat(alpha,beta,gamma)
+    implicit none
+!!$    Determines rotaion matrix equivalent to rotation
+!!$    by three Euler angles - alpha,beta, gammma
+!!$    Gamma applied first, active zyz convention
+    real(kind=DEF_DBL_PREC) :: euler_mat(3,3)
+    real(kind=DEF_DBL_PREC), intent(in) :: alpha,beta,gamma
+!!$    Local
+    real(kind=DEF_DBL_PREC) :: amat(3,3),bmat(3,3),gmat(3,3)
+
+    gmat(1,:)=(/cos(gamma), -sin(gamma), 0.0d0/)
+    gmat(2,:)=(/sin(gamma), cos(gamma), 0.0d0/)
+    gmat(3,:)=(/     0.0d0,      0.0d0, 1.0d0/)
+
+    bmat(1,:)=(/ cos(beta), 0.0d0,  sin(beta)/)
+    bmat(2,:)=(/     0.0d0, 1.0d0,      0.0d0/)
+    bmat(3,:)=(/-sin(beta), 0.0d0,  cos(beta)/)
+
+    amat(1,:)=(/cos(alpha), -sin(alpha), 0.0d0/)
+    amat(2,:)=(/sin(alpha),  cos(alpha), 0.0d0/)
+    amat(3,:)=(/     0.0d0,       0.0d0, 1.0d0/)
+
+    euler_mat=matmul(amat,matmul(bmat,gmat))
+
+  end function euler_mat
+
+  function euler_ang(mat)
+!!$    use algebra
+    implicit none
+!!$    Determines three Euler angles: euler_ang=(alpha,beta, gammma)
+!!$    equivalent to the rotation matrix
+!!$    Gamma applied first, active zyz convention
+    real(kind=DEF_DBL_PREC) :: euler_ang(3) ! alpha,beta,gamma
+    real(kind=DEF_DBL_PREC), intent(in) :: mat(3,3)
+!!$    Local
+    real(kind=DEF_DBL_PREC), parameter :: small=1.0d-8
+    real(kind=DEF_DBL_PREC) :: xp(3),yp(3),zp(3),pi
+    integer :: i
+
+    pi=4*atan(1.0d0)
+
+    xp(:)=mat(:,1)
+    yp(:)=mat(:,2)
+    zp(:)=mat(:,3)
+
+    euler_ang(2)=atan2(sqrt(zp(1)**2+zp(2)**2),zp(3))
+
+    if(abs(sin(euler_ang(2)))>small) then
+
+       euler_ang(1)=atan2(zp(2),zp(1))
+       euler_ang(3)=atan2(zp(1)*xp(2)-zp(2)*xp(1),zp(1)*yp(2)-zp(2)*yp(1))
+
+    elseif(abs(euler_ang(2))<=small) then
+
+       euler_ang(1)=0.0d0
+       euler_ang(3)=atan2(xp(2),xp(1))
+       
+    elseif(abs(euler_ang(2)-pi)<=small) then
+
+       euler_ang(1)=0.0d0
+       euler_ang(3)=atan2(xp(2),-xp(1))
+
+    end if
+
+  end function euler_ang
+    
+
+
+
+
+  subroutine rot_mat(v,rot)
+!! Transformation to the system of coord. with z pointing along v
+!!$    use algebra
+    implicit none
+    real(kind=DEF_DBL_PREC), parameter :: small=1.0d-4
+    real(kind=DEF_DBL_PREC) :: rot(3,3), r(3),v(3),z,tmp(3),&
+         &a(3),b(3),c(3)
+
+    c=v/length(v)
+    tmp=(/0.0d0,0.0d0,1.0d0/)
+
+    if(sum(abs(vec_prod(c,tmp)))<=small) tmp=(/1.0d0,0.0d0,0.0d0/)
+
+    a=vec_prod(c,tmp)
+    a=a/length(a)
+
+    b=vec_prod(c,a)
+    b=b/length(b)
+
+    rot(1,1:3)=a
+    rot(2,1:3)=b
+    rot(3,1:3)=c
+
+  end subroutine rot_mat
+
+
+end module spherical
+
+

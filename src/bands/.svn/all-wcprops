@@ -1,0 +1,47 @@
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/codes/!svn/ver/1981/trans/trunk/src/bands
+END
+band.F90
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/svn/codes/!svn/ver/1981/trans/trunk/src/bands/band.F90
+END
+deps.mk
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/svn/codes/!svn/ver/1981/trans/trunk/src/bands/deps.mk
+END
+bandmodel.F90
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1981/trans/trunk/src/bands/bandmodel.F90
+END
+bandfull.F90
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svn/codes/!svn/ver/1981/trans/trunk/src/bands/bandfull.F90
+END
+bandfull1.F90
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1981/trans/trunk/src/bands/bandfull1.F90
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/svn/codes/!svn/ver/1981/trans/trunk/src/bands/Makefile
+END
+band_sk.F90
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/codes/!svn/ver/1981/trans/trunk/src/bands/band_sk.F90
+END

@@ -1,0 +1,42 @@
+#!/bin/sh
+for supercell in 4x4 5x5 6x6
+do
+
+for d0 in L10 
+do
+mkdir $d0
+l=$(echo "$d0" | tr -dc '0-9')
+nlc=$((l-10))
+#rm $d0/dirlist
+
+echo " 0" >> $d0/dirlist
+echo " 1" >> $d0/dirlist
+#echo " cf-1" >> dirlist
+
+
+for d1 in cf-1
+do
+mkdir $d0/$d1
+
+echo " $d1" >> $d0/dirlist
+cp -r trans.conf atomlist atoms $d0/$d1/
+~/trunk/bin/prolong.x 4 1 $nlc
+#exit
+#~/trunk/bin/prandgen.x -s 5 -t 500,567
+~/trunk/bin/prandgen.x -s $supercell --rms # -i 4 # 0 is the 1st layer
+
+sed -i '/2.70/ s/2.700000000/2.700000    7.415106/' geom_*
+mv geom_m geom_l geom_r $d0/$d1/
+
+cp atoms_EMTO/Pt_B $d0/$d1/atoms/.
+cp atomlist_EMTO $d0/$d1/atomlist_EMTO
+#rm geom_m geom_l geom_r
+done
+done
+
+mkdir L10/$supercell
+mv L10/cf-1 L10/$supercell/.
+mv L10/dirlist L10/$supercell/.
+
+
+done

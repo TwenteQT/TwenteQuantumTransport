@@ -1,0 +1,73 @@
+---------------  GEOMETRY - FCC LATTICE  ---------------------------
+     1    2                                             NB,  NMTR
+    2.7                                               CUTRAT
+    1.0            1.0            1.0             SCALING FACTORS
+    0.0            0.5            0.5            1ST TRANSL. VECTOR   
+    0.5            0.0            0.5            2ND TRANSL. VECTOR  
+    0.5            0.5            0.0            3RD TRANSL. VECTOR  
+    0.0            0.0            0.0                 BASIS:  IB=1
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X
+---------------  GEOMETRY - BCC LATTICE  ---------------------------
+     1    2                                             NB,  NMTR
+    2.7                                               CUTRAT
+    1.0            1.0            1.0             SCALING FACTORS
+   -0.5            0.5            0.5            1ST TRANSL. VECTOR   
+    0.5           -0.5            0.5            2ND TRANSL. VECTOR  
+    0.5            0.5           -0.5            3RD TRANSL. VECTOR  
+    0.0            0.0            0.0                 BASIS:  IB=1    
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X
+---------------  GEOMETRY - FCC LATTICE  ---------------------------
+     4    2                                             NB,  NMTR
+    2.7                                               CUTRAT
+    1.0            1.0            1.0             SCALING FACTORS
+    0.0            0.5            0.5            1ST TRANSL. VECTOR   
+    0.5            0.0            0.5            2ND TRANSL. VECTOR  
+    0.5            0.5            0.0            3RD TRANSL. VECTOR  
+    0.0            0.0            0.0                 BASIS:  IB=1    
+    0.5            0.0            0.0                         IB=2
+    0.25           0.25           0.25                        IB=3
+   -0.25           0.25           0.25                        IB=4
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X
+---------------  GEOMETRY - FCC LATTICE  ---------------------------
+     4    2                                             NB,  NMTR
+    2.7                                               CUTRAT
+    1.0            1.0            1.0             SCALING FACTORS
+    0.0            0.5            0.5            1ST TRANSL. VECTOR   
+    0.5            0.0            0.5            2ND TRANSL. VECTOR  
+    0.5            0.5            0.0            3RD TRANSL. VECTOR  
+    0.0            0.0            0.0                 BASIS:  IB=1    
+    0.25           0.25           0.25                        IB=2
+    0.50           0.5            0.5                         IB=3
+   -0.25          -0.25          -0.25                        IB=4
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X
+---------------  GEOMETRY - BCC LATTICE  ---------------------------
+     1    2                                             NB,  NMTR
+    2.7                                               CUTRAT
+    1.0            1.0            1.0             SCALING FACTORS
+   -0.5            0.5            0.5            1ST TRANSL. VECTOR   
+    0.5           -0.5            0.5            2ND TRANSL. VECTOR  
+    0.5            0.5           -0.5            3RD TRANSL. VECTOR  
+    0.0            0.0            0.0                 BASIS:  IB=1    
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X
+------------  GEOMETRY - FCC(111) DEF  -----------------------------      
+     1    2                                             NB,  NMTR
+    2.7                                               CUTRAT
+   0.7071068      0.4082483      0.5773503           SCALING FACTORS
+    1.0            0.0            0.0           1ST TRANSL. VECTOR       
+   -0.5            1.5            0.0           2ND TRANSL. VECTOR      
+    0.0            1.0            1.0           3RD TRANSL. VECTOR
+    0.0            0.0            0.0                BASIS: IB=1
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X
+
+
+------------  GEOMETRY - FCC(111) DEF  -----------------------------      
+     3    2                                             NB,  NMTR
+    2.7                                               CUTRAT
+   0.7071068      0.4082483      0.5773503           SCALING FACTORS
+    1.0            0.0            0.0           1ST TRANSL. VECTOR       
+   -0.5            1.5            0.0           2ND TRANSL. VECTOR      
+    0.0            0.0            3.0           3RD TRANSL. VECTOR
+    0.0            0.0            0.0                BASIS: IB=1
+    0.0           -1.0            1.0                BASIS: IB=2
+    0.0            1.0            2.0                BASIS: IB=3
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X

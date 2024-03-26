@@ -1,0 +1,1124 @@
+!!$ $Id$
+#include "math_def.h"
+Module hamiltonian
+      Use sparselib
+      Use potpars
+      Implicit None
+
+
+      Type t_system
+         Type (zcsrmat) :: mat, lhop, rhop
+         Integer :: n, nl, nr, havehops = 0, alloc = 0
+      End Type t_system
+
+      Interface prep_system
+         Module Procedure prep_system_sc, prep_system_sk, prep_system_model, prep_system_slater_k
+      End Interface
+#define handle_ps_system 1
+#define handle_h_system 2
+#define handle_ham_system 3
+#define model_tbchain_system 4
+#define model_fourband_system 5
+#define slater_koster_system 7
+Contains
+
+      Subroutine prep_system_sk (ham, sk, ppar, po, needhops)
+         Use structure         
+         Implicit None
+         Type (t_potpar_mats) :: ppar
+         Integer :: needhops
+         Type (t_mathop) :: ham, sk
+         Type (t_pot_opts) :: po
+         Select Case (po%kind)
+         Case (handle_ps_system)
+            Call make_ps_sk (ham, sk, ppar, needhops)
+         Case (handle_ham_system)
+            Call make_ham_sk (ham, sk, ppar, needhops)
+         Case (handle_h_system)
+            Call make_h_sk (ham, sk, ppar, needhops)
+         Case Default
+            Write (*,*) 'I"m not smart enough to handle system'
+            Write (*,*) 'with identifier:', po%kind, 'Fix ME! :)'
+            Stop
+         End Select
+         Return
+      End Subroutine prep_system_sk
+
+      Subroutine prep_system_sc (ham, sc, k, ppar, po, needhops)
+         Use structure
+         Implicit None
+         Type (t_potpar_mats) :: ppar
+         Integer :: needhops
+         Type (t_mathop) :: ham
+         Type (t_strconst) :: sc
+         Type (t_pot_opts) :: po
+         Real (Kind=DEF_DBL_PREC) :: k (:)
+         Select Case (po%kind)
+         Case (handle_ps_system)
+            Call make_ps_sc (ham, sc, k, ppar, needhops)
+         Case (handle_ham_system)
+            Call make_ham_sc (ham, sc, k, ppar, needhops)
+         Case (handle_h_system)
+            Call make_h_sc (ham, sc, k, ppar, needhops)
+         Case (slater_koster_system)
+            Call make_slater_rs(ham, sc, k, needhops)
+         Case Default
+            Write (*,*) 'I"m not smart enough to handle system'
+            Write (*,*) 'with identifier:', po%kind, 'Fix ME! :)'
+            Stop
+         End Select
+         Return
+      End Subroutine prep_system_sc
+
+      Subroutine prep_system_model (ham, po, ngc, ngr, kpar, rot_mask)
+         Use structure
+         Implicit None
+         Integer :: ngc (3), ngr (3)
+         Real (Kind=DEF_DBL_PREC) :: kpar (2)
+         Type (t_mathop) :: ham
+         Type (t_pot_opts) :: po
+         Real (Kind=DEF_DBL_PREC), Optional :: rot_mask (:, :)
+
+         Select Case (po%kind)
+         Case (model_tbchain_system)
+!Fixme           Call make_model_tb
+         Case (model_fourband_system)
+               Call make_model_fourband (ham, po, ngc, ngr, kpar, rot_mask)
+         Case Default
+            Write (*,*) 'I"m not smart enough to handle model system'
+            Write (*,*) 'with identifier:', po%kind, 'Fix ME! :)'
+            Stop
+         End Select
+         Return
+      End Subroutine prep_system_model
+
+      Subroutine make_slater_rs(ham,sc,k, needhops)
+!!$ Prepare H-EO in reciprocal space and sparse form starting from real-space
+!!  matrices
+         Use structure
+         Implicit None
+         Type (t_mathop) :: ham
+         Type (t_strconst) :: sc
+         Real (Kind=DEF_DBL_PREC) :: k (2)
+         Integer :: needhops
+!!$         Local
+         Type (t_mathop) :: sk
+
+         call make_sk(sk,sc,k,needhops)
+         call prep_system_slater_k(ham,sk,needhops)
+         Call free_mathop (sk)
+
+       End Subroutine make_slater_rs
+
+
+      Subroutine prep_system_slater_k(ham, sk, needhops)
+!!$   Prepare H-EO in sparse form from precalkulated reciprocal space matrices
+         Use structure
+         Implicit None
+         Integer :: needhops
+         Type (t_mathop) :: ham, sk
+!!$ Local
+!!$          Type (zcsrmat) :: m1, m2
+
+         Call free (ham%c)
+         call spcopy (sk%c, ham%c, sign=+1)
+
+         ham%n = ham%c%ncol
+         If (needhops > 0) Then
+            Call free (ham%l)
+            Call free (ham%r)
+            Call spcopy (sk%l, ham%l, sign=+1)
+            Call spcopy (sk%r, ham%r, sign=+1)
+
+            ham%nl = ham%l%ncol
+            ham%nr = ham%r%ncol
+            ham%havehops = 1
+         End If
+         ham%alloc = 1
+       End Subroutine prep_system_slater_k
+
+
+      Subroutine make_ps_sc (ham, sc, k, ppar, needhops)
+         Use structure
+         Implicit None
+         Type (t_potpar_mats) :: ppar
+         Type (t_strconst) :: sc
+         Integer :: needhops
+         Type (t_mathop) :: ham
+         Real (Kind=DEF_DBL_PREC) :: k (2)
+         Type (t_mathop) :: sk
+
+         Call make_sk (sk, sc, k, needhops)
+         Call make_ps_sk (ham, sk, ppar, needhops)
+         Call free_mathop (sk)
+      End Subroutine make_ps_sc
+
+      Subroutine make_ps_sk (ham, sk, ppar, needhops)
+         Use structure
+         Implicit None
+         Type (t_potpar_mats) :: ppar
+         Integer :: needhops
+         Type (t_mathop) :: ham, sk
+!!$ Local
+         Type (zcsrmat) :: m1, m2
+
+         Call free (ham%c)
+         ham%c = spmatadd (ppar%pfun, sk%c, sign=-1)
+         If (ppar%needso == 1) Then
+            m1 = make1cent (ham%c, ppar%c1, ppar%c1conj)
+!!$             m1 = make1cent (ham%c, ppar%c1conj, ppar%c1)
+            m2 = spmatadd (ham%c, ppar%c0)
+            Call free (ham%c)
+            ham%c = spmatadd (m1, m2)
+            Call free (m1)
+            Call free (m2)
+         End If
+
+         ham%n = ham%c%ncol
+         If (needhops > 0) Then
+            If (ppar%needso == 1) Then
+               Call free (ham%l)
+               Call free (ham%r)
+
+               m1 = make1cent (sk%l, ppar%c1, ppar%c1conj)
+!!$                m1 = make1cent (sk%l, ppar%c1conj, ppar%c1)
+               ham%l = spmatadd (sk%l, m1)
+               Call free (m1)
+
+!!$                m1 = make1cent (sk%r, ppar%c1, ppar%c1conj)
+!!$                m1 = make1cent (sk%r, ppar%c1conj, ppar%c1)
+!!$                ham%r = spmatadd (sk%r, m1)
+!!$                Call free (m1)
+               ham%r = spherm (ham%l)
+               ham%r%A = - ham%r%A
+               ham%l%A = - ham%l%A
+            Else
+               Call spcopy (sk%l, ham%l, sign=-1)
+               Call spcopy (sk%r, ham%r, sign=-1)
+            End If
+            ham%nl = ham%l%ncol
+            ham%nr = ham%r%ncol
+            ham%havehops = 1
+         End If
+         ham%alloc = 1
+      End Subroutine make_ps_sk
+
+      Subroutine make_ham_sc (ham, sc, k, ppar, needhops)
+         Use structure
+         Implicit None
+         Type (t_potpar_mats) :: ppar
+         Type (t_strconst) :: sc
+         Real (Kind=DEF_DBL_PREC) :: k (2)
+         Integer :: needhops
+         Type (t_mathop) :: ham
+!!$ Local
+         Type (t_mathop) :: sk
+         Call init_mathop (sk)
+         Call make_sk (sk, sc, k, 1, 1.0d0)
+         Call make_ham_sk (ham, sk, ppar, needhops)
+         Call free_mathop (sk)
+      End Subroutine make_ham_sc
+
+      Subroutine make_h_sc (ham, sc, k, ppar, needhops)
+         Use structure
+         Implicit None
+         Type (t_potpar_mats) :: ppar
+         Type (t_strconst) :: sc
+         Real (Kind=DEF_DBL_PREC) :: k (2)
+         Integer :: needhops
+         Type (t_mathop) :: ham
+!!$ Local
+         Type (t_mathop) :: sk
+         Call init_mathop (sk)
+         Call make_sk (sk, sc, k, 1, 1.0d0)
+         Call make_h_sk (ham, sk, ppar, needhops)
+         Call free_mathop (sk)
+      End Subroutine make_h_sc
+
+      Subroutine make_h_sk (ham, sk, ppar, needhops)
+         Use structure
+         Implicit None
+         Type (t_potpar_mats) :: ppar
+         Integer :: needhops
+         Type (t_mathop) :: ham, sk
+!!$ Local
+         Type (zcsrmat) :: H
+         Type (zcsrmat) :: m1, mtx2
+
+!!$          If (sk%havehops /= 1) Then
+!!$             Write (*,*) 'incorrect call of "make_so_h_sk"'
+!!$             Write (*,*) 'S(k) matrix should have left-,right- hoppings also'
+!!$             Stop
+!!$          End If
+         H = getH (sk%c, ppar, 1)
+!!$          Write (*,*) 'h1'
+         m1 = make1cent (H, ppar%c1, ppar%c1conj)
+!!$          Write (*,*) 'h2'
+         Call free (ham%c)
+!!$          Write (*,*) 'h3'
+         ham%c = spmatadd (m1, ppar%c0)
+!!$          Write (*,*) 'h4'
+         Call free (m1)
+
+         ham%n = ham%c%ncol
+         If (needhops /= 0) Then
+            Call free (ham%l)
+            Call free (ham%r)
+
+            mtx2 = getH (sk%l, ppar, 0)
+!!$             Write (*,*) 'h5'
+
+            ham%l = make1cent (mtx2, ppar%c1, ppar%c1conj)
+!!$             Write (*,*) 'h6'
+
+            Call free (mtx2)
+
+            ham%r = spherm (ham%l)
+!!$             Write (*,*) 'h7'
+
+            ham%nr = ham%r%ncol
+            ham%nl = ham%l%ncol
+            ham%havehops = 1
+         End If
+         ham%alloc = 1
+         Call free (H)
+      End Subroutine make_h_sk
+
+      Subroutine make_ham_sk (ham, sk, ppar, needhops)
+         Use structure
+         Implicit None
+         Type (t_potpar_mats) :: ppar
+         Integer :: needhops
+         Type (t_mathop) :: ham, sk
+!!$ Local
+         Type (zcsrmat) :: H, ham0, h1, h0l, h0r
+         Type (zcsrmat) :: m1, m2, mtx, mtx2
+
+         If (sk%havehops /= 1) Then
+            Write (*,*) 'incorrect call of "make_so_ham_sk"'
+            Write (*,*) 'S(k) matrix should have left-,right- hoppings also'
+            Stop
+         End If
+         H = getH (sk%c, ppar, 1)
+         m1 = make1cent (H, ppar%c1, ppar%c1conj)
+         mtx = spmatmul (ppar%c2, H)
+         m2 = spmatmul (H, mtx)
+         mtx2 = spmatadd (m1, ppar%c0)
+         ham0 = spmatadd (mtx2, m2)
+         Call free (m1)
+         Call free (m2)
+         Call free (mtx2)
+!!$ Right addition to H(N,N)
+         mtx2 = getH (sk%r, ppar, 0)
+         h1 = spherm (mtx2)
+         h0r = get3MMM (mtx2, ppar%c2, h1)
+         Call free (mtx2)
+         Call free (h1)
+
+!!$ Left addition to H(0,0)
+         mtx2 = getH (sk%l, ppar, 0)
+         h1 = spherm (mtx2)
+         h0l = get3MMM (mtx2, ppar%c2, h1)
+         Call free (h1)
+
+         h1 = spmatadd (h0l, h0r)
+         Call free (h0l)
+         Call free (h0r)
+
+         Call free (ham%c)
+         ham%c = spmatadd (ham0, h1)
+         Call free (h1)
+         Call free (ham0)
+
+         ham%n = ham%c%ncol
+         If (needhops /= 0) Then
+            Call free (ham%l)
+            Call free (ham%r)
+            m1 = make1cent (mtx2, ppar%c1, ppar%c1conj)
+            h1 = spherm (mtx)
+            h0l = spmatmul (mtx2, mtx)
+            ham0 = spmatmul (h1, mtx2)
+            Call free (h1)
+            m2 = spmatadd (h0l, ham0)
+            Call free (ham0)
+            Call free (h0l)
+            ham%l = spmatadd (m1, m2)
+            Call free (m2)
+            Call free (m1)
+            ham%r = spherm (ham%l)
+            ham%nr = ham%r%ncol
+            ham%nl = ham%l%ncol
+            ham%havehops = 1
+         End If
+         ham%alloc = 1
+         Call free (mtx)
+         Call free (mtx2)
+         Call free (H)
+      End Subroutine make_ham_sk
+
+      Subroutine make_model_fourband (ham, po, ngc, ngr, kpar, rot_mask)
+!!zhe: add for four-band model hamiltonian of (Ga,Mn)As
+!! H = (g1 + 2.5 * g2) * p^2 / 2m - g2 / m * (p.J)^2 + h.J + \Delta V
+         Use structure
+         Implicit None
+         Integer :: ngc (3), ngr (3)
+         Real (Kind=DEF_DBL_PREC) :: kpar (2)
+         Type (t_mathop) :: ham
+         Type (t_pot_opts) :: po
+         Real (Kind=DEF_DBL_PREC), Optional :: rot_mask (:, :)
+!!$ local variables
+         Type t_local_ham
+            Integer :: nel
+            Complex (Kind=DEF_DBL_PREC), Pointer :: A (:)
+            Integer, Pointer :: jc (:)
+         End Type
+         Type (t_local_ham), Pointer :: lham (:), lhop (:)
+         Integer :: i, n, nh, nx, ny, nz, ix, iy, iz, ind1, ind2, ind3, ind4, ind5, nb, nc
+         Real (Kind=DEF_DBL_PREC) :: dx, dy, dz, rt3 = Sqrt (3.d0), a1, a2, h0, hvec (3), en
+         Complex (Kind=DEF_DBL_PREC) :: jx (4, 4), jy (4, 4), jz (4, 4), m4 (4, 4), mi4 (4, 4), kdotj (4, 4), &
+        & kross (4, 4, 3)
+         Complex (Kind=DEF_DBL_PREC) :: am1 (4, 4), am2 (4, 4), am3 (4, 4), am4 (4, 4), am5 (4, 4), am6 (4, &
+        & 4), hdj (4, 4)
+         Complex (Kind=DEF_DBL_PREC) :: ci = (0.d0, 1.d0), czero = (0.d0, 0.d0)
+         Complex (Kind=DEF_DBL_PREC), Allocatable :: ons (:, :), ofs (:, :)
+         Integer, Allocatable :: temp_ir (:), temq_ir (:), countm (:), countn (:)
+         Real (Kind=DEF_DBL_PREC), Allocatable :: rot (:, :)
+         Integer :: j, nnz, fnz, inc, pos, iseed, s_nnz, s_fnz, t_nnz, t_fnz
+         Logical :: hopping, periodic
+         Real (Kind=DEF_DBL_PREC) :: nonzero = 1.d-30
+!!$     random number
+         Integer :: TIME, STIME, T (9)
+!!$     time analysis
+!!$     real (Kind=DEF_DBL_PREC) :: tt,t2,t3,t4,t5,t6,tim_start,tim_end
+
+!!$      t2=0.0; t3=0.0; t4=0.0; t5=0.0; t6=0.0
+!!$      call cpu_time(tt)
+
+!! this factor 4 leads to 4 bands on each site. for spin-up and spin-down
+!! systems, e.g. free electron model (or stoner model), just use factor 2
+         nb = 2
+         nc = 2 * nb
+         nx = ngc (1)
+         ny = ngc (2)
+         nz = ngc (3)
+         n = nc * nx * ny * nz
+         nh = po%nhops
+         dx = po%dx
+         dy = po%dy
+         dz = po%dz
+         en = po%energy
+         hopping = .True.
+         If (ngr(3) /= ngc(3)) hopping = .False.
+         Allocate (lham(nx*ny*nz))
+         If (hopping) allocate (lhop(nx*ny*nz))
+
+!!$       Initial seed from the system time and forced to be odd
+         If ( .Not. hopping) Then
+            STIME = TIME ()
+            Call gmtime (STIME, T)
+            iseed = T (6) + 70 * (T(5)+12*(T(4)+31*(T(3)+23*(T(2)+59*T(1)))))
+            If (Mod(iseed, 2) .Eq. 0) iseed = iseed - 1
+         End If
+
+         If (present(rot_mask)) Then
+            Allocate (rot(2, size(rot_mask, 2)))
+            rot (:, :) = rot_mask (:, :)
+         Else
+            Allocate (rot(2, 1))
+            rot (:, :) = 0.d0
+         End If
+         inc = 1
+         pos = 1
+         If (size(rot, 2) /= nx*ny*nz) inc = 0
+
+!!$ be aware of the size of the ons matrix
+         Allocate (ons(nc, n), temp_ir(n+1), countm(2*nc*n))
+         If (hopping) allocate (ofs(nc, n), temq_ir(n+1), countn(2*nc*n))
+
+         m4 (:, :) = (0.d0, 0.d0)
+         mi4 (:, :) = (0.d0, 0.d0)
+         Do i = 1, 4
+            mi4 (i, i) = (1.d0, 0.d0)
+         End Do
+!!      set spin matrices for J=3/2
+         jx (:, :) = czero
+         jy (:, :) = czero
+         jz (:, :) = czero
+         jx (1, 2) = rt3
+         jx (2, 3) = 2.d0
+         jx (3, 4) = rt3
+         jx (2, 1) = rt3
+         jx (3, 2) = 2.d0
+         jx (4, 3) = rt3
+         jy (1, 2) = - rt3 * ci
+         jy (2, 3) = - 2.d0 * ci
+         jy (3, 4) = - rt3 * ci
+         jy (2, 1) = rt3 * ci
+         jy (3, 2) = 2.d0 * ci
+         jy (4, 3) = rt3 * ci
+         jz (1, 1) = 3.d0
+         jz (2, 2) = 1.d0
+         jz (3, 3) = - 1.d0
+         jz (4, 4) = - 3.d0
+         jx (:, :) = 0.5d0 * jx (:, :)
+         jy (:, :) = 0.5d0 * jy (:, :)
+         jz (:, :) = 0.5d0 * jz (:, :)
+
+         a1 = po%gamma1 + 2.5d0 * po%gamma2
+         a2 = - 2.d0 * po%gamma2
+         h0 = po%h0 / 13.6058d0
+         periodic = .False.
+         If (po%periodic == 1) periodic = .True.
+!!$       sca=po%v0/13.6058d0
+
+         en = en - a1 * (kpar(1)*kpar(1)+kpar(2)*kpar(2))
+         m4 (:, :) = kpar (1) * jx (:, :) + kpar (2) * jy (:, :)
+         kdotj (:, :) = m4 (:, :)
+         kross (:, :, 1) = matmul (kdotj(:, :), jx(:, :))
+         m4 (:, :) = matmul (jx(:, :), kdotj(:, :))
+         kross (:, :, 1) = kross (:, :, 1) + m4 (:, :)
+         kross (:, :, 1) = - 0.5d0 * a2 * ci * kross (:, :, 1) / dx
+         kross (:, :, 2) = matmul (kdotj(:, :), jy(:, :))
+         m4 (:, :) = matmul (jy(:, :), kdotj(:, :))
+         kross (:, :, 2) = kross (:, :, 2) + m4 (:, :)
+         kross (:, :, 2) = - 0.5d0 * a2 * ci * kross (:, :, 2) / dy
+         kross (:, :, 3) = matmul (kdotj(:, :), jz(:, :))
+         m4 (:, :) = matmul (jz(:, :), kdotj(:, :))
+         kross (:, :, 3) = kross (:, :, 3) + m4 (:, :)
+         kross (:, :, 3) = - 0.5d0 * a2 * ci * kross (:, :, 3) / dz
+         m4 (:, :) = matmul (kdotj(:, :), kdotj(:, :))
+         kdotj (:, :) = a2 * m4 (:, :)
+
+         m4 (:, :) = matmul (jx(:, :), jx(:, :))
+         am1 (:, :) = (a2*m4(:, :)+a1*mi4(:, :)) / (dx*dx)
+         m4 (:, :) = matmul (jy(:, :), jy(:, :))
+         am2 (:, :) = (a2*m4(:, :)+a1*mi4(:, :)) / (dy*dy)
+         m4 (:, :) = matmul (jz(:, :), jz(:, :))
+         am3 (:, :) = (a2*m4(:, :)+a1*mi4(:, :)) / (dz*dz)
+
+         m4 (:, :) = matmul (jx(:, :), jy(:, :))
+         am4 (:, :) = matmul (jy(:, :), jx(:, :))
+         am4 (:, :) = a2 * (am4(:, :)+m4(:, :)) / (4.d0*dx*dy)
+         m4 (:, :) = matmul (jy(:, :), jz(:, :))
+         am5 (:, :) = matmul (jz(:, :), jy(:, :))
+         am5 (:, :) = a2 * (am5(:, :)+m4(:, :)) / (4.d0*dz*dy)
+         m4 (:, :) = matmul (jz(:, :), jx(:, :))
+         am6 (:, :) = matmul (jx(:, :), jz(:, :))
+         am6 (:, :) = a2 * (am6(:, :)+m4(:, :)) / (4.d0*dx*dz)
+
+         t_nnz = 0
+         t_fnz = 0
+         Do iz = 1, nz
+            Do iy = 1, ny
+               Do ix = 1, nx
+
+!!$       call cpu_time(tim_end)
+!!$       initialize hamiltonian (partly) and hopping if necessary
+                  ons (:, :) = (0.d0, 0.d0)
+                  If (hopping) ofs (:, :) = (0.d0, 0.d0)
+
+!!$       call cpu_time(tim_start)
+!!$       t2=t2+tim_start-tim_end
+
+!!$       set x-derivatives and y, z diagonal elements
+                  ind1 = (iz-1) * nx * ny + (iy-1) * nx + ix - 1
+                  m4 (:, :) = 2.d0 * (am1(:, :)+am2(:, :)+am3(:, :)) - en * mi4 (:, :) + kdotj (:, :)
+                  ons (1:nc, nc*ind1+1:nc*ind1+nc) = ons (1:nc, nc*ind1+1:nc*ind1+nc) + m4 (1:4, 1:4)
+                  If (ix /= 1) Then
+                     ind2 = (iz-1) * nx * ny + (iy-1) * nx + ix - 2
+                     m4 (:, :) = - am1 (:, :) - kross (:, :, 1)
+                     ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                  Else If (periodic) Then
+                     ind2 = (iz-1) * nx * ny + (iy-1) * nx + nx - 1
+                     m4 (:, :) = - am1 (:, :) - kross (:, :, 1)
+                     ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                  End If
+                  If (ix /= nx) Then
+                     ind2 = (iz-1) * nx * ny + (iy-1) * nx + ix
+                     m4 (:, :) = - am1 (:, :) + kross (:, :, 1)
+                     ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                  Else If (periodic) Then
+                     ind2 = (iz-1) * nx * ny + (iy-1) * nx
+                     m4 (:, :) = - am1 (:, :) + kross (:, :, 1)
+                     ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                  End If
+!!$       set y-derivatives part
+                  If (iy /= 1) Then
+                     ind2 = (iz-1) * nx * ny + (iy-2) * nx + ix - 1
+                     m4 (:, :) = - am2 (:, :) - kross (:, :, 2)
+                     ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                  Else If (periodic) Then
+                     ind2 = (iz-1) * nx * ny + (ny-1) * nx + ix - 1
+                     m4 (:, :) = - am2 (:, :) - kross (:, :, 2)
+                     ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                  End If
+                  If (iy /= ny) Then
+                     ind2 = (iz-1) * nx * ny + iy * nx + ix - 1
+                     m4 (:, :) = - am2 (:, :) + kross (:, :, 2)
+                     ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                  Else If (periodic) Then
+                     ind2 = (iz-1) * nx * ny + ix - 1
+                     m4 (:, :) = - am2 (:, :) + kross (:, :, 2)
+                     ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                  End If
+!!$       set z-derivatives part, z is the transport direction
+                  If (iz /= 1) Then
+                     ind2 = (iz-2) * nx * ny + (iy-1) * nx + ix - 1
+                     m4 (:, :) = - am3 (:, :) - kross (:, :, 3)
+                     ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                  End If
+                  If (iz /= nz) Then
+                     ind2 = iz * nx * ny + (iy-1) * nx + ix - 1
+                     m4 (:, :) = - am3 (:, :) + kross (:, :, 3)
+                     ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                  Else If (hopping) Then
+                     ind2 = (iy-1) * nx + ix - 1
+                     m4 (:, :) = - am3 (:, :) + kross (:, :, 3)
+                     ofs (1:nc, nc*ind2+1:nc*ind2+nc) = ofs (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                  End If
+!!$       set x,y (4 terms totally)
+!ind2 -> ix+1, iy+1, iz
+!ind3 -> ix+1, iy-1, iz
+!ind4 -> ix-1, iy+1, iz
+!ind5 -> ix-1, iy-1, iz
+                  ind2 = (iz-1) * nx * ny + iy * nx + ix
+                  ind3 = (iz-1) * nx * ny + (iy-2) * nx + ix
+                  ind4 = (iz-1) * nx * ny + iy * nx + ix - 2
+                  ind5 = (iz-1) * nx * ny + (iy-2) * nx + ix - 2
+                  m4 (:, :) = - am4 (:, :)
+                  If ( .Not. periodic) Then
+                     If (ix /= nx .And. iy /= ny) ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, &
+                    & nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                     If (ix /= nx .And. iy /= 1) ons (1:nc, nc*ind3+1:nc*ind3+nc) = ons (1:nc, &
+                    & nc*ind3+1:nc*ind3+nc) - m4 (1:4, 1:4)
+                     If (ix /= 1 .And. iy /= ny) ons (1:nc, nc*ind4+1:nc*ind4+nc) = ons (1:nc, &
+                    & nc*ind4+1:nc*ind4+nc) - m4 (1:4, 1:4)
+                     If (ix /= 1 .And. iy /= 1) ons (1:nc, nc*ind5+1:nc*ind5+nc) = ons (1:nc, &
+                    & nc*ind5+1:nc*ind5+nc) + m4 (1:4, 1:4)
+                  Else
+                     If (ix == nx) Then
+                         ind2 = ind2 - nx
+                        ind3 = ind3 - nx
+                     End If
+                     If (ix == 1) Then
+                        ind4 = ind4 + nx
+                        ind5 = ind5 + nx
+                     End If
+                     If (iy == ny) Then
+                        ind2 = ind2 - ny * nx
+                        ind4 = ind4 - ny * nx
+                     End If
+                     If (iy == 1) Then
+                        ind3 = ind3 + ny * nx
+                        ind5 = ind5 + ny * nx
+                     End If
+                     ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                     ons (1:nc, nc*ind3+1:nc*ind3+nc) = ons (1:nc, nc*ind3+1:nc*ind3+nc) - m4 (1:4, 1:4)
+                     ons (1:nc, nc*ind4+1:nc*ind4+nc) = ons (1:nc, nc*ind4+1:nc*ind4+nc) - m4 (1:4, 1:4)
+                     ons (1:nc, nc*ind5+1:nc*ind5+nc) = ons (1:nc, nc*ind5+1:nc*ind5+nc) + m4 (1:4, 1:4)
+                  End If
+!!        set y,z (4 terms totally)
+                  m4 (:, :) = - am5 (:, :)
+!ind2 -> ix, iy+1, iz+1
+!ind3 -> ix, iy+1, iz-1
+!ind4 -> ix, iy-1, iz+1
+!ind5 -> ix, iy-1, iz-1
+!ind1 = (iz-1)*nx*ny+(iy-1)*nx+ix-1
+                  ind2 = iz * nx * ny + iy * nx + ix - 1
+                  ind3 = (iz-2) * nx * ny + iy * nx + ix - 1
+                  ind4 = iz * nx * ny + (iy-2) * nx + ix - 1
+                  ind5 = (iz-2) * nx * ny + (iy-2) * nx + ix - 1
+                  If ( .Not. periodic) Then
+                     If (iz /= nz .And. iz /= 1) Then
+                        If (iy /= ny) Then
+                           ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, &
+                          & 1:4)
+                           ons (1:nc, nc*ind3+1:nc*ind3+nc) = ons (1:nc, nc*ind3+1:nc*ind3+nc) - m4 (1:4, &
+                          & 1:4)
+                        End If
+                        If (iy /= 1) Then
+                           ons (1:nc, nc*ind4+1:nc*ind4+nc) = ons (1:nc, nc*ind4+1:nc*ind4+nc) - m4 (1:4, &
+                          & 1:4)
+                           ons (1:nc, nc*ind5+1:nc*ind5+nc) = ons (1:nc, nc*ind5+1:nc*ind5+nc) + m4 (1:4, &
+                          & 1:4)
+                        End If
+                     Else If (iz == nz .And. iz /= 1) Then
+                        ind2 = ind2 - nz * ny * nx
+                        ind4 = ind4 - nz * ny * nx
+                        If (iy /= ny) ons (1:nc, nc*ind3+1:nc*ind3+nc) = ons (1:nc, nc*ind3+1:nc*ind3+nc) - &
+                       & m4 (1:4, 1:4)
+                        If (iy /= 1) ons (1:nc, nc*ind5+1:nc*ind5+nc) = ons (1:nc, nc*ind5+1:nc*ind5+nc) + m4 &
+                       & (1:4, 1:4)
+                        If (hopping) Then
+                           If (iy /= ny) ofs (1:nc, nc*ind2+1:nc*ind2+nc) = ofs (1:nc, nc*ind2+1:nc*ind2+nc) &
+                          & + m4 (1:4, 1:4)
+                           If (iy /= 1) ofs (1:nc, nc*ind4+1:nc*ind4+nc) = ofs (1:nc, nc*ind4+1:nc*ind4+nc) - &
+                          & m4 (1:4, 1:4)
+                        End If
+                     Else If (iz /= nz .And. iz == 1) Then
+                        If (iy /= ny) ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + &
+                       & m4 (1:4, 1:4)
+                        If (iy /= 1) ons (1:nc, nc*ind4+1:nc*ind4+nc) = ons (1:nc, nc*ind4+1:nc*ind4+nc) - m4 &
+                       & (1:4, 1:4)
+                     Else If (iz == nz .And. iz == 1 .And. hopping) Then
+                        ind2 = ind2 - nz * ny * nx
+                        ind4 = ind4 - nz * ny * nx
+                        If (iy /= ny) ofs (1:nc, nc*ind2+1:nc*ind2+nc) = ofs (1:nc, nc*ind2+1:nc*ind2+nc) + &
+                       & m4 (1:4, 1:4)
+                        If (iy /= 1) ofs (1:nc, nc*ind4+1:nc*ind4+nc) = ofs (1:nc, nc*ind4+1:nc*ind4+nc) - m4 &
+                       & (1:4, 1:4)
+                     End If
+                  Else
+                     If (iy == ny) Then
+                        ind2 = ind2 - ny * nx
+                        ind3 = ind3 - ny * nx
+                     End If
+                     If (iy == 1) Then
+                        ind4 = ind4 + ny * nx
+                        ind5 = ind5 + ny * nx
+                     End If
+                     If (iz /= nz .And. iz /= 1) Then
+                        ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                        ons (1:nc, nc*ind3+1:nc*ind3+nc) = ons (1:nc, nc*ind3+1:nc*ind3+nc) - m4 (1:4, 1:4)
+                        ons (1:nc, nc*ind4+1:nc*ind4+nc) = ons (1:nc, nc*ind4+1:nc*ind4+nc) - m4 (1:4, 1:4)
+                        ons (1:nc, nc*ind5+1:nc*ind5+nc) = ons (1:nc, nc*ind5+1:nc*ind5+nc) + m4 (1:4, 1:4)
+                     Else If (iz == nz .And. iz /= 1) Then
+                        ind2 = ind2 - nz * ny * nx
+                        ind4 = ind4 - nz * ny * nx
+                        ons (1:nc, nc*ind3+1:nc*ind3+nc) = ons (1:nc, nc*ind3+1:nc*ind3+nc) - m4 (1:4, 1:4)
+                        ons (1:nc, nc*ind5+1:nc*ind5+nc) = ons (1:nc, nc*ind5+1:nc*ind5+nc) + m4 (1:4, 1:4)
+                        If (hopping) Then
+                           ofs (1:nc, nc*ind2+1:nc*ind2+nc) = ofs (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, &
+                          & 1:4)
+                           ofs (1:nc, nc*ind4+1:nc*ind4+nc) = ofs (1:nc, nc*ind4+1:nc*ind4+nc) - m4 (1:4, &
+                          & 1:4)
+                        End If
+                     Else If (iz /= nz .And. iz == 1) Then
+                        ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                        ons (1:nc, nc*ind4+1:nc*ind4+nc) = ons (1:nc, nc*ind4+1:nc*ind4+nc) - m4 (1:4, 1:4)
+                     Else If (iz == nz .And. iz == 1 .And. hopping) Then
+                        ind2 = ind2 - nz * ny * nx
+                        ind4 = ind4 - nz * ny * nx
+                        ofs (1:nc, nc*ind2+1:nc*ind2+nc) = ofs (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                        ofs (1:nc, nc*ind4+1:nc*ind4+nc) = ofs (1:nc, nc*ind4+1:nc*ind4+nc) - m4 (1:4, 1:4)
+                     End If
+                  End If
+!!        set z,x (4 terms totally)
+                  m4 (:, :) = - am6 (:, :)
+!ind2 -> ix+1, iy, iz+1
+!ind3 -> ix+1, iy, iz-1
+!ind4 -> ix-1, iy, iz+1
+!ind5 -> ix-1, iy, iz-1
+!ind1 = (iz-1)*nx*ny+(iy-1)*nx+ix-1
+                  ind2 = iz * nx * ny + (iy-1) * nx + ix
+                  ind3 = (iz-2) * nx * ny + (iy-1) * nx + ix
+                  ind4 = iz * nx * ny + (iy-1) * nx + ix - 2
+                  ind5 = (iz-2) * nx * ny + (iy-1) * nx + ix - 2
+                  If ( .Not. periodic) Then
+                     If (iz /= nz .And. iz /= 1) Then
+                        If (ix /= nx) Then
+                           ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, &
+                          & 1:4)
+                           ons (1:nc, nc*ind3+1:nc*ind3+nc) = ons (1:nc, nc*ind3+1:nc*ind3+nc) - m4 (1:4, &
+                          & 1:4)
+                        End If
+                        If (ix /= 1) Then
+                           ons (1:nc, nc*ind4+1:nc*ind4+nc) = ons (1:nc, nc*ind4+1:nc*ind4+nc) - m4 (1:4, &
+                          & 1:4)
+                           ons (1:nc, nc*ind5+1:nc*ind5+nc) = ons (1:nc, nc*ind5+1:nc*ind5+nc) + m4 (1:4, &
+                          & 1:4)
+                        End If
+                     Else If (iz == nz .And. iz /= 1) Then
+                        ind2 = ind2 - nz * ny * nx
+                        ind4 = ind4 - nz * ny * nx
+                        If (ix /= nx) ons (1:nc, nc*ind3+1:nc*ind3+nc) = ons (1:nc, nc*ind3+1:nc*ind3+nc) - &
+                       & m4 (1:4, 1:4)
+                        If (ix /= 1) ons (1:nc, nc*ind5+1:nc*ind5+nc) = ons (1:nc, nc*ind5+1:nc*ind5+nc) + m4 &
+                       & (1:4, 1:4)
+                        If (hopping) Then
+                           If (ix /= nx) ofs (1:nc, nc*ind2+1:nc*ind2+nc) = ofs (1:nc, nc*ind2+1:nc*ind2+nc) &
+                          & + m4 (1:4, 1:4)
+                           If (ix /= 1) ofs (1:nc, nc*ind4+1:nc*ind4+nc) = ofs (1:nc, nc*ind4+1:nc*ind4+nc) - &
+                          & m4 (1:4, 1:4)
+                        End If
+                     Else If (iz /= nz .And. iz == 1) Then
+                        If (ix /= nx) ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + &
+                       & m4 (1:4, 1:4)
+                        If (ix /= 1) ons (1:nc, nc*ind4+1:nc*ind4+nc) = ons (1:nc, nc*ind4+1:nc*ind4+nc) - m4 &
+                       & (1:4, 1:4)
+                     Else If (iz == nz .And. iz == 1 .And. hopping) Then
+                        ind2 = ind2 - nz * ny * nx
+                        ind4 = ind4 - nz * ny * nx
+                        If (ix /= nx) ofs (1:nc, nc*ind2+1:nc*ind2+nc) = ofs (1:nc, nc*ind2+1:nc*ind2+nc) + &
+                       & m4 (1:4, 1:4)
+                        If (ix /= 1) ofs (1:nc, nc*ind4+1:nc*ind4+nc) = ofs (1:nc, nc*ind4+1:nc*ind4+nc) - m4 &
+                       & (1:4, 1:4)
+                     End If
+                  Else
+                     If (ix == nx) Then
+                        ind2 = ind2 - nx
+                        ind3 = ind3 - nx
+                     End If
+                     If (ix == 1) Then
+                        ind4 = ind4 + nx
+                        ind5 = ind5 + nx
+                     End If
+                     If (iz /= nz .And. iz /= 1) Then
+                        ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                        ons (1:nc, nc*ind3+1:nc*ind3+nc) = ons (1:nc, nc*ind3+1:nc*ind3+nc) - m4 (1:4, 1:4)
+                        ons (1:nc, nc*ind4+1:nc*ind4+nc) = ons (1:nc, nc*ind4+1:nc*ind4+nc) - m4 (1:4, 1:4)
+                        ons (1:nc, nc*ind5+1:nc*ind5+nc) = ons (1:nc, nc*ind5+1:nc*ind5+nc) + m4 (1:4, 1:4)
+                     Else If (iz == nz .And. iz /= 1) Then
+                        ind2 = ind2 - nz * ny * nx
+                        ind4 = ind4 - nz * ny * nx
+                        ons (1:nc, nc*ind3+1:nc*ind3+nc) = ons (1:nc, nc*ind3+1:nc*ind3+nc) - m4 (1:4, 1:4)
+                        ons (1:nc, nc*ind5+1:nc*ind5+nc) = ons (1:nc, nc*ind5+1:nc*ind5+nc) + m4 (1:4, 1:4)
+                        If (hopping) Then
+                           ofs (1:nc, nc*ind2+1:nc*ind2+nc) = ofs (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, &
+                          & 1:4)
+                           ofs (1:nc, nc*ind4+1:nc*ind4+nc) = ofs (1:nc, nc*ind4+1:nc*ind4+nc) - m4 (1:4, &
+                          & 1:4)
+                        End If
+                     Else If (iz /= nz .And. iz == 1) Then
+                        ons (1:nc, nc*ind2+1:nc*ind2+nc) = ons (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                        ons (1:nc, nc*ind4+1:nc*ind4+nc) = ons (1:nc, nc*ind4+1:nc*ind4+nc) - m4 (1:4, 1:4)
+                     Else If (iz == nz .And. iz == 1 .And. hopping) Then
+                        ind2 = ind2 - nz * ny * nx
+                        ind4 = ind4 - nz * ny * nx
+                        ofs (1:nc, nc*ind2+1:nc*ind2+nc) = ofs (1:nc, nc*ind2+1:nc*ind2+nc) + m4 (1:4, 1:4)
+                        ofs (1:nc, nc*ind4+1:nc*ind4+nc) = ofs (1:nc, nc*ind4+1:nc*ind4+nc) - m4 (1:4, 1:4)
+                     End If
+                  End If
+!!$ set h.J term
+                  hvec (1) = Sin (rot(1, pos)) * Cos (rot(2, pos))
+                  hvec (2) = Sin (rot(1, pos)) * Sin (rot(2, pos))
+                  hvec (3) = Cos (rot(1, pos))
+                  hdj (:, :) = hvec (1) * jx (:, :) + hvec (2) * jy (:, :) + hvec (3) * jz (:, :)
+                  hdj (:, :) = h0 * hdj (:, :)
+                  ons (1:nc, nc*ind1+1:nc*ind1+nc) = ons (1:nc, nc*ind1+1:nc*ind1+nc) + hdj (1:4, 1:4)
+                  pos = pos + inc
+!!$ set random impurities
+!!         if(.NOT.hopping.And.iz>po%nlz.And.iz<=(nz-po%nrz))then
+!!           m4(:,:)=0.5d0*sca*(ranf()-0.5d0)*mi4(:,:)
+!!           ons(1:nc,nc*ind1+1:nc*ind1+nc)=ons(1:nc,nc*ind1+1:nc*ind1+nc)+m4(1:4,1:4)
+!!         endif
+!!$ partly hamiltonian finished!
+!!$       call cpu_time(tim_end)
+!!$       t3=t3+tim_end-tim_start
+!! count non-zero elements
+                  nnz = 1
+                  fnz = 1
+                  If (ind1 == 0) Then
+                     temp_ir (nc*ind1+1) = 1
+                     If (hopping) temq_ir (nc*ind1+1) = 1
+                  End If
+
+                  Do i = 1, nc
+                     Do j = 1, n
+                        If (Abs(ons(i, j)) > nonzero) Then
+                           countm (2*nnz-1) = i
+                           countm (2*nnz) = j
+                           nnz = nnz + 1
+                        End If
+                        If (hopping) Then
+                           If (Abs(ofs(i, j)) > nonzero) Then
+                              countn (2*fnz-1) = i
+                              countn (2*fnz) = j
+                              fnz = fnz + 1
+                           End If
+                        End If
+                     End Do
+                     temp_ir (nc*ind1+i+1) = nnz + t_nnz
+                     If (hopping) temq_ir (nc*ind1+i+1) = fnz + t_fnz
+                  End Do
+                  s_nnz = nnz - 1
+                  s_fnz = fnz - 1
+
+!!$       call cpu_time(tim_start)
+!!$       t4=t4+tim_start-tim_end
+
+                  lham(ind1+1)%nel = s_nnz
+                  Allocate (lham(ind1+1)%A(s_nnz), lham(ind1+1)%jc(s_nnz))
+                  If (hopping) Then
+                     lhop(ind1+1)%nel = s_fnz
+                     Allocate (lhop(ind1+1)%A(s_fnz), lhop(ind1+1)%jc(s_fnz))
+                  End If
+
+                  Do nnz = 1, s_nnz
+                     i = countm (2*nnz-1)
+                     j = countm (2*nnz)
+                     lham(ind1+1)%A(nnz) = ons (i, j)
+                     lham(ind1+1)%jc(nnz) = j
+                  End Do
+                  t_nnz = t_nnz + lham(ind1+1)%nel
+
+                  If (hopping) Then
+                     Do fnz = 1, s_fnz
+                        i = countn (2*fnz-1)
+                        j = countn (2*fnz)
+                        lhop(ind1+1)%A(fnz) = ofs (i, j)
+                        lhop(ind1+1)%jc(fnz) = j
+                     End Do
+                     t_fnz = t_fnz + lhop(ind1+1)%nel
+                  End If
+
+!!$       call cpu_time(tim_end)
+!!$       t5=t5+tim_end-tim_start
+
+               End Do
+            End Do
+         End Do
+
+!!$     Call cpu_time(tim_end)
+
+         Call alloc (ham%c, t_nnz, n)
+         ham%c%nnz = t_nnz
+         ham%c%nnzmax = t_nnz
+         ham%c%nrow = n
+         ham%c%ncol = n
+         ham%c%alloc = 1
+         ham%c%ir (:) = temp_ir (:)
+         If (hopping) Then
+            Call alloc (ham%r, t_fnz, n)
+            ham%r%nnz = t_fnz
+            ham%r%nnzmax = t_fnz
+            ham%r%nrow = n
+            ham%r%ncol = n
+            ham%r%alloc = 1
+            ham%r%ir (:) = temq_ir (:)
+         End If
+
+         t_nnz = 0
+         t_fnz = 0
+         Do ix = 1, nx * ny * nz
+            nnz = lham(ix)%nel
+            ham%c%A (t_nnz+1:t_nnz+nnz) = lham(ix)%A(1:nnz)
+            ham%c%jc (t_nnz+1:t_nnz+nnz) = lham(ix)%jc(1:nnz)
+            t_nnz = t_nnz + nnz
+            If (hopping) Then
+               fnz = lhop(ix)%nel
+               ham%r%A (t_fnz+1:t_fnz+fnz) = lhop(ix)%A(1:fnz)
+               ham%r%jc (t_fnz+1:t_fnz+fnz) = lhop(ix)%jc(1:fnz)
+               t_fnz = t_fnz + fnz
+            End If
+         End Do
+
+!!$     call cpu_time(tim_start)
+!!$     t6=t6+tim_start-tim_end
+
+         ham%n = ham%c%ncol
+         If (hopping) ham%nr = ham%r%ncol
+         ham%alloc = 1
+         If (hopping) ham%havehops = 1
+
+         Deallocate (ons, lham, temp_ir, countm)
+         If (hopping) deallocate (ofs, lhop, temq_ir, countn)
+!!$     If(.not.hopping) Then
+!!$     open(unit=10,file='times.analysis')
+!!$     write(10,*) 't2=',t2,'nullify ons,ofs'
+!!$     write(10,*) 't3=',t3,'set hamiltonian'
+!!$     write(10,*) 't4=',t4,'counting elements'
+!!$     write(10,*) 't5=',t5,'convert matrices'
+!!$     write(10,*) 't6=',t6,'final copying'
+!!$     call cpu_time(tim_end)
+!!$     write(10,*) 't=',tim_end-tt
+!!$     close(10)
+!!$     endif
+         Return
+
+      Contains
+         Real * 8 Function RANF () Result (RR)
+!!$       Uniform random number generator x(n+1) = a*x(n) mod c with
+!!$       a=7**5 and c = 2**(31)-1.
+            Implicit None
+            Integer :: IH, IL, IT, IA, IC, IQ, ir
+            Data IA / 16807 /, IC / 2147483647 /, IQ / 127773 /, ir / 2836 /
+            IH = iseed / IQ
+            IL = Mod (iseed, IQ)
+            IT = IA * IL - ir * IH
+            If (IT .Gt. 0) Then
+               iseed = IT
+            Else
+               iseed = IC + IT
+            End If
+            RR = iseed / FLOAT (IC)
+         End Function RANF
+
+      End Subroutine make_model_fourband
+
+      Function get3MMM (A, B, c) Result (D)
+         Type (zcsrmat) :: A, B, c, D
+         Type (zcsrmat) :: t1
+         t1 = spmatmul (A, B)
+         D = spmatmul (t1, c)
+         Call free (t1)
+      End Function
+
+      Function getH (sk, ppar, flag) Result (H)
+         Type (t_potpar_mats) :: ppar
+         Type (zcsrmat) :: H, sk, tmat
+         Integer :: flag
+         If (flag > 0) Then
+            tmat = spmatadd (sk, ppar%pfun, sign=-1)
+         Else
+            Call spcopy (sk, tmat, sign=1)
+         End If
+!!$ H=sqrt(delta)*(S-P)*sqrt(delta)
+         H = get3MMM (ppar%sqrtd, tmat, ppar%sqrtd)
+         Call free (tmat)
+      End Function
+
+      Function make1cent (H, B, Bc) Result (M)
+         Implicit None
+         Type (zcsrmat) :: H, B, Bc, M
+!!$ Locals
+         Integer :: nz
+!!$ REMOVE SIMPLE FORM LATER!!
+
+         Call alloc (M, 0, H%nrow, H%ncol)
+         Call cent1_size (H%nrow, H%ir, H%jc, B%ir, B%jc, Bc%ir, Bc%jc, nz, M%ir)
+         Deallocate (M%jc, M%A)
+         Allocate (M%jc(nz), M%A(nz))
+         M%nnzmax = nz
+!!$ H*B+herm(B)*H
+         Call cent1mul (H%nrow, B%ncol, H%ir, H%jc, H%A, B%ir, B%jc, B%A, Bc%ir, Bc%jc, Bc%A, M%ir, M%jc, &
+        & M%A)
+
+!!$ H*herm(B)+B*H
+!!$          Call cent1mul (H%nrow, Bc%ncol, H%ir, H%jc, H%A, Bc%ir, Bc%jc, Bc%A, B%ir, B%jc, B%A, M%ir, M%jc, &
+!!$         & M%A)
+         M%nnz = nz
+!!$           Q1=spmatmul(H,Bc)
+!!$           Q2=spmatmul(B,H)
+!!$           M=spmatadd(Q1,Q2)
+!!$           call free(Q2)
+!!$           call free(Q1)
+         Call ordercsr (M)
+
+      Contains
+
+         Subroutine cent1mul (n, M, IA, ja, A, ib, jb, B, cib, cjb, cB, IC, jc, c)
+            Implicit None
+!!$ C = A*B
+!!$    usage:  matmul_normal(nrow1,ncol2,ir1,jc1,val1,ir2,jc2,val2,ir3,jc3,val3)
+            Integer, Intent (In) :: n, M
+            Integer, Intent (In) :: IA (:), ib (:), ja (:), jb (:), IC (:), cib (:), cjb (:)
+            Integer, Intent (Out) :: jc (:)
+            Complex (Kind=DEF_DBL_PREC), Intent (In) :: A (:), B (:), cB (:)
+            Complex (Kind=DEF_DBL_PREC), Intent (Out) :: c (:)
+            Integer :: nz, i, j, k, icol, icol_add, neigh
+            Integer, Pointer :: mask (:)
+            Complex (Kind=DEF_DBL_PREC) :: aij
+!!$ write(*,*)
+!!$ initialise the mask array which is an array that has non-zero value if the
+!!$ column index already exist, in which case
+!!$ the value is the index of that column
+
+!$omp parallel private(mask,j,k,icol_add,icol,aij,nz,neigh) shared(n,M)
+            Allocate (mask(M))
+            mask = 0
+!$omp do
+            Do i = 1, n
+               If (IC(i+1) /= IC(i)) Then
+                  nz = IC (i)
+
+                  Do j = IA (i), IA (i+1) - 1
+                     aij = A (j)
+                     neigh = ja (j)
+                     Do k = ib (neigh), ib (neigh+1) - 1
+                        icol_add = jb (k)
+                        icol = mask (icol_add)
+                        If (icol == 0) Then
+                           jc (nz) = icol_add
+                           c (nz) = aij * B (k)
+                           mask (icol_add) = nz ! add mask
+                           nz = nz + 1
+                        Else
+                           c (icol) = c (icol) + aij * B (k)
+                        End If
+                     End Do
+                  End Do
+
+                  Do j = cib (i), cib (i+1) - 1
+                     aij = cB (j)
+                     neigh = cjb (j)
+                     Do k = IA (neigh), IA (neigh+1) - 1
+                        icol_add = ja (k)
+                        icol = mask (icol_add)
+                        If (icol == 0) Then
+                           jc (nz) = icol_add
+                           c (nz) = aij * A (k)
+                           mask (icol_add) = nz ! add mask
+                           nz = nz + 1
+                        Else
+                           c (icol) = c (icol) + aij * A (k)
+                        End If
+                     End Do
+                  End Do
+                  mask (jc(IC(i) :nz-1)) = 0 ! done this row i, so set mask to zero again
+               End If
+            End Do
+!$omp end do
+            Deallocate (mask)
+!$omp end parallel
+         End Subroutine cent1mul
+
+         Subroutine cent1_size (nrow, ir1, jc1, ir2, jc2, cir2, cjc2, nz, nir)
+            Implicit None
+!!$ find the size of the new matrix which is a product of a1 and a2
+            Integer, Intent (In) :: nrow
+            Integer, Intent (In), Dimension (*) :: ir1, jc1, ir2, jc2, cir2, cjc2
+            Integer, Intent (Inout) :: nz, nir (:)
+!!$    integer , dimension (ncol2) :: mask
+            Integer, Pointer :: mask (:)
+            Integer :: i, j, k, neigh, icol_add
+
+!!$ initialise the mask array which is an array that has
+!!$ value i if column index already exist in row i of the new matrix
+
+            nz = 0
+            nir = 0
+!$omp parallel private(mask,j,k,icol_add,neigh) shared(nrow) reduction(+:nz)
+            Allocate (mask(nrow))
+            mask = 0
+!$omp do
+            Do i = 1, nrow
+
+               Do j = ir1 (i), ir1 (i+1) - 1
+                  neigh = jc1 (j)
+                  Do k = ir2 (neigh), ir2 (neigh+1) - 1
+                     icol_add = jc2 (k)
+                     If (mask(icol_add) /= i) Then
+                        nz = nz + 1
+                        nir (i+1) = nir (i+1) + 1
+                        mask (icol_add) = i ! add mask
+                     End If
+                  End Do
+               End Do
+
+               Do j = cir2 (i), cir2 (i+1) - 1
+                  neigh = cjc2 (j)
+                  Do k = ir1 (neigh), ir1 (neigh+1) - 1
+                     icol_add = jc1 (k)
+                     If (mask(icol_add) /= i) Then
+                        nz = nz + 1
+                        nir (i+1) = nir (i+1) + 1
+                        mask (icol_add) = i ! add mask
+                     End If
+                  End Do
+               End Do
+
+
+            End Do
+!$omp end do
+            Deallocate (mask)
+!$omp end parallel
+            nir (1) = 1
+            Do i = 1, nrow
+               nir (i+1) = nir (i+1) + nir (i)
+            End Do
+         End Subroutine cent1_size
+
+      End Function make1cent
+
+End Module hamiltonian

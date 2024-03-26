@@ -1,0 +1,38 @@
+  Conservation: integrated,      worst
+               0.141319E-08      0.202738E-07
+  Left Sharvin conductance :
+     by spin :     30.6400000000     30.5600000000
+     total   :     61.2000000000
+  Right Sharvin conductance :
+     by spin :     30.5200000000     30.6800000000
+     total   :     61.2000000000
+ ---------------------------------------------
+ 
+  L->R Conductance(carefull with decomposition!):
+               Up:                Down:
+   Up   :     21.44208897         2.250396808    
+   Down :     2.187077725         21.39781594    
+ 
+  Conductance total:
+              23.69248578         23.58489367    
+  Grand total:                    47.27737945    
+ 
+  Specular:
+               Up:                Down:
+   Up   :     0.000000000         0.000000000    
+   Down :     0.000000000         0.000000000    
+ 
+  R->L Conductance(carefull with decomposition!):
+               Up                Down
+   Up   :     21.42759181         2.157075325    
+   Down :     2.229539656         21.46317266    
+ 
+  Conductance total:
+              23.58466714         23.69271231    
+  Grand total:                    47.27737945    
+ 
+  Specular:
+               Up:                Down:
+   Up   :     0.000000000         0.000000000    
+   Down :     0.000000000         0.000000000    
+ 

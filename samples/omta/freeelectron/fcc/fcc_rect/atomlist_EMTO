@@ -1,0 +1,12 @@
+#Format: (the first line) label, atomic number, lmax
+#Format: (the second line) need downfold any basis? (1-calculate, 2-downfold)
+2
+ES 0 3 0     #name, atomic number, lmax (2 for spd and 3 for spdf)
+1 1 1 1
+0.70 0.70 0.70 0.70
+ESB 0 3 0     #name, atomic number, lmax (2 for spd and 3 for spdf)
+1 1 1 1
+0.70 0.70 0.70 0.70
+2
+.68200000000000000000               #Fermi level
+0.0000000000 0            #Muffin-tin zero (constant in interstitial)

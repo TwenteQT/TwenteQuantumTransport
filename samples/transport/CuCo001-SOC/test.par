@@ -1,0 +1,3 @@
+#!/bin/bash
+
+../../../bin/trans_full_par.x

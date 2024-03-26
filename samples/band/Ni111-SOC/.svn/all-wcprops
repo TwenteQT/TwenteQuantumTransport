@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Ni111-SOC
+END
+test
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Ni111-SOC/test
+END
+.gitignore
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Ni111-SOC/.gitignore
+END
+band.conf
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Ni111-SOC/band.conf
+END
+geom_b
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Ni111-SOC/geom_b
+END
+atomlist
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Ni111-SOC/atomlist
+END

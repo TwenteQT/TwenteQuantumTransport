@@ -1,0 +1,626 @@
+!!$ $Id$
+#include "math_def.h"
+Module potpars
+      Use sparselib
+      Implicit None
+
+      Type t_Lop_mats
+         Complex (Kind=DEF_DBL_PREC), Pointer :: Lz (:, :), Ly (:, :), Lx (:, :)
+         Complex (Kind=DEF_DBL_PREC), Pointer :: Lp (:, :), Lm (:, :)
+      End Type t_Lop_mats
+
+      Type t_pot_opts
+         Integer :: so, Kind = 1, full = 0, nhops = 1
+         Integer :: rot_mask, rotcf
+         Integer :: need_current_pol = 0
+!!$   add for model hamiltonian
+         Integer :: periodic
+         Integer :: ngrid, ngridx, ngridy, ngridz, nlx, nly, nlz, nrx, nry, nrz
+         Real (Kind=DEF_DBL_PREC) :: gamma1, gamma2, h0, v0
+         Real (Kind=DEF_DBL_PREC) :: dx, dy, dz, energy
+!!$   end
+         Real (Kind=DEF_DBL_PREC) :: so_scale, rnegl, rot_angle (3), ei
+         Real (Kind=DEF_DBL_PREC), Pointer :: rm_angles (:, :)
+      End Type t_pot_opts
+
+      Type t_potpar_mats
+         Integer :: alloc = 0
+         Type (zcsrmat) :: overlap, sqrtd, pfun
+         Type (zcsrmat) :: c0, c1, c2, c1conj
+         Integer :: needso = 0
+      End Type t_potpar_mats
+
+
+Contains
+
+      Function calc_magmoms (geo, rotm, magvals, magmom) Result (f1)
+         Use geometry_module
+         Implicit None
+         Type (t_geometry) :: geo
+         Logical :: f1
+         Real (Kind=DEF_DBL_PREC) :: magvals (3), magmom (3), rotm (:, :)
+!!$ local vars
+         Integer :: i
+         Real (Kind=DEF_DBL_PREC) :: m1, m2
+         m1 = 0.0d0
+         Do i = 1, geo%num
+            m1 = m1 + geo%atoms(i)%ptr%magmom
+         End Do
+         f1 = .False.
+         If (Abs(m1) > 1.0d-12) f1 = .True.
+         magmom = 0.0d0
+         m2 = 0.0d0
+         Do i = 1, geo%num
+            m1 = geo%atoms(i)%ptr%magmom
+            If ( .Not. f1) m1 = 1.0d0
+            magmom (3) = magmom (3) + Cos (rotm(1, i)) * m1
+            magmom (1) = magmom (1) + Sin (rotm(1, i)) * Cos (rotm(2, i)) * m1
+            magmom (2) = magmom (2) + Sin (rotm(1, i)) * Sin (rotm(2, i)) * m1
+            m2 = m2 + m1
+         End Do
+         magvals (1) = m2
+         magvals (2) = Sqrt (sum(magmom**2))
+         magvals (3) = magvals (2) / m2
+         If ( .Not. f1) Then
+            magvals (1:2) = 0.0d0
+            magmom = 0.0d0
+         End If
+      End Function calc_magmoms
+
+      Function prep_rot_mask (geo, po) Result (rotm)
+         Use logging
+         Use rotations
+         Use geometry_module
+         Implicit None
+         Type (t_geometry) :: geo
+         Type (t_pot_opts) :: po
+!!$ local
+         Integer :: i
+         Real (Kind=DEF_DBL_PREC), Parameter :: zr (2) = (/ 0.0d0, 0.0d0 /)
+         Real (Kind=DEF_DBL_PREC) :: ang (2)
+         Real (Kind=DEF_DBL_PREC), Pointer :: rotm (:, :), rotmb (:, :)
+         Allocate (rotm(2, geo%num))
+         po%rm_angles => rotm
+         If (po%rot_mask == 1) Then
+            rotmb => read_rot_mask (geo%tna)
+!SMP$ DO SERIAL
+            Do i = 1, geo%tna
+               rotm (1:2, geo%ltna+i) = rotspheric (rotmb(1:2, i), po%rot_angle)
+            End Do
+            Forall (i=1:geo%ltna) rotm (1:2, i) = rotm (1:2, geo%ltna+1)
+            Forall (i=1:geo%rtna) rotm (1:2, geo%ltna+geo%tna+i) = rotm (1:2, geo%ltna+geo%tna)
+            Deallocate (rotmb)
+         Else
+            ang (1:2) = rotspheric (zr, po%rot_angle)
+            Do i = 1, geo%num
+               rotm (1:2, i) = ang (1:2)
+            End Do
+         End If
+      End Function prep_rot_mask
+
+      Subroutine free_ppar (ppar)
+         Implicit None
+         Type (t_potpar_mats) :: ppar (2)
+         Integer :: s
+         Do s = 1, 2
+            Call free_ppar_f (ppar(s))
+         End Do
+      End Subroutine free_ppar
+
+      Subroutine free_ppar_f (ppar)
+         Implicit None
+         Type (t_potpar_mats) :: ppar
+         Call free (ppar%overlap)
+         Call free (ppar%sqrtd)
+         Call free (ppar%pfun)
+         Call free (ppar%c0)
+         Call free (ppar%c1)
+         Call free (ppar%c1conj)
+         Call free (ppar%c2)
+      End Subroutine free_ppar_f
+
+
+      Subroutine init_ppar (ppar)
+         Implicit None
+         Type (t_potpar_mats) :: ppar (2)
+         Integer :: s
+         Do s = 1, 2
+            ppar(s)%overlap%alloc = 1
+            ppar(s)%sqrtd%alloc = 1
+            ppar(s)%pfun%alloc = 1
+         End Do
+      End Subroutine init_ppar
+
+      Function make_ppar (geom, po) Result (ppar)
+!!$ Build matrices with potential parameters for whole region
+         Use geometry_module
+         Use rotations
+         Implicit None
+         Type (t_potpar_mats) :: ppar (2)
+         Type (t_geometry) :: geom
+         Type (t_pot_opts) :: po
+!!$ Local
+         Integer :: s, l, n, ii1, ii2, k
+         Type (t_atom_defenition), Pointer :: aptr
+
+         Do s = 1, 2
+            Call alloc (ppar(s)%overlap, geom%norbit, geom%norbit)
+            Call alloc (ppar(s)%sqrtd, geom%norbit, geom%norbit)
+            Call alloc (ppar(s)%pfun, geom%norbit, geom%norbit)
+            ii1 = 1
+            Do n = 1, geom%num
+               aptr => geom%atoms(n)%ptr
+               Do l = 1, aptr%nl
+                  ii2 = ii1 + 2 * (l-1)
+                  ppar(s)%overlap%A(ii1:ii2) = aptr%pp(s)%el%ovl(l)
+                  ppar(s)%sqrtd%A(ii1:ii2) = aptr%pp(s)%el%sqrtd(l)
+                  ppar(s)%pfun%A(ii1:ii2) = aptr%pp(s)%el%pf(l)
+                  Do k = ii1, ii2
+                     ppar(s)%overlap%jc(k) = k
+                     ppar(s)%overlap%ir(k) = k
+                     ppar(s)%sqrtd%jc(k) = k
+                     ppar(s)%sqrtd%ir(k) = k
+                     ppar(s)%pfun%jc(k) = k
+                     ppar(s)%pfun%ir(k) = k
+                  End Do
+                  ii1 = ii2 + 1
+               End Do
+            End Do
+            If (ii2 < geom%norbit) Then
+               Write (*,*) 'Something goes wrong with filling ppar matrices'
+               Stop
+            End If
+            ppar(s)%overlap%nnz = ii2
+            ppar(s)%pfun%nnz = ii2
+            ppar(s)%sqrtd%nnz = ii2
+            ii2 = ii2 + 1
+            ppar(s)%overlap%ir(ii2) = ii2
+            ppar(s)%sqrtd%ir(ii2) = ii2
+            ppar(s)%pfun%ir(ii2) = ii2
+            If ((po%kind) > 1) Then
+               Call alloc (ppar(s)%c0, 0, geom%norbit)
+               ppar(s)%c1 = unmat (geom%norbit,-0.5d0)
+               ppar(s)%c1conj = spherm (ppar(s)%c1)
+               If ((po%kind) > 2) Then
+                  Call spcopy (ppar(s)%overlap, ppar(s)%c2, sign=-1)
+               End If
+            End If
+         End Do
+      End Function make_ppar
+
+      Function make_ppar_full (geom, po, rotm) Result (ppar)
+!!$ Build matrices with potential parameters for whole region
+         Use geometry_module
+         Implicit None
+         Type (t_potpar_mats) :: ppar
+         Type (t_geometry) :: geom
+         Type (t_pot_opts) :: po
+         Real (Kind=DEF_DBL_PREC), Optional :: rotm (:, :)
+!!$ Local
+         Integer :: s, l, n, ii1, ii2, k
+         Type (t_atom_defenition), Pointer :: aptr
+         Type (zcsrmat) :: op, oph, A, B, C, un, sqrtdi
+         Call alloc (ppar%overlap, geom%norbit*2, geom%norbit*2)
+         Call alloc (ppar%sqrtd, geom%norbit*2, geom%norbit*2)
+         Call alloc (ppar%pfun, geom%norbit*2, geom%norbit*2)
+
+         ii1 = 1
+         Do n = 1, geom%num
+            aptr => geom%atoms(n)%ptr
+            Do s = 1, 2
+               Do l = 1, aptr%nl
+                  ii2 = ii1 + 2 * (l-1)
+                  ppar%overlap%A (ii1:ii2) = aptr%pp(s)%el%ovl(l)
+                  ppar%sqrtd%A (ii1:ii2) = aptr%pp(s)%el%sqrtd(l)
+                  ppar%pfun%A (ii1:ii2) = aptr%pp(s)%el%pf(l)
+                  Do k = ii1, ii2
+                     ppar%overlap%jc (k) = k
+                     ppar%overlap%ir (k) = k
+                     ppar%sqrtd%jc (k) = k
+                     ppar%sqrtd%ir (k) = k
+                     ppar%pfun%jc (k) = k
+                     ppar%pfun%ir (k) = k
+                  End Do
+                  ii1 = ii2 + 1
+               End Do
+            End Do
+         End Do
+
+         If (ii2 < geom%norbit*2) Then
+            Write (*,*) 'Something goes wrong with filling ppar matrices'
+            Stop
+         End If
+         ppar%overlap%nnz = ii2
+         ppar%pfun%nnz = ii2
+         ppar%sqrtd%nnz = ii2
+         ii2 = ii2 + 1
+         ppar%overlap%ir (ii2) = ii2
+         ppar%sqrtd%ir (ii2) = ii2
+         ppar%pfun%ir (ii2) = ii2
+         If (po%kind == 1 .And. po%so == 1) Then
+            Call spcopy (ppar%sqrtd, sqrtdi)
+            Forall (ii1=1:ppar%sqrtd%nnz) sqrtdi%A(ii1) = 1. / sqrtdi%A(ii1)
+         End If
+
+         If (present(rotm)) Then
+            Call GetRotOp (op, geom, rotm)
+            oph = spherm (op)
+            Call RotateZCSR (oph, ppar%pfun, op, po%rnegl)
+            Call RotateZCSR (oph, ppar%sqrtd, op, po%rnegl)
+            Call RotateZCSR (oph, ppar%overlap, op, po%rnegl)
+            If (po%kind == 1 .And. po%so == 1) Then
+               Call RotateZCSR (oph, sqrtdi, op, po%rnegl)
+            End If
+            Call free (op)
+            Call free (oph)
+         End If
+
+!!$ (P-S)- sqrtd(^-1) *A *sqrtd(^-1) +(P-S)* sqrtd * B * sqrtd^(-1)+ ((P-S) * sqrtd * B * sqrtd^(-1))^(+)
+         If (po%kind == 1 .And. po%so == 1) Then
+            Call prep_so (A, B, C, geom, po, rotm)
+            Call free (C)
+            ppar%needso = 1
+
+            C = spmatmul (sqrtdi, A)
+            ppar%c0 = spmatmul (C, sqrtdi)
+            ppar%c0%A = - ppar%c0%A
+            Call free (C)
+
+            C = spmatmul (B, sqrtdi)
+            ppar%c1 = spmatmul (ppar%sqrtd, C)
+            ppar%c1conj = spherm (ppar%c1)
+            Call free (C)
+            Call free (A)
+            Call free (B)
+            Call free (sqrtdi)
+         End If
+
+         If (po%kind > 1) Then
+            If (po%so == 1) Then
+               Call prep_so (A, B, C, geom, po, rotm)
+               ppar%needso = 1
+               If (po%kind > 2) Then
+                  ppar%c2 = spmatadd (C, ppar%overlap, sign=1)
+                  ppar%c2%A = - ppar%c2%A
+               End If
+               Call free (C)
+               Call spcopy (A, ppar%c0, sign=-1)
+
+               un = unmat (geom%norbit*2,-0.5d0)
+               ppar%c1 = spmatadd (un, B, sign=-1)
+               Call free (un)
+               Call free (A)
+               Call free (B)
+               Call free (C)
+            Else
+               If (po%kind > 2) Then
+                  Call spcopy (ppar%overlap, ppar%c2, sign=-1)
+               End If
+!!$                ppar%%A = 0.0d0
+               Call alloc (ppar%c0, 0, geom%norbit*2)
+               ppar%c1 = unmat (geom%norbit*2,-0.5d0)
+            End If
+
+            ppar%c1conj = spherm (ppar%c1)
+         End If
+      End Function make_ppar_full
+
+
+      Subroutine prep_so (A, B, C, geom, po, ang_in)
+         Use geometry_module
+         Use rotations
+         Implicit None
+         Type (t_geometry) :: geom
+         Type (t_pot_opts) :: po
+         Type (zcsrmat) :: A, B, C
+         Real (Kind=DEF_DBL_PREC), Optional, Target :: ang_in (:, :)
+!!$ Local vars
+         Type (t_Lop_mats) :: Lop (geom%nlmax)
+         Type (t_atom_defenition), Pointer :: at
+         Type (zcoomat) :: aip
+         Integer :: i, j, no, shift, pos, inc
+         Type (zcoomat) :: sA, sB, sC
+         Real (Kind=DEF_DBL_PREC) :: scf, mask (geom%num)
+         Real (Kind=DEF_DBL_PREC) :: vrm (2)
+         Real (Kind=DEF_DBL_PREC), Pointer :: ang (:, :)
+         Real (Kind=DEF_DBL_PREC), Target :: defrot (3, 1) = reshape ( (/ 0.0d0, 0.0d0, 0.0d0 /), (/ 3, 1 /))
+
+         ang => defrot
+         inc = 0
+         pos = 1
+         If (present(ang_in)) Then
+            ang => ang_in
+            If (size(ang_in, 2) >= geom%num) inc = 1
+         End If
+
+         j = 0
+!SMP$ DO SERIAL
+         Do i = 1, geom%num
+            j = j + 16 - 36 * geom%atoms(i)%ptr%nl + 20 * geom%atoms(i)%ptr%nl ** 2
+         End Do
+         j = j * 4
+         no = geom%norbit
+         Call alloc (sA, j, 2*no)
+         Call alloc (sB, j, 2*no)
+         Call alloc (sC, j, 2*no)
+         mask = po%so_scale
+         Call make_Lmats (geom%nlmax, Lop)
+         shift = 0
+!SMP$ DO SERIAL
+         Do i = 1, geom%num
+            vrm (1) = Cos (ang(1, pos)/2.0d0) ** 2
+            vrm (2) = Sin (ang(1, pos)/2.0d0) ** 2
+            at => geom%atoms(i)%ptr
+            scf = mask (i)
+            Call mk_so_atom (Lop, at%PvP, at%nl, aip, vrm)
+            Call cooaddelms (sA, scf*aip%A, aip%icol+shift, aip%irow+shift, aip%nnz)
+            Call mk_so_atom (Lop, at%PvPD, at%nl, aip, vrm)
+            Call cooaddelms (sB, scf*aip%A, aip%icol+shift, aip%irow+shift, aip%nnz)
+            Call mk_so_atom (Lop, at%PDvPD, at%nl, aip, vrm)
+            Call cooaddelms (sC, scf*aip%A, aip%icol+shift, aip%irow+shift, aip%nnz)
+            shift = shift + 2 * at%nl ** 2
+            pos = pos + inc
+         End Do
+         A = conv2csr (sA)
+         Call ordercsr (A)
+         B = conv2csr (sB)
+         Call ordercsr (B)
+         C = conv2csr (sC)
+         Call ordercsr (C)
+
+         Call free (aip)
+         Call free (sA)
+         Call free (sB)
+         Call free (sC)
+         Call free_Lmats (Lop)
+!!$          B%A=0.0d0
+      End Subroutine prep_so
+
+      Subroutine mk_so_atom (Lop, p, nl, aip, vrm)
+         Use rotations
+         Implicit None
+         Type (t_Lop_mats), Intent (In) :: Lop (:)
+         Integer, Intent (In) :: nl
+         Real (Kind=DEF_DBL_PREC), Intent (In) :: p (:, :), vrm (2)
+         Type (zcoomat), Intent (Inout) :: aip
+!!$  Local vars
+         Complex (Kind=DEF_DBL_PREC), Parameter :: sz (2, 2) = reshape ( (/ 0.5d0, 0.0d0, 0.0d0,-0.5d0 /), (/ &
+        & 2, 2 /))
+         Complex (Kind=DEF_DBL_PREC), Parameter :: Sy (2, 2) = DEF_cmplx_Ione * reshape ( (/ 0.0d0, &
+        & .5d0,-.5d0, 0.0d0 /), (/ 2, 2 /))
+         Complex (Kind=DEF_DBL_PREC), Parameter :: Sx (2, 2) = reshape ( (/ 0.0d0, .5d0, .5d0, 0.0d0 /), (/ &
+        & 2, 2 /))
+         Complex (Kind=DEF_DBL_PREC), Pointer :: Sz1 (:, :), Sp1 (:, :), Sm1 (:, :), Sx1 (:, :), Sy1 (:, :)
+         Complex (Kind=DEF_DBL_PREC), Pointer :: DM (:, :)
+         Complex (Kind=DEF_DBL_PREC) :: ppc (2, 2)
+         Integer :: no, is1, is2, il, s1, s2
+         Allocate (Sx1(2, 2), Sy1(2, 2), Sz1(2, 2), Sp1(2, 2), Sm1(2, 2), DM(2*nl**2, 2*nl**2))
+         Call free (aip)
+         no = nl ** 2
+         DM = 0.0d0
+
+!!$ !SMP$ DO SERIAL
+         Do il = 2, nl
+            ppc (1, 1) = vrm (1) * p (1, il) + vrm (2) * p (2, il)
+            ppc (2, 2) = vrm (2) * p (1, il) + vrm (1) * p (2, il)
+            ppc (2, 1) = p (3, il)
+            ppc (1, 2) = p (3, il)
+!!$ !SMP$ DO SERIAL
+            Do is1 = 1, 2
+               s1 = (is1-1) * no
+!!$ !SMP$ DO SERIAL
+               Do is2 = 1, 2
+                  s2 = (is2-1) * no
+                  DM (((il-1)**2+1+s1) :(il**2+s1), ((il-1)**2+1+s2) :(il**2+s2)) = ppc (is1, is2) * (sz(is1, &
+                 & is2)*Lop(il)%Lz+Sy(is1, is2)*Lop(il)%Ly+Sx(is1, is2)*Lop(il)%Lx)
+               End Do
+            End Do
+         End Do
+         Call zdense2coo (DM, aip, 1.0d-20)
+         Deallocate (Sx1, Sy1, Sz1, Sp1, Sm1, DM)
+!!$       Contains
+!!$          Function getLn (Lop, r3m, n) Result (l)
+!!$             Implicit None
+!!$             Type (t_Lop_mats), Intent (In) :: Lop
+!!$             Integer, Intent (In) :: n
+!!$             Complex (Kind=DEF_DBL_PREC), Intent (In) :: r3m (3, 3)
+!!$             Complex (Kind=DEF_DBL_PREC) :: l (size(Lop%Lz, 1), size(Lop%Lz, 2))
+!!$             l = rot3d (Lop%Lx, Lop%Ly, Lop%Lz, r3m, n)
+!!$          End Function
+      End Subroutine mk_so_atom
+
+      Subroutine make_Lmats (lmax, Lop)
+         Implicit None
+         Type (t_Lop_mats) :: Lop (lmax)
+         Integer :: lmax
+!!$ Local vars
+         Complex (Kind=DEF_DBL_PREC), Parameter :: ci = DEF_cmplx_Ione
+         Integer :: i
+         Do i = 1, lmax
+            Allocate (Lop(i)%Lz(2*i-1, 2*i-1))
+            Allocate (Lop(i)%Lm(2*i-1, 2*i-1))
+            Allocate (Lop(i)%Lp(2*i-1, 2*i-1))
+            Allocate (Lop(i)%Lx(2*i-1, 2*i-1))
+            Allocate (Lop(i)%Ly(2*i-1, 2*i-1))
+            Call CalcLInts (Lop(i)%Lp, Lop(i)%Lm, Lop(i)%Lz, i)
+            Lop(i)%Lx = .5d0 * (Lop(i)%Lp+Lop(i)%Lm)
+            Lop(i)%Ly = - ci * .5d0 * (Lop(i)%Lp-Lop(i)%Lm)
+         End Do
+      End Subroutine make_Lmats
+
+      Subroutine free_Lmats (Lop)
+         Type (t_Lop_mats) :: Lop (:)
+!!$ Local
+         Integer :: i
+         Do i = 1, size (Lop)
+            Deallocate (Lop(i)%Lz, Lop(i)%Lp, Lop(i)%Lm, Lop(i)%Ly, Lop(i)%Lx)
+            Nullify (Lop(i)%Lz, Lop(i)%Lp, Lop(i)%Lm, Lop(i)%Ly, Lop(i)%Lx)
+         End Do
+      End Subroutine free_Lmats
+
+      Subroutine CalcLInts (Lp, Lm, Lz, il)
+         Implicit None
+         Integer :: il
+         Complex (Kind=DEF_DBL_PREC) :: Lp (:, :), Lm (:, :), Lz (:, :)
+!!$ Local vars
+         Complex (Kind=DEF_DBL_PREC) :: R (-(il-1) :(il-1),-(il-1) :(il-1))
+         Complex (Kind=DEF_DBL_PREC) :: Ri (-(il-1) :(il-1),-(il-1) :(il-1))
+         Complex (Kind=DEF_DBL_PREC) :: Lb (-(il-1) :(il-1),-(il-1) :(il-1))
+         Integer :: l, M
+         l = il - 1
+
+         Call transmat (R, l)
+         Ri = transpose (conjg(R))
+
+         Lz (:, :) = 0.0d0
+         Lp (:, :) = 0.0d0
+         Lm (:, :) = 0.0d0
+
+         If (il > 1) Then
+
+            Lb (:, :) = DEF_cmplx_zero
+            Forall (M=-l:l) Lb (M, M) = cmplx (M, 0.0d0, kind=DEF_DBL_PREC)
+            Lz (1:(2*l+1), 1:(2*l+1)) = .5d0 * matmul (R, matmul(Lb, Ri))
+            Lb (:, :) = DEF_cmplx_zero
+            Forall (M=-l:(l-1)) Lb (M+1, M) = Sqrt (cmplx(l*(l+1)-M*(M+1), 0.0d0, kind=DEF_DBL_PREC))
+            Lp (1:(2*l+1), 1:(2*l+1)) = .5d0 * matmul (R, matmul(Lb, Ri))
+            Lm = transpose (conjg(Lp))
+         End If
+      Contains
+
+         Subroutine transmat (R, l)
+!!$ Transformation matrix complex->real harmonics (without 1/sqrt(2) prefactor!!!)
+            Implicit None
+            Integer :: l
+            Complex (Kind=DEF_DBL_PREC) :: R (-l:l,-l:l)
+!!$
+            Integer :: M
+            R (:, :) = DEF_cmplx_zero
+            R (0, 0) = DEF_cmplx_one * Sqrt (2.0d0)
+            Do M = 1, l, 1
+               R (-M,-M) = DEF_cmplx_Ione
+               R (M, M) = (-1.0d0) ** M
+               R (M,-M) = DEF_cmplx_one
+               R (-M, M) = - DEF_cmplx_Ione * (-1.0d0) ** M
+            End Do
+         End Subroutine transmat
+      End Subroutine CalcLInts
+      Function unmat (sz, B) Result (A)
+         Implicit None
+         Type (zcsrmat) :: A
+         Real (Kind=DEF_DBL_PREC) :: B
+         Integer :: sz
+!! Local
+         Integer :: i
+         Call alloc (A, sz, sz)
+         Do i = 1, sz
+            A%A (i) = B
+            A%jc (i) = i
+            A%ir (i) = i
+         End Do
+         A%ir (sz+1) = sz + 1
+         A%nnz = sz
+      End Function
+
+      Subroutine zcsrcompress (amat, zcrit)
+         Implicit None
+         Type (zcsrmat) :: amat
+!!$ Local vars
+         Integer :: nnz, i, j, l
+         Real (Kind=DEF_DBL_PREC) :: zcrit
+         Complex (Kind=DEF_DBL_PREC), Pointer, Dimension (:) :: A, a_old
+         Integer, Pointer, Dimension (:) :: jc, ir, jc_old, ir_old
+         nnz = 0
+         a_old => amat%A
+         jc_old => amat%jc
+
+         Do i = 1, amat%nnz
+            If (Abs(a_old(i)) > zcrit) Then
+               nnz = nnz + 1
+            Else
+               jc_old (i) = - 99
+            End If
+         End Do
+
+         If (nnz < amat%nnz) Then
+            ir_old => amat%ir
+            Allocate (A(nnz), jc(nnz), ir(amat%nrow+1))
+            ir (1) = 1
+            Do j = 1, amat%nrow
+               l = ir (j)
+               Do i = ir_old (j), ir_old (j+1) - 1
+                  If (jc_old(i) /=-99) Then
+                     jc (l) = jc_old (i)
+                     A (l) = a_old (i)
+                     l = l + 1
+                  End If
+               End Do
+               ir (j+1) = l
+            End Do
+            If (l /= (nnz+1)) Then
+               Write (*,*) "wrong compression"
+               Stop
+            End If
+            Deallocate (amat%A, amat%ir, amat%jc)
+            amat%A => A
+            amat%jc => jc
+            amat%ir => ir
+            amat%nnz = nnz
+            Nullify (ir, jc, A, a_old, jc_old, ir_old)
+         End If
+      End Subroutine zcsrcompress
+
+      Subroutine RotateZCSR (oph, A, op, fix_in)
+         Implicit None
+         Type (zcsrmat) :: op, oph, A
+         Real (Kind=DEF_DBL_PREC), Optional :: fix_in
+!!$ Local
+         Real (Kind=DEF_DBL_PREC) :: fix = 1.0d-20
+         Type (zcsrmat) :: B
+
+         If (present(fix_in)) fix = fix_in
+         B = spmatmul (A, op)
+         Call free (A)
+         A = spmatmul (oph, B)
+         Call free (B)
+         Call zcsrcompress (A, fix)
+      End Subroutine RotateZCSR
+
+      Subroutine GetRotOp (op, geom, mask)
+         Use geometry_module
+         Use rotations
+         Implicit None
+         Type (t_geometry) :: geom
+         Real (Kind=DEF_DBL_PREC) :: mask (:, :)
+         Type (zcsrmat) :: op
+!!$ Local
+         Integer :: i, j, no, ofs, is, oofs, row, inc, mi
+         Complex (Kind=DEF_DBL_PREC) :: rm (2, 2)
+         Call alloc (op, geom%norbit*4, geom%norbit*2)
+         ofs = 0
+         oofs = 0
+         op%ir (1) = 1
+         row = 1
+         inc = 1
+         mi = 1
+         If (size(mask, 2) < geom%num) inc = 0
+         Do i = 1, geom%num
+            rm = spinrm (mask(:, mi))
+            no = geom%atoms(i)%ptr%nl ** 2
+            Do is = 1, 2
+               Do j = 1, no
+                  op%A (ofs+1:ofs+2) = rm (is, :)
+                  op%jc (ofs+1:ofs+2) = oofs + (/ j, no + j /)
+                  op%ir (row+1) = op%ir(row) + 2
+                  row = row + 1
+                  ofs = ofs + 2
+               End Do
+            End Do
+            oofs = oofs + no * 2
+            mi = mi + inc
+         End Do
+         op%nnz = ofs
+      End Subroutine GetRotOp
+
+End Module potpars
+

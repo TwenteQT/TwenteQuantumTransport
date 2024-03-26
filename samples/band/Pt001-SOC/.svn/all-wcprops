@@ -1,0 +1,41 @@
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Pt001-SOC
+END
+output
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Pt001-SOC/output
+END
+band.conf
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Pt001-SOC/band.conf
+END
+geom_b
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Pt001-SOC/geom_b
+END
+bandup
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Pt001-SOC/bandup
+END
+atomlist
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Pt001-SOC/atomlist
+END
+banddown
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Pt001-SOC/banddown
+END

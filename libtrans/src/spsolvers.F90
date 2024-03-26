@@ -1,0 +1,1370 @@
+!!$ $Id: ssolve.F90 61 2006-10-02 16:24:01Z antst $
+#include "math_def.h"
+Module sparse_solvers
+      Type t_leq_param
+         Integer :: workhost = 1, debug, maxit
+         Integer :: memover = - 1, solver = 0
+         Integer :: partitioner = 4, redistmtx = 0, permscale = 7
+         Integer :: keepmtx = 1
+         Complex (Kind=DEF_DBL_PREC) :: tol
+         Character (Len=256) :: tmpdir = ''
+      End Type t_leq_param
+
+      Interface sp_solve
+         Module Procedure sp_solve_drhs, sp_solve_srhs
+      End Interface
+
+      Interface sp_solve_diffs
+         Module Procedure sp_solve_drhs_diffs
+      End Interface
+
+Contains
+
+
+      Function set1zptr (a, n) Result (ptr)
+         Implicit None
+         Complex (Kind=DEF_DBL_PREC), Target, Intent (In) :: a (*)
+         Complex (Kind=DEF_DBL_PREC), Pointer :: ptr (:)
+         Integer, Intent (In) :: n
+         ptr => a (1:n)
+      End Function set1zptr
+
+#if defined(USE_PASTIX)
+      Subroutine sp_solve_srhs (ham, rhs, wf, root, comm, opt)
+         Use sparselib
+         use mpi
+         Implicit None
+         !Include 'mpif.h'
+         Type (t_leq_param) :: opt
+         Type (zcsrmat) :: ham, rhs
+         Type (zdensemat) :: wf
+         Integer :: root, comm, nrhs, lrhs, ierr
+
+         Write (*,*) 'not implemented!'
+         Stop
+      End Subroutine sp_solve_srhs
+
+      Subroutine sp_solve_drhs (ham, rhs, root, comm, opt)
+         Use sparselib
+         Implicit None
+         Type (t_leq_param) :: opt
+         Type (zcsrmat) :: ham
+         Type (zdensemat) :: rhs
+         Integer :: root, comm, nrhs
+         Call sp_solve_past_drhs (ham, rhs, root, comm, opt)
+      End Subroutine sp_solve_drhs
+      Subroutine sp_solve_past_drhs (ham, rhs, root, comm, opt)
+!!$
+         Use sparselib
+         Use logging
+         use mpi
+         Implicit None
+         !Include 'mpif.h'
+#include "pastix_fortran.h"
+
+         Type (t_leq_param) :: opt
+         Integer :: root, comm
+         Type (zcsrmat) :: ham
+         Type (zdensemat) :: rhs
+
+!!$ Local
+         Integer :: nrhs
+         Integer :: ierr, i, j
+         Integer :: gsz, NNZ, n
+         Integer :: work_comm, key, myid, nmyid
+         Complex (Kind=DEF_DBL_PREC), Pointer :: b (:, :)
+         Complex (Kind=DEF_DBL_PREC), Allocatable :: a (:)
+         Integer, Allocatable :: ir (:), jc (:), nlocs (:)
+         pastix_int_t :: iparm (IPARM_SIZE)! Integer parameters
+         Real (Kind=DEF_DBL_PREC) :: dparm (DPARM_SIZE)! Floating poin parameters
+         pastix_data_ptr_t :: pastix_data ! Structure to keep information in PaStiX (0 for first call)
+         pastix_data_ptr_t :: check_data
+!!$          pastix_int_t :: nbthread ! Number of threads in PaStiX
+!!$          pastix_int_t :: verbose ! Verbose level
+         pastix_int_t :: flagsym ! Symmetric or not
+!!$          pastix_int_t :: mun = - 1
+!!$          pastix_int_t :: un = 1
+         pastix_int_t, dimension (:), allocatable :: perm ! permutation tabular
+         pastix_int_t, dimension (:), allocatable :: invp ! reverse permutation tabular
+         pastix_int_t, dimension (:), allocatable :: loc2glob, loc2glob2
+         Integer, External :: OMP_GET_MAX_THREADS
+         Integer :: locn, locnnz
+         Integer, Allocatable :: locir (:), locjc (:)
+         Complex (Kind=DEF_DBL_PREC), Allocatable :: loca (:), locb (:, :)
+         pastix_data_ptr_t :: cscdata
+         Integer :: status (MPI_STATUS_SIZE)
+
+         Call MPI_Barrier (comm, ierr)
+         Call mpi_comm_rank (comm, myid, ierr)
+         If (myid == root) key = 0
+         key = 1
+         Call MPI_COMM_SPLIT (comm, 1, key, work_comm, ierr)
+         Call mpi_comm_size (work_comm, gsz, ierr)
+         Call mpi_comm_rank (work_comm, nmyid, ierr)
+
+         If ((myid == root) .And. (nmyid /= 0)) Then
+            Write (*,*) 'New comm rank assign error1!'
+            Write (*,*) 'nmyid=', nmyid
+            Write (*,*) 'myid=', myid
+            Write (*,*) 'root=', root
+         End If
+!!$
+         pastix_data = 0
+
+         If (gsz == 1) Then
+            n = ham%ncol
+            nrhs = rhs%ncol
+            NNZ = ham%NNZ
+            Allocate (ir(n+1), jc(NNZ), a(NNZ))
+            Call csrcsc2z (ham%nrow, ham%ncol, ham%a, ham%jc, ham%ir, a, jc, ir)
+            b => rhs%bl
+            If (opt%keepmtx /= 1) Call free (ham)
+            flagsym = API_SYM_NO
+!!$          Call pastix_fortran_checkmatrix (check_data, work_comm, verbose, flagsym, API_YES, n, ir, jc, a, &
+!!$         & mun, un)
+
+            iparm (IPARM_MODIFY_PARAMETER) = API_NO
+            iparm (IPARM_START_TASK) = API_TASK_INIT
+            iparm (IPARM_END_TASK) = API_TASK_INIT
+            Allocate (perm(n))
+            Allocate (invp(n))
+
+            Call pastix_fortran (pastix_data, work_comm, n, ir, jc, a, perm, invp, b, nrhs, iparm, dparm)
+
+!!$ Customize some parameters
+#ifdef _OPENMP
+            iparm (IPARM_THREAD_NBR) = OMP_GET_MAX_THREADS ()
+#endif
+            iparm (IPARM_VERBOSE) = opt%debug
+            iparm (IPARM_SYM) = API_SYM_NO
+            iparm (IPARM_FACTORIZATION) = API_FACT_LU
+            iparm (IPARM_MATRIX_VERIFICATION) = API_NO
+            iparm (IPARM_RHS_MAKING) = API_RHS_B
+
+!!$          iparm(IPARM_LEVEL_OF_FILL) = -1
+!!$          iparm(IPARM_AMALGAMATION_LEVEL) = 5
+
+            iparm (IPARM_START_TASK) = API_TASK_ORDERING
+            iparm (IPARM_END_TASK) = API_TASK_SOLVE
+!!$          iparm (IPARM_END_TASK) = API_TASK_CLEAN
+!!$ Call PaStiX.
+            Call pastix_fortran (pastix_data, work_comm, n, ir, jc, a, perm, invp, b, nrhs, iparm, dparm)
+
+!!$ Call PaStiX.
+            iparm (IPARM_START_TASK) = API_TASK_CLEAN ! API_TASK_SOLVE
+            iparm (IPARM_END_TASK) = API_TASK_CLEAN
+            Call pastix_fortran (pastix_data, work_comm, n, ir, jc, a, perm, invp, b, nrhs, iparm, dparm)
+
+            Deallocate (ir, jc, a, perm, invp)
+            Nullify (b)
+         Else
+!!$ PARALLEL CASE!
+            iparm (IPARM_MODIFY_PARAMETER) = API_NO
+            iparm (IPARM_START_TASK) = API_TASK_INIT
+            iparm (IPARM_END_TASK) = API_TASK_INIT
+
+            If (myid == root) Then
+               n = ham%ncol
+               nrhs = rhs%ncol
+               NNZ = ham%NNZ
+               Allocate (ir(n+1), jc(NNZ), a(NNZ))
+               Call csrcsc2z (ham%nrow, ham%ncol, ham%a, ham%jc, ham%ir, a, jc, ir)
+               b => rhs%bl
+               If (opt%keepmtx /= 1) Call free (ham)
+               Allocate (loc2glob(n))
+               Do i = 1, n
+                  loc2glob (i) = i
+               End Do
+               Allocate (perm(n))
+            Else
+               n = 0
+               nrhs = 0
+               NNZ = 0
+               Allocate (ir(1), jc(1), a(1), loc2glob(1), b(1, 1))
+               ir (1) = 1
+               jc (1) = 0
+               loc2glob (1) = 0
+               Allocate (perm(1))
+            End If
+            Call MPI_Barrier (work_comm, ierr)
+            Call mpi_bcast (nrhs, 1, mpi_integer, 0, work_comm, ierr)
+            Allocate (invp(1))
+
+            Call dpastix_fortran (pastix_data, work_comm, n, ir, jc, a, loc2glob, perm, invp, b, nrhs, iparm, &
+           & dparm)
+#ifdef _OPENMP
+            iparm (IPARM_THREAD_NBR) = OMP_GET_MAX_THREADS ()
+#endif
+            iparm (IPARM_VERBOSE) = opt%debug
+            iparm (IPARM_SYM) = API_SYM_NO
+            iparm (IPARM_FACTORIZATION) = API_FACT_LU
+            iparm (IPARM_MATRIX_VERIFICATION) = API_NO
+            iparm (IPARM_RHS_MAKING) = API_RHS_B
+            iparm (IPARM_START_TASK) = API_TASK_ORDERING
+            iparm (IPARM_END_TASK) = API_TASK_BLEND
+
+            Call dpastix_fortran (pastix_data, work_comm, n, ir, jc, a, loc2glob, perm, invp, b, nrhs, iparm, &
+           & dparm)
+
+
+            Call pastix_fortran_getlocalnodenbr (pastix_data, locn)
+            Allocate (loc2glob2(locn))
+            Call pastix_fortran_getlocalnodelst (pastix_data, loc2glob2, ierr)
+
+            Call cscd_redispatch_fortran (cscdata, n, ir, jc, a, b, nrhs, loc2glob, locn, loc2glob2, locnnz, &
+           & work_comm, ierr)
+            Allocate (loca(locnnz), locjc(locnnz), locb(locn, nrhs), locir(locn+1))
+            Call cscd_redispatch_fortran_end (cscdata, locir, locjc, loca, locb)
+
+!!$             j=1
+!!$             Call pastix_fortran_checkmatrix (check_data, work_comm, 2, API_SYM_NO, API_YES, locn, locir, locjc, loca, &
+!!$            & loc2glob2, j)
+
+
+            Deallocate (ir, jc, a, loc2glob)
+            If (myid /= root) Then
+               Deallocate (b)
+            Else
+               Nullify (b)
+               Deallocate (perm)
+               Allocate (perm(1))
+            End If
+
+            iparm (IPARM_START_TASK) = API_TASK_NUMFACT
+            iparm (IPARM_END_TASK) = API_TASK_SOLVE
+!!$             iparm (IPARM_END_TASK) = API_TASK_REFINE
+            Call dpastix_fortran (pastix_data, work_comm, locn, locir, locjc, loca, loc2glob2, perm, invp, &
+           & locb, nrhs, iparm, dparm)
+
+            Deallocate (perm, invp)
+            Deallocate (loca, locir, locjc)
+
+            Call MPI_Reduce (locn, j, 1, mpi_integer, MPI_MAX, root, comm, ierr)
+
+            If (myid == root) Then
+               Allocate (nlocs(gsz))
+               Call mpi_gather (locn, 1, mpi_integer, nlocs, 1, mpi_integer, 0, work_comm, ierr)
+
+               Do i = 1, locn
+                  rhs%bl (loc2glob2(i), :) = locb (i, :)
+               End Do
+               Deallocate (locb)
+               Allocate (loc2glob(j))
+               Allocate (locb(j, nrhs))
+               Do j = 2, gsz
+                  Call MPI_Recv (loc2glob, nlocs(j), mpi_integer, j-1, nlocs(j)*j*j, work_comm, status, ierr)
+                  Call MPI_Recv (locb, nlocs(j)*nrhs, mpi_double_complex, j-1, nlocs(j)*j*j+1, work_comm, &
+                 & status, ierr)
+                  Do i = 1, nlocs (j)
+                     rhs%bl (loc2glob(i), :) = locb (i, :)
+                  End Do
+               End Do
+               Deallocate (locb)
+               Deallocate (loc2glob)
+            Else
+               Allocate (nlocs(1))
+               Call mpi_gather (locn, 1, mpi_integer, nlocs, 1, mpi_integer, 0, work_comm, ierr)
+
+               Call MPI_Send (loc2glob2, locn, mpi_integer, 0, locn*(nmyid+1)*(nmyid+1), work_comm, ierr)
+               Call MPI_Send (locb, locn*nrhs, mpi_double_complex, 0, locn*(nmyid+1)*(nmyid+1)+1, work_comm, &
+              & ierr)
+               Deallocate (locb)
+            End If
+            Call MPI_Barrier (work_comm, ierr)
+            Deallocate (nlocs, loc2glob2)
+
+         End If
+         Call MPI_Comm_free (work_comm, ierr)
+      End Subroutine sp_solve_past_drhs
+#elif defined(USE_SCSL)
+      Subroutine sp_solve_drhs (ham, rhs, root, comm, opt)
+         Use sparselib
+         Implicit None
+         Type (t_leq_param) :: opt
+         Type (zcsrmat) :: ham
+         Type (zdensemat) :: rhs
+         Integer :: root, comm, nrhs
+         Integer :: n, token
+         Integer * 8 :: NNZ
+         Real (Kind=DEF_DBL_PREC) :: ops
+         Complex (Kind=DEF_DBL_PREC), Pointer :: a (:)
+         Integer, Pointer :: ir (:), jc (:)
+
+         n = ham%ncol
+         NNZ = ham%NNZ
+         nrhs = rhs%ncol
+         Allocate (ir(n+1), jc(NNZ), a(NNZ))
+         Call csrcsc2z (ham%nrow, ham%ncol, ham%a, ham%jc, ham%ir, a, jc, ir)
+         If (myid == root .And. opt%keepmtx /= 1) Then
+            Call free (ham)
+         End If
+         Call ZPSLDU_Ordering (token, 1)
+         Call ZPSLDU_PREPROCESS (token, n, ir, jc, NNZ, ops)
+         Call ZPSLDU_FACTOR (token, n, ir, jc, a)
+         Call ZPSLDU_SOLVEM (token, rhs%bl, n, rhs%bl, n, nrhs)
+         Call ZPSLDU_Destroy (token)
+         Deallocate (ir, jc, a)
+      End Subroutine sp_solve_drhs
+#elif defined(USE_WSMP)
+      Subroutine sp_solve_drhs (ham, rhs, root, comm, opt)
+         Use sparselib
+         Implicit None
+         Type (t_leq_param) :: opt
+         Type (zcsrmat) :: ham
+         Type (zdensemat) :: rhs
+         Integer :: root, comm, nrhs
+         Integer :: n, NNZ
+         Integer :: idum
+         Integer :: iparm (64)
+         Complex (Kind=DEF_DBL_PREC) :: dparm (64)
+         Complex (Kind=DEF_DBL_PREC) :: rmisc, ddum ! just a placeholder in this program
+         Integer, External :: OMP_GET_MAX_THREADS
+         n = ham%ncol
+         NNZ = ham%NNZ
+         nrhs = rhs%ncol
+         Write (*,*) OMP_GET_MAX_THREADS ()
+         Call WSETMAXTHRDS (OMP_GET_MAX_THREADS())
+         iparm (1) = 0
+         iparm (2) = 0
+         iparm (3) = 0
+
+         Call zgsmp (n, ham%ir, ham%jc, ham%a, rhs%bl, n, nrhs, rmisc, iparm, dparm)
+
+         If (iparm(64) .Ne. 0) Then
+            Print *, 'The following ERROR was detected: ', iparm (64)
+            Stop
+         End If
+
+         iparm (2) = 1
+         iparm (3) = 4
+!!$    iparm(15) = 1
+!!$    iparm(16) = 2
+!!$    iparm(20) = 1
+         Call WSETMAXTHRDS (OMP_GET_MAX_THREADS())
+         Call zgsmp (n, ham%ir, ham%jc, ham%a, rhs%bl, n, nrhs, rmisc, iparm, dparm)
+
+         If (iparm(64) .Ne. 0) Then
+            Print *, 'The following ERROR was detected: ', iparm (64)
+            Stop
+         End If
+         Call wgffree ()
+      End Subroutine sp_solve_drhs
+#elif defined(USE_PARDISO)
+      Subroutine sp_solve_drhs (ham, rhs, root, comm, opt)
+         Use sparselib
+         Implicit None
+         Type (t_leq_param) :: opt
+         Type (zcsrmat) :: ham
+         Type (zdensemat) :: rhs
+         Integer :: root, comm, nrhs
+         Integer :: n, NNZ
+
+         Integer * 8 :: pt (64)
+         Integer :: maxfct, mnum, mtype, phase, error, msglvl
+         Integer :: iparm (64)
+         Integer :: idum
+         Real (Kind=DEF_DBL_PREC) :: ddum
+         Complex (Kind=DEF_DBL_PREC), Pointer :: xx (:, :)
+         Integer, External :: OMP_GET_MAX_THREADS
+
+         n = ham%ncol
+         NNZ = ham%NNZ
+         nrhs = rhs%ncol
+         maxfct = 1
+         mnum = 1
+         Allocate (xx(n, nrhs))
+
+         mtype = 13 ! unsymmetric matrix
+         Call pardisoinit (pt, mtype, iparm)
+         iparm (3) = OMP_GET_MAX_THREADS ()
+         phase = 13 ! only reordering and symbolic factorization
+         msglvl = 0 ! with statistical information
+         iparm (8) = 2 ! max numbers of iterative refinement steps
+         iparm (6) = 1
+         Call pardiso (pt, maxfct, mnum, mtype, phase, n, ham%a, ham%ir, ham%jc, idum, nrhs, iparm, msglvl, &
+        & rhs%bl, xx, error)
+!!$    rhs=xx
+         If (error .Ne. 0) Then
+            Write (*,*) 'The following ERROR was detected: ', error
+            Stop
+         End If
+
+         phase = - 1 ! release internal memory
+         Call pardiso (pt, maxfct, mnum, mtype, phase, n, ddum, idum, idum, idum, nrhs, iparm, msglvl, ddum, &
+        & ddum, error)
+
+         Deallocate (xx)
+      End Subroutine sp_solve_drhs
+#elif defined(USE_SPOOLES)
+      Subroutine sp_solve_drhs (ham, rhs, root, comm, opt)
+         Use sparselib
+         Implicit None
+         Type (t_leq_param) :: opt
+         Type (zcsrmat) :: ham
+         Type (zdensemat) :: rhs
+         Integer :: root, comm, nrhs
+         Integer :: n, opts (4) = 0
+         Integer :: NNZ
+         n = ham%ncol
+         NNZ = ham%NNZ
+         nrhs = rhs%ncol
+         Call zspooles (opts, n, NNZ, ham%a, ham%ir, ham%jc, nrhs, rhs%bl)
+
+      End Subroutine sp_solve_drhs
+#elif defined(USE_ZMUMPS)
+      Subroutine sp_solve_drhs (ham, rhs, root, comm, opt)
+         Use sparselib
+         use mpi
+         Implicit None
+         !Include 'mpif.h'
+         Type (t_leq_param) :: opt
+         Type (zcsrmat) :: ham
+         Type (zdensemat) :: rhs
+         Integer :: root, comm, nrhs, lrhs, ierr
+
+         nrhs = rhs%ncol
+         lrhs = rhs%nrow
+         Call mpi_bcast (nrhs, 1, mpi_integer, root, comm, ierr)
+         Call mpi_bcast (lrhs, 1, mpi_integer, root, comm, ierr)
+         Call zsp_solver (ham, rhs%bl, nrhs, lrhs, root, comm, opt)
+      End Subroutine sp_solve_drhs
+
+      Subroutine sp_solve_drhs_diffs (ham, hdiffs, rhs, xdiffs, root, comm, opt)
+         Use sparselib
+         use mpi
+         Implicit None
+         !Include 'mpif.h'
+         Type (t_leq_param) :: opt
+         Type (zcsrmat) :: ham, hdiffs (:)
+         Type (zdensemat) :: rhs, xdiffs (:)
+         Integer :: root, comm, nrhs, lrhs, ierr
+
+         nrhs = rhs%ncol
+         lrhs = rhs%nrow
+         Call mpi_bcast (nrhs, 1, mpi_integer, root, comm, ierr)
+         Call mpi_bcast (lrhs, 1, mpi_integer, root, comm, ierr)
+         Call zsp_solver_diffs (ham, hdiffs, rhs, xdiffs, nrhs, lrhs, root, comm, opt)
+      End Subroutine sp_solve_drhs_diffs
+
+      Subroutine sp_solve_srhs (ham, rhs, wf, root, comm, opt)
+         Use sparselib
+         use mpi
+         Implicit None
+         !Include 'mpif.h'
+         Type (t_leq_param) :: opt
+         Type (zcsrmat) :: ham, rhs
+         Type (zdensemat) :: wf
+         Integer :: root, comm, nrhs, lrhs, ierr
+
+         lrhs = rhs%ncol
+         nrhs = rhs%nrow
+         Call mpi_bcast (nrhs, 1, mpi_integer, root, comm, ierr)
+         Call mpi_bcast (lrhs, 1, mpi_integer, root, comm, ierr)
+         Call zsp_solver_srhs (ham, rhs, wf, nrhs, lrhs, root, comm, opt)
+      End Subroutine sp_solve_srhs
+#else
+      Subroutine sp_solve_drhs (ham, rhs, root, comm, opt)
+         Use sparselib
+         use mpi
+         Implicit None
+         !Include 'mpif.h'
+         Type (t_leq_param) :: opt
+         Type (zcsrmat) :: ham
+         Type (zdensemat) :: rhs
+         Integer :: root, comm, nrhs, lrhs, ierr
+
+         nrhs = rhs%ncol
+         lrhs = rhs%nrow
+
+         Call mpi_bcast (nrhs, 1, mpi_integer, root, comm, ierr)
+         Call mpi_bcast (lrhs, 1, mpi_integer, root, comm, ierr)
+
+         Select Case (opt%solver)
+         Case (0)
+            Call zsp_solver (ham, rhs%bl, nrhs, lrhs, root, comm, opt)
+         Case (1)
+            Call zcsp_solver (ham, rhs%bl, nrhs, lrhs, root, comm, opt)
+         Case Default
+            Stop
+         End Select
+
+      End Subroutine sp_solve_drhs
+
+      Subroutine sp_solve_srhs (ham, rhs, wf, root, comm, opt)
+         Use sparselib
+         use mpi
+         Implicit None
+         !Include 'mpif.h'
+         Type (t_leq_param) :: opt
+         Type (zcsrmat) :: ham, rhs
+         Type (zdensemat) :: wf
+         Integer :: root, comm, nrhs, lrhs, ierr
+
+         lrhs = rhs%ncol
+         nrhs = rhs%nrow
+
+         Call mpi_bcast (nrhs, 1, mpi_integer, root, comm, ierr)
+         Call mpi_bcast (lrhs, 1, mpi_integer, root, comm, ierr)
+
+         Select Case (opt%solver)
+         Case (0)
+            Call zsp_solver_srhs (ham, rhs, wf, nrhs, lrhs, root, comm, opt)
+         Case (1)
+            Write (*,*) 'not implemented!'
+            Stop
+!!$             Call zcsp_solver (ham, rhs%bl, nrhs, lrhs, root, comm, opt)
+         Case Default
+            Stop
+         End Select
+
+      End Subroutine sp_solve_srhs
+#endif
+
+#if defined(USE_ZMUMPS) || defined(USE_EMBED_MUMPS)
+      Subroutine zsp_solver (ham, rhs, nrhs, lrhs, root, comm, opt)
+!!$
+         Use sparselib
+         Use logging
+         use mpi
+         Implicit None
+         !Include 'mpif.h'
+         Include 'zmumps_struc.h'
+         Type (t_leq_param) :: opt
+         Integer :: root, comm
+         Type (zcsrmat), target :: ham
+         Integer :: nrhs, lrhs
+         Complex (Kind=DEF_DBL_PREC), Target :: rhs (:, :)
+
+!!$ Local
+         Type (zmumps_struc) :: mumps
+         Integer :: ierr, i
+         Integer :: hw, gsz, nnz_loc, NNZ
+         Integer, Pointer :: ir (:), nzlocs (:), displs (:)
+         Integer :: work_comm, key, myid, debf
+         Character (Len=10) :: logfile = 'solverout'
+         Nullify (ir, nzlocs, displs)
+         debf = 999
+         key = 1
+         Call MPI_Barrier (comm, ierr)
+         Call mpi_comm_rank (comm, myid, ierr)
+         If (myid == root) key = 0
+         Call MPI_COMM_SPLIT (comm, 1, key, work_comm, ierr)
+         Call mpi_comm_size (work_comm, gsz, ierr)
+         If (gsz == 1) Then
+            hw = 1
+         Else
+            hw = opt%workhost
+         End If
+
+         If (opt%debug >= 0 .And. myid == root) Then
+            Open (Unit=debf, File=logfile, Action='write')
+         Else
+            debf = - 1
+         End If
+
+         mumps%comm = work_comm
+         mumps%job = - 1
+         mumps%sym = 0
+         mumps%par = hw
+         mumps%icntl (4) = opt%debug
+         mumps%icntl (3) = debf
+         mumps%keep (40) = 0
+         mumps%icntl (23) = 6000 !the max. memory in MB that MUMPS can allocate, just testing here
+         Call zmumps (mumps)
+         mumps%icntl (4) = opt%debug
+         mumps%icntl (3) = debf
+         If ((myid == root) .And. (mumps%myid /= 0)) Then
+            Write (*,*) 'New comm rank assign error1!'
+            Write (*,*) 'mumps%myid=', mumps%myid
+            Write (*,*) 'myid=', myid
+            Write (*,*) 'root=', root
+         End If
+
+         If (myid == root) Then
+            ir => getrowind (ham)
+            mumps%n = ham%ncol
+            mumps%nz = ham%NNZ
+         Else
+            Allocate (ir(1))
+         End If
+         Nullify (nzlocs)
+         mumps%icntl (5) = 0
+         If (gsz > 1 .And. opt%redistmtx == 1) Then
+            If (myid == root) Then
+               Allocate (nzlocs(gsz), displs(gsz))
+               nnz_loc = ham%NNZ / (gsz-1+hw)
+               nzlocs (1) = 0
+               NNZ = 0
+               displs (1) = 0
+               Do i = 2 - hw, gsz - 1
+                  displs (i) = NNZ
+                  nzlocs (i) = nnz_loc
+                  NNZ = NNZ + nnz_loc
+               End Do
+               displs (gsz) = NNZ
+               nzlocs (gsz) = ham%NNZ - NNZ
+            Else
+               Allocate (nzlocs(1), displs(1))
+            End If
+
+            Call MPI_Scatter (nzlocs, 1, mpi_integer, nnz_loc, 1, mpi_integer, 0, work_comm, ierr)
+            Allocate (mumps%irn_loc(nnz_loc), mumps%jcn_loc(nnz_loc), mumps%a_loc(nnz_loc))
+            Call MPI_Scatterv (ir, nzlocs, displs, mpi_integer, mumps%irn_loc, nnz_loc, mpi_integer, 0, &
+           & work_comm, ierr)
+
+            Call MPI_Scatterv (ham%jc, nzlocs, displs, mpi_integer, mumps%jcn_loc, nnz_loc, mpi_integer, 0, &
+           & work_comm, ierr)
+
+            Call MPI_Scatterv (ham%a, nzlocs, displs, mpi_double_complex, mumps%a_loc, nnz_loc, &
+           & mpi_double_complex, 0, work_comm, ierr)
+
+            mumps%icntl (18) = 3
+            mumps%nz_loc = nnz_loc
+            If (myid == root .And. opt%keepmtx /= 1) Then
+               Call free (ham)
+            End If
+            Deallocate (ir)
+         Else
+            If (myid == root) Then
+               mumps%a => ham%a
+               mumps%jcn => ham%jc
+               mumps%irn => ir
+            Else
+               Nullify (mumps%a)
+               Nullify (mumps%jcn)
+               Nullify (mumps%irn)
+            End If
+            mumps%icntl (18) = 0
+         End If
+         If (gsz == 1) Then
+            mumps%icntl (7) = 2
+         Else
+            mumps%icntl (7) = opt%partitioner
+         End If
+         mumps%icntl (6) = opt%permscale
+         If (len(trim(opt%tmpdir)) > 0) Then
+            mumps%icntl (22) = 1
+            mumps%ooc_tmpdir = trim (opt%tmpdir)
+         End If
+!!$    mumps%icntl (7) = 0
+!!$    mumps%ICNTL(7)=2 ! fastest ordering ???
+!!$    mumps%ICNTL(6)=0 ! no permutation applied
+!!$    mumps%ICNTL(8)=0 ! no scaling
+!!$    mumps%CNTL(1)=0.0
+
+
+!!$    call mpi_barrier (work_comm, ierr)
+
+
+         mumps%job = 1
+         Call zmumps (mumps)
+         Call mumps_error_handler (mumps%info, 'analisys', mumps%myid)
+         If (opt%memover > 0) Then
+            mumps%icntl (14) = opt%memover
+         End If
+
+         mumps%job = 2
+         Call zmumps (mumps)
+         Call mumps_error_handler (mumps%info, 'factoring', mumps%myid)
+
+!!$     Solve for differents RHS
+         mumps%job = 3
+         mumps%nrhs = nrhs
+         mumps%lrhs = lrhs
+         If (mumps%myid .Eq. 0) Then
+            mumps%rhs => set1zptr (rhs, lrhs*nrhs)
+         End If
+
+         Call zmumps (mumps)
+         Call mumps_error_handler (mumps%info, 'solving', mumps%myid)
+
+         If (gsz > 1 .And. opt%redistmtx == 1) Then
+            Deallocate (mumps%a_loc)
+            Deallocate (mumps%irn_loc)
+            Deallocate (mumps%jcn_loc)
+            Nullify (mumps%a_loc)
+            Nullify (mumps%irn_loc)
+            Nullify (mumps%jcn_loc)
+            Deallocate (displs, nzlocs)
+         Else
+            Nullify (mumps%a)
+            Nullify (mumps%jcn)
+            Nullify (mumps%irn)
+            Deallocate (ir)
+         
+!!$             If (myid == 0) Call free (ham)
+         End If
+
+         Nullify (mumps%rhs)
+
+         mumps%job = - 2
+         Call zmumps (mumps)
+
+         If (opt%debug >= 0) Then
+            Close (Unit=debf)
+         End If
+
+
+         Call MPI_Comm_free (work_comm, ierr)
+      End Subroutine zsp_solver
+
+      Subroutine zsp_solver_diffs (ham, hdiffs, rhsm, xdiffs, nrhs, lrhs, root, comm, opt)
+!!$
+         Use sparselib
+         Use logging
+         use mpi
+         Implicit None
+         !Include 'mpif.h'
+         Include 'zmumps_struc.h'
+         Type (t_leq_param) :: opt
+         Integer :: root, comm
+         Type (zcsrmat), Intent (In) :: ham, hdiffs (:)
+         Type (zdensemat), Intent (Inout) :: xdiffs (:), rhsm
+         Integer :: nrhs, lrhs
+!!$          Complex (Kind=DEF_DBL_PREC), pointer :: rhs (:, :)
+
+!!$ Local
+         Type (zmumps_struc) :: mumps
+         Integer :: ierr, i
+         Integer :: hw, gsz, nnz_loc, NNZ
+         Integer, Pointer :: ir (:), jc(:), nzlocs (:), displs (:)
+         Complex (kind=DEF_DBL_PREC), pointer :: a(:)
+         Integer :: work_comm, key, myid, debf, hasd
+         Character (Len=10) :: logfile = 'solverout'
+         Nullify (ir, nzlocs, displs)
+         debf = 999
+         key = 1
+         Call MPI_Barrier (comm, ierr)
+         Call mpi_comm_rank (comm, myid, ierr)
+         If (myid == root) key = 0
+         Call MPI_COMM_SPLIT (comm, 1, key, work_comm, ierr)
+         Call mpi_comm_size (work_comm, gsz, ierr)
+         If (gsz == 1) Then
+            hw = 1
+         Else
+            hw = opt%workhost
+         End If
+
+         If (opt%debug >= 0 .And. myid == root) Then
+            Open (Unit=debf, File=logfile, Action='write')
+         Else
+            debf = - 1
+         End If
+
+         mumps%comm = work_comm
+         mumps%job = - 1
+         mumps%sym = 0
+         mumps%par = hw
+         mumps%icntl (4) = opt%debug
+         mumps%icntl (3) = debf
+         mumps%keep (40) = 0
+         Call zmumps (mumps)
+         mumps%icntl (4) = opt%debug
+         mumps%icntl (3) = debf
+         If ((myid == root) .And. (mumps%myid /= 0)) Then
+            Write (*,*) 'New comm rank assign error1!'
+            Write (*,*) 'mumps%myid=', mumps%myid
+            Write (*,*) 'myid=', myid
+            Write (*,*) 'root=', root
+         End If
+
+         If (myid == root) Then
+            ir => getrowind (ham)
+            allocate(a(ham%nnz),jc(ham%nnz))
+            a = ham%a
+            jc = ham%jc
+            mumps%n = ham%ncol
+            mumps%nz = ham%NNZ
+         Else
+            Allocate (ir(1))
+         End If
+         Nullify (nzlocs)
+         mumps%icntl (5) = 0
+         If (gsz > 1 .And. opt%redistmtx == 1) Then
+            If (myid == root) Then
+               Allocate (nzlocs(gsz), displs(gsz))
+               nnz_loc = ham%NNZ / (gsz-1+hw)
+               nzlocs (1) = 0
+               NNZ = 0
+               displs (1) = 0
+               Do i = 2 - hw, gsz - 1
+                  displs (i) = NNZ
+                  nzlocs (i) = nnz_loc
+                  NNZ = NNZ + nnz_loc
+               End Do
+               displs (gsz) = NNZ
+               nzlocs (gsz) = ham%NNZ - NNZ
+            Else
+               Allocate (nzlocs(1), displs(1))
+            End If
+            Call MPI_Scatter (nzlocs, 1, mpi_integer, nnz_loc, 1, mpi_integer, 0, work_comm, ierr)
+            Allocate (mumps%irn_loc(nnz_loc), mumps%jcn_loc(nnz_loc), mumps%a_loc(nnz_loc))
+            Call MPI_Scatterv (ir, nzlocs, displs, mpi_integer, mumps%irn_loc, nnz_loc, mpi_integer, 0, &
+           & work_comm, ierr)
+            Call MPI_Scatterv (ham%jc, nzlocs, displs, mpi_integer, mumps%jcn_loc, nnz_loc, mpi_integer, 0, &
+           & work_comm, ierr)
+            Call MPI_Scatterv (ham%a, nzlocs, displs, mpi_double_complex, mumps%a_loc, nnz_loc, &
+           & mpi_double_complex, 0, work_comm, ierr)
+            mumps%icntl (18) = 3
+            mumps%nz_loc = nnz_loc
+            If (myid == root .And. opt%keepmtx /= 1) Then
+               Call free (ham)
+            End If
+            Deallocate (ir)
+         Else
+            If (myid == root) Then
+               mumps%a => a
+               mumps%jcn => jc
+               mumps%irn => ir
+            Else
+               Nullify (mumps%a)
+               Nullify (mumps%jcn)
+               Nullify (mumps%irn)
+            End If
+            mumps%icntl (18) = 0
+         End If
+         If (gsz == 1) Then
+            mumps%icntl (7) = 2
+         Else
+            mumps%icntl (7) = opt%partitioner
+         End If
+         mumps%icntl (6) = opt%permscale
+         If (len(trim(opt%tmpdir)) > 0) Then
+            mumps%icntl (22) = 1
+            mumps%ooc_tmpdir = trim (opt%tmpdir)
+         End If
+!!$    mumps%icntl (7) = 0
+!!$    mumps%ICNTL(7)=2 ! fastest ordering ???
+!!$    mumps%ICNTL(6)=0 ! no permutation applied
+!!$    mumps%ICNTL(8)=0 ! no scaling
+!!$    mumps%CNTL(1)=0.0
+
+
+!!$    call mpi_barrier (work_comm, ierr)
+
+
+         mumps%job = 1
+         Call zmumps (mumps)
+         Call mumps_error_handler (mumps%info, 'analisys', mumps%myid)
+         If (opt%memover > 0) Then
+            mumps%icntl (14) = opt%memover
+         End If
+
+         mumps%job = 2
+         Call zmumps (mumps)
+         Call mumps_error_handler (mumps%info, 'factoring', mumps%myid)
+
+!!$     Solve for differents RHS
+         mumps%job = 3
+         mumps%nrhs = nrhs
+         mumps%lrhs = lrhs
+         If (mumps%myid .Eq. 0) Then
+            mumps%rhs => set1zptr (rhsm%bl, nrhs*lrhs)
+         End If
+
+         Call zmumps (mumps)
+         Call mumps_error_handler (mumps%info, 'solving', mumps%myid)
+
+         Do i = 1, size (hdiffs)
+            hasd = 0
+            If (myid == root .And. hdiffs(i)%alloc /= 0) Then
+               hasd = 1
+               Call spmatmul2 (hdiffs(i), rhsm, xdiffs(i))
+               mumps%rhs => set1zptr (xdiffs(i)%bl, nrhs*lrhs)
+            End If
+            Call mpi_bcast (hasd, 1, mpi_integer, 0, work_comm, ierr)
+            If (hasd /= 0) Then
+               mumps%job = 3
+               Call zmumps (mumps)
+               Call mumps_error_handler (mumps%info, 'solving_diff', mumps%myid)
+            End If
+         End Do
+
+         If (gsz > 1 .And. opt%redistmtx == 1) Then
+            Deallocate (mumps%a_loc)
+            Deallocate (mumps%irn_loc)
+            Deallocate (mumps%jcn_loc)
+            Nullify (mumps%a_loc)
+            Nullify (mumps%irn_loc)
+            Nullify (mumps%jcn_loc)
+            Deallocate (displs, nzlocs)
+         Else
+            Nullify (mumps%a)
+            Nullify (mumps%jcn)
+            Nullify (mumps%irn)
+            Deallocate (a,jc,ir)
+!!$             If (myid == 0) Call free (ham)
+         End If
+
+         Nullify (mumps%rhs)
+
+         mumps%job = - 2
+         Call zmumps (mumps)
+
+         If (opt%debug >= 0) Then
+            Close (Unit=debf)
+         End If
+
+
+         Call MPI_Comm_free (work_comm, ierr)
+      End Subroutine zsp_solver_diffs
+
+      Subroutine zsp_solver_srhs (ham, rhs, wf, nrhs, lrhs, root, comm, opt)
+!!$
+         Use sparselib
+         Use logging
+         use mpi
+         Implicit None
+         !Include 'mpif.h'
+         Include 'zmumps_struc.h'
+         Type (t_leq_param) :: opt
+         Integer :: root, comm
+         Type (zcsrmat) :: ham, rhs
+         Type (zdensemat) :: wf
+         Integer :: nrhs, lrhs
+
+!!$ Local
+         Type (zmumps_struc) :: mumps
+         Integer :: ierr, i
+         Integer :: hw, gsz, nnz_loc, NNZ
+         Integer, Pointer :: ir (:), jc(:), nzlocs (:), displs (:)
+         Complex (kind=DEF_DBL_PREC), Pointer :: a(:)
+         Integer :: work_comm, key, myid, debf
+         Character (Len=10) :: logfile = 'solverout'
+         Nullify (ir, nzlocs, displs)
+         debf = 999
+         key = 1
+         Call MPI_Barrier (comm, ierr)
+         Call mpi_comm_rank (comm, myid, ierr)
+         If (myid == root) key = 0
+         Call MPI_COMM_SPLIT (comm, 1, key, work_comm, ierr)
+         Call mpi_comm_size (work_comm, gsz, ierr)
+         If (gsz == 1) Then
+            hw = 1
+         Else
+            hw = opt%workhost
+         End If
+
+         If (opt%debug >= 0 .And. myid == root) Then
+            Open (Unit=debf, File=logfile, Action='write')
+         Else
+            debf = - 1
+         End If
+
+         mumps%comm = work_comm
+         mumps%job = - 1
+         mumps%sym = 0
+         mumps%par = hw
+         mumps%icntl (4) = opt%debug
+         mumps%icntl (3) = debf
+         mumps%keep (40) = 0
+         Call zmumps (mumps)
+         mumps%icntl (4) = opt%debug
+         mumps%icntl (3) = debf
+         If ((myid == root) .And. (mumps%myid /= 0)) Then
+            Write (*,*) 'New comm rank assign error1!'
+            Write (*,*) 'mumps%myid=', mumps%myid
+            Write (*,*) 'myid=', myid
+            Write (*,*) 'root=', root
+         End If
+
+         If (myid == root) Then
+            ir => getrowind (ham)
+            allocate(a(ham%nnz),jc(ham%nnz))
+            a = ham%a
+            jc = ham%jc
+            mumps%n = ham%ncol
+            mumps%nz = ham%NNZ
+         Else
+            Allocate (ir(1))
+         End If
+         Nullify (nzlocs)
+         mumps%icntl (5) = 0
+         If (gsz > 1 .And. opt%redistmtx == 1) Then
+            If (myid == root) Then
+               Allocate (nzlocs(gsz), displs(gsz))
+               nnz_loc = ham%NNZ / (gsz-1+hw)
+               nzlocs (1) = 0
+               NNZ = 0
+               displs (1) = 0
+               Do i = 2 - hw, gsz - 1
+                  displs (i) = NNZ
+                  nzlocs (i) = nnz_loc
+                  NNZ = NNZ + nnz_loc
+               End Do
+               displs (gsz) = NNZ
+               nzlocs (gsz) = ham%NNZ - NNZ
+            Else
+               Allocate (nzlocs(1), displs(1))
+            End If
+            Call MPI_Scatter (nzlocs, 1, mpi_integer, nnz_loc, 1, mpi_integer, 0, work_comm, ierr)
+            Allocate (mumps%irn_loc(nnz_loc), mumps%jcn_loc(nnz_loc), mumps%a_loc(nnz_loc))
+            Call MPI_Scatterv (ir, nzlocs, displs, mpi_integer, mumps%irn_loc, nnz_loc, mpi_integer, 0, &
+           & work_comm, ierr)
+            Call MPI_Scatterv (ham%jc, nzlocs, displs, mpi_integer, mumps%jcn_loc, nnz_loc, mpi_integer, 0, &
+           & work_comm, ierr)
+            Call MPI_Scatterv (ham%a, nzlocs, displs, mpi_double_complex, mumps%a_loc, nnz_loc, &
+           & mpi_double_complex, 0, work_comm, ierr)
+            mumps%icntl (18) = 3
+            mumps%nz_loc = nnz_loc
+!!$             If (myid == root) Then
+!!$                Call free (ham)
+!!$             End If
+            Deallocate (ir)
+         Else
+            If (myid == root) Then
+               mumps%a => a
+               mumps%jcn => jc
+               mumps%irn => ir
+            Else
+               Nullify (mumps%a)
+               Nullify (mumps%jcn)
+               Nullify (mumps%irn)
+            End If
+            mumps%icntl (18) = 0
+         End If
+
+
+
+!!$          If (gsz == 1) Then
+!!$             mumps%icntl (7) = 2
+!!$          Else
+         mumps%icntl (7) = opt%partitioner
+!!$          End If
+         mumps%icntl (6) = opt%permscale
+         If (len(trim(opt%tmpdir)) > 0) Then
+            mumps%icntl (22) = 1
+            mumps%ooc_tmpdir = trim (opt%tmpdir)
+         End If
+!!$    mumps%icntl (7) = 0
+!!$    mumps%ICNTL(7)=2 ! fastest ordering ???
+!!$    mumps%ICNTL(6)=0 ! no permutation applied
+!!$    mumps%ICNTL(8)=0 ! no scaling
+!!$    mumps%CNTL(1)=0.0
+
+
+!!$    call mpi_barrier (work_comm, ierr)
+
+
+         mumps%job = 1
+         Call zmumps (mumps)
+         If (debf > 0) flush (debf)
+         Call mumps_error_handler (mumps%info, 'analisys', mumps%myid)
+         If (opt%memover > 0) Then
+            mumps%icntl (14) = opt%memover
+         End If
+
+         mumps%job = 2
+         Call zmumps (mumps)
+         If (debf > 0) flush (debf)
+         Call mumps_error_handler (mumps%info, 'factoring', mumps%myid)
+
+!!$     Solve for differents RHS
+         mumps%job = 3
+         mumps%nrhs = nrhs
+         mumps%lrhs = lrhs
+!!$          mumps%cntl(1)=0.0d0 !!!!!!!!!!!!!!!!
+!!$                   mumps%cntl(4)=1.0d0
+         If (mumps%myid .Eq. 0) Then
+            Call alloc (wf, lrhs, nrhs)
+            mumps%rhs => set1zptr (wf%bl, lrhs*nrhs)
+            mumps%NZ_RHS = rhs%NNZ
+            mumps%nrhs = rhs%nrow
+            mumps%RHS_SPARSE = rhs%a !!$should be => instead of =, but the routine is never called anyway 
+            mumps%IRHS_SPARSE = rhs%jc !!$idem
+            mumps%IRHS_PTR = rhs%ir !!$ idem
+            mumps%icntl (20) = 1
+         End If
+
+         Call zmumps (mumps)
+         If (debf > 0) flush (debf)
+         Call mumps_error_handler (mumps%info, 'solving', mumps%myid)
+
+         If (gsz > 1 .And. opt%redistmtx == 1) Then
+            Deallocate (mumps%a_loc)
+            Deallocate (mumps%irn_loc)
+            Deallocate (mumps%jcn_loc)
+            Nullify (mumps%a_loc)
+            Nullify (mumps%irn_loc)
+            Nullify (mumps%jcn_loc)
+            Deallocate (displs, nzlocs)
+         Else
+            Nullify (mumps%a)
+            Nullify (mumps%jcn)
+            Nullify (mumps%irn)
+            Deallocate (a,jc,ir)
+!!$             If (myid == 0) Call free (ham)
+         End If
+         If (myid == root) Then
+            Nullify (mumps%rhs)
+            Nullify (mumps%RHS_SPARSE, mumps%IRHS_SPARSE, mumps%IRHS_PTR)
+         End If
+
+         Nullify (mumps%rhs)
+
+         mumps%job = - 2
+         Call zmumps (mumps)
+
+         If (opt%debug >= 0) Then
+            Close (Unit=debf)
+         End If
+
+
+         Call MPI_Comm_free (work_comm, ierr)
+      End Subroutine zsp_solver_srhs
+#endif
+
+#if defined(USE_CMUMPS) || defined(USE_EMBED_MUMPS)
+      Subroutine zcsp_solver (ham, rhs, nrhs, lrhs, root, comm, opt)
+!!$
+         Use sparselib
+         Use logging
+         use mpi
+         Implicit None
+         !Include 'mpif.h'
+         Include 'cmumps_struc.h'
+         Type (t_leq_param) :: opt
+         Integer :: root, comm
+         Type (zcsrmat) :: ham
+         Integer :: nrhs, lrhs
+         Complex (Kind=DEF_DBL_PREC), Target :: rhs (:, :)
+#if defined(CMUMPS_IS_WORKING)
+
+!!$ Local
+         Type (cmumps_struc) :: mumps
+         Integer :: ierr, i
+         Complex (Kind=DEF_SING_PREC), Pointer :: singa (:)
+         Complex (Kind=DEF_DBL_PREC), Pointer :: sol (:), res (:)
+         Real (Kind=DEF_DBL_PREC) :: tol, prec
+         Real (Kind=DEF_DBL_PREC), External :: dznrm2
+         Integer :: hw, gsz, nnz_loc, NNZ, stf, maxit
+         Integer, Pointer :: ir (:), nzlocs (:), displs (:)
+         Integer :: work_comm, key, myid, debf
+         Character (Len=10) :: logfile = 'solverout'
+         Integer, External :: izamax
+
+	
+         maxit = opt%maxit
+         prec = opt%tol
+
+         debf = 999
+         key = 1
+         Call MPI_Barrier (comm, ierr)
+         Call mpi_comm_rank (comm, myid, ierr)
+         If (myid == root) key = 0
+
+         Call MPI_COMM_SPLIT (comm, 1, key, work_comm, ierr)
+
+         Call mpi_comm_size (work_comm, gsz, ierr)
+
+         If (gsz == 1) Then
+            hw = 1
+         Else
+            hw = opt%workhost
+         End If
+
+         If (opt%debug >= 0 .And. myid == root) Then
+            Open (Unit=debf, File=logfile, Action='write')
+         Else
+            debf = - 1
+         End If
+
+         mumps%comm = work_comm
+         mumps%job = - 1
+         mumps%sym = 0
+         mumps%par = hw
+         mumps%icntl (4) = opt%debug
+         mumps%icntl (3) = debf
+         mumps%keep (40) = 0
+         Call cmumps (mumps)
+         mumps%icntl (4) = opt%debug
+         mumps%icntl (3) = debf
+
+         If ((myid == root) .And. (mumps%myid /= 0)) write (*,*) 'New comm rank assign error2!'
+
+         If (myid == root) Then
+            ir => getrowind (ham)
+            mumps%n = ham%ncol
+            mumps%nz = ham%NNZ
+         End If
+         Nullify (nzlocs)
+
+         mumps%icntl (5) = 0
+         If (gsz > 1 .And. opt%redistmtx == 1) Then
+            If (myid == root) Then
+               Allocate (nzlocs(gsz), displs(gsz))
+               Allocate (singa(ham%NNZ))
+               singa = ham%a
+               nnz_loc = ham%NNZ / (gsz-1+hw)
+               nzlocs (1) = 0
+               NNZ = 0
+               displs (1) = 0
+               Do i = 2 - hw, gsz - 1
+                  displs (i) = NNZ
+                  nzlocs (i) = nnz_loc
+                  NNZ = NNZ + nnz_loc
+               End Do
+               displs (gsz) = NNZ
+               nzlocs (gsz) = ham%NNZ - NNZ
+            Else
+               Allocate (nzlocs(1), displs(1))
+            End If
+
+            Call MPI_Scatter (nzlocs, 1, mpi_integer, nnz_loc, 1, mpi_integer, 0, work_comm, ierr)
+
+            Allocate (mumps%irn_loc(nnz_loc), mumps%jcn_loc(nnz_loc), mumps%a_loc(nnz_loc))
+            Call MPI_Scatterv (ir, nzlocs, displs, mpi_integer, mumps%irn_loc, nnz_loc, mpi_integer, 0, &
+           & work_comm, ierr)
+            Call MPI_Scatterv (ham%jc, nzlocs, displs, mpi_integer, mumps%jcn_loc, nnz_loc, mpi_integer, 0, &
+           & work_comm, ierr)
+            Call MPI_Scatterv (singa, nzlocs, displs, mpi_complex, mumps%a_loc, nnz_loc, mpi_double_complex, &
+           & 0, work_comm, ierr)
+
+            mumps%icntl (18) = 3
+            mumps%nz_loc = nnz_loc
+
+            If (myid == root) Then
+               Deallocate (singa)
+            End If
+            Deallocate (ir)
+         Else
+            If (myid == root) Then
+               Allocate (mumps%a(ham%NNZ))
+               mumps%a = ham%a
+               mumps%jcn => ham%jc
+               mumps%irn => ir
+            Else
+               Nullify (mumps%a)
+               Nullify (mumps%jcn)
+               Nullify (mumps%irn)
+            End If
+            mumps%icntl (18) = 0
+         End If
+
+         If (gsz == 1) Then
+            mumps%icntl (7) = 2
+         Else
+            mumps%icntl (7) = opt%partitioner
+         End If
+
+
+         mumps%job = 1
+
+         Call cmumps (mumps)
+         Call mumps_error_handler (mumps%info, 'analisys', mumps%myid)
+
+         If (opt%memover > 0) Then
+            mumps%icntl (14) = opt%memover
+         End If
+
+
+         mumps%job = 2
+         Call cmumps (mumps)
+         Call mumps_error_handler (mumps%info, 'factoring', mumps%myid)
+
+         mumps%job = 3
+
+!!$     Solve for differents RHS
+         If (mumps%myid .Eq. 0) Then
+            Allocate (mumps%rhs(mumps%n))
+            Allocate (sol(mumps%n))
+            Allocate (res(mumps%n))
+         End If
+
+         Do i = 1, nrhs
+            If (mumps%myid .Eq. 0) Then
+               res = rhs (:, i)
+               sol = 0.0d0
+            End If
+            stf = 0
+            Do while (stf < maxit)
+               If (mumps%myid .Eq. 0) Then
+                  mumps%rhs = res
+               End If
+               mumps%job = 3
+               Call cmumps (mumps)
+               Call mumps_error_handler (mumps%info, 'solving', mumps%myid)
+               If (mumps%myid .Eq. 0) Then
+                  sol = sol + mumps%rhs
+                  res = spmatmul (ham, sol)
+                  res = rhs (:, i) - res
+                  tol = Abs (res(izamax(mumps%n, res, 1)))
+                  stf = stf + 1
+                  If (tol <= prec) Then
+                     stf = maxit
+                  End If
+               End If
+               Call mpi_bcast (stf, 1, mpi_integer, 0, work_comm, ierr)
+            End Do
+            If (mumps%myid .Eq. 0) Then
+               rhs (:, i) = sol
+            End If
+         End Do
+
+         If (mumps%myid .Eq. 0) Then
+            Deallocate (mumps%rhs)
+            Deallocate (res)
+            Deallocate (sol)
+         End If
+
+         If (gsz > 1 .And. opt%redistmtx == 1) Then
+            Deallocate (mumps%a_loc)
+            Deallocate (mumps%irn_loc)
+            Deallocate (mumps%jcn_loc)
+            Nullify (mumps%a_loc)
+            Nullify (mumps%irn_loc)
+            Nullify (mumps%jcn_loc)
+            Deallocate (displs, nzlocs)
+         Else
+            Deallocate (mumps%a)
+            Nullify (mumps%a)
+            Nullify (mumps%jcn)
+            Nullify (mumps%irn)
+            Deallocate (ir)
+            If (myid == 0) Call free (ham)
+         End If
+
+
+         Nullify (mumps%rhs)
+
+         mumps%job = - 2
+         Call cmumps (mumps)
+
+         If (opt%debug >= 0) Then
+            Close (Unit=debf)
+         End If
+
+
+         Call MPI_Comm_free (work_comm, ierr)
+#else
+         Write (*,*) 'This solver temporary unavailable!!!'
+         Stop
+
+#endif 	
+      End Subroutine zcsp_solver
+#endif
+
+#if defined(USE_ZMUMPS) || defined(USE_CMUMPS) || defined(USE_EMBED_MUMPS)
+      Subroutine mumps_error_handler (info, job, id)
+         Integer :: info (:), id, ierr
+         Character (Len=*) :: job
+         If (info(1) .Ne. 0) Then
+            If (info(1) .Ne.-1) Then
+               Write (*,*) 'Error of ' // job // ' at proc=', id
+               Write (*,*) 'INFO(1)=', info (1), ',   INFO(2)=', info (2)
+               Select Case (info(1))
+               Case (-9,-11,-12,-19,-8,-14,-15,-18,-17)
+                  Write (*,*) 'You need to set MUMPS_MEMORY_OVERHEAD parameter in "trans.conf"'
+                  Write (*,*) 'Try values higher than 21'
+               Case (-13,-5,-7)
+                  Write (*,*) 'Not enough memory. Solver can''t allocate.'
+               End Select
+               Write (*,*) 'Stop!'
+            End If
+            Call mpi_finalize (ierr)
+            Stop
+         End If
+      End Subroutine mumps_error_handler
+#endif
+
+End Module sparse_solvers

@@ -1,0 +1,938 @@
+!!$ $Id: geometry.F90 2009 2014-04-01 18:20:11Z rien $
+#include "math_def.h"
+Module geometry_module
+      Use atoms_module
+      Use omta_defs
+      Implicit None
+
+      Type t_atom_pointer
+         Type (t_atom_defenition), Pointer :: ptr
+         Real (Kind=DEF_DBL_PREC) :: coord (3)
+      End Type t_atom_pointer
+
+      Type t_geometry
+         Integer :: num, sc_size (2), lls, rrs, num_cells, l_ntrperp, r_ntrperp, ntrpar
+         Integer :: l_transnum, r_transnum, norbit, nlmax
+         Real (Kind=DEF_DBL_PREC) :: cutrat, base (2, 2), dawsr, rawsr, scx (3),scale
+         Real (Kind=DEF_DBL_PREC) :: perp_trans (3), l_perp_trans (3), r_perp_trans (3)
+         Integer :: isptr = 0,tno=0,tna=0,ltno=0,ltna=0,rtno=0,rtna=0
+         Type (t_atom_pointer), Pointer :: atoms (:)
+      End Type t_geometry
+
+      Type t_geometry_EMTO
+         Integer :: num, sc_size (2), num_cells, l_ntrperp, r_ntrperp, ntrpar
+         Integer :: l_transnum, r_transnum, norbit, nlmax, nspin
+         Real (Kind=DEF_DBL_PREC) :: alat, cutrat, base (2, 2), dawsr, rawsr, scx (3), scale
+         Real (Kind=DEF_DBL_PREC) :: perp_trans (3), l_perp_trans (3), r_perp_trans (3)
+         Integer :: isptr = 0,tno=0,tna=0,ltno=0,ltna=0,rtno=0,rtna=0
+         Type (tsite), Pointer :: atoms (:)
+         Integer, Allocatable :: to_downfold(:)
+         Integer :: num_emb_l, num_emb_m, num_emb_r
+      End Type t_geometry_EMTO
+
+
+      Type t_mask
+         Real (Kind=DEF_DBL_PREC), Pointer :: a (:), o (:)
+      End Type t_mask
+
+Contains
+      Function read_geom (filename, atoms,scale_in) Result (geo)
+!!$    Read geometry data from file
+         Use logging
+         Implicit None
+         Character (Len=*) :: filename
+         Type (t_atoms_set) :: atoms
+         Type (t_geometry) :: geo
+         Real (Kind=DEF_DBL_PREC),optional :: scale_in
+!!$ Local
+         Integer :: i, j, num, nat, Len, len_old, indx
+         Character (Len=100) :: cwork
+         Character (Len=20) :: label, label_old
+         Integer, Parameter :: geof = 100
+         Real (Kind=DEF_DBL_PREC) :: scx (3), vol
+         Type (t_atom_pointer), Pointer :: atp
+         Type (t_atom_defenition), Pointer :: at
+100      Format (5 a16)
+101      Format (1 x, 10 i5)
+104      Format (1 x, 4 g15.9)
+105      Format (4 x, i1, 11 x, 1 x, 4 g15.9)
+106      Format (1 x, 3 g15.9)
+
+         Call do_log (1, 'Reading geometry:'//filename)
+
+         Open (Unit=geof, File=filename, Action='read')
+
+         Read (geof, 100) cwork ! Skipping the comment line
+         Read (geof,*) geo%num, geo%ntrpar, geo%l_ntrperp
+         geo%r_ntrperp = geo%l_ntrperp
+         Read (geof, 104) geo%cutrat
+         Read (geof,*) geo%sc_size(1), geo%sc_size(2)
+         geo%num_cells = geo%sc_size(1) * geo%sc_size(2)
+         Read (geof,*) scx (1:3)! Scaling of the coordinates
+         geo%scx = scx
+!!$    scx(1)=1.0d0/sqrt(2.0d0)
+!!$    scx(3)=1.0d0/sqrt(3.0d0)
+!!$    scx(2)=1.0d0/sqrt(6.0d0)
+
+         Read (geof,*) geo%base(:, 1)!  The in-plane trans. vectors
+         Read (geof,*) geo%base(:, 2)
+
+         geo%base (:, 1) = geo%base(:, 1) * scx (1:2)!  Rescaling
+         geo%base (:, 2) = geo%base(:, 2) * scx (1:2)
+         Read (geof,*) geo%perp_trans(1:3)
+         geo%perp_trans = geo%perp_trans * scx
+         geo%l_perp_trans = geo%perp_trans
+         geo%r_perp_trans = geo%perp_trans
+
+         num = geo%num
+         geo%l_transnum = num
+         geo%r_transnum = num
+         Allocate (geo%atoms(num))
+         nat = atoms%num
+         label_old = ''
+         indx = 0
+         geo%rawsr = 0.0d0
+         geo%norbit = 0
+         geo%nlmax = 0
+         Do i = 1, num
+            atp => geo%atoms (i)
+            Read (geof,*) atp%coord, label
+            atp%coord = atp%coord * scx
+            atp%coord (2) = atp%coord(2) * 1.0d0
+            Len = len_trim (label)
+
+!!$ Now we need to associate this atom with atomic parameters for corresponded atom from atom_set
+            If (trim(label) /= trim(label_old)) Then
+               indx = 0
+               Do j = 1, nat
+                  at => atoms%at (j)
+                  If (len == at%label_len) Then
+                     If (trim(label) == trim(at%label)) Then
+                        indx = j
+                        Exit
+                     End If
+                  End If
+               End Do
+               If (indx == 0) Then
+                  Write (*,*) 'No such atom in defenitions! label=', trim (label)
+                  Stop
+               End If
+               label_old = label
+               len_old = len
+            End If
+            atp%ptr => atoms%at(indx)
+            geo%norbit = geo%norbit + atp%ptr%nl ** 2
+            geo%nlmax = Max (geo%nlmax, atp%ptr%nl)
+            geo%rawsr = geo%rawsr + atp%ptr%wsr ** 3
+         End Do
+         geo%tno=geo%norbit
+         geo%tna=geo%num
+         
+         geo%rawsr = (geo%rawsr/geo%num) ** (1.0d0/3.0d0)
+         vol = Abs ((geo%base(1, 1)*geo%base(2, 2)-geo%base(1, 2)*geo%base(2, 1))*geo%perp_trans(3))
+         geo%dawsr = (0.75d0*vol/(geo%num*DEF_M_PI)) ** (1.0d0/3.0d0)
+         geo%scale=geo%dawsr / geo%rawsr
+         If (present(scale_in)) geo%scale=scale_in
+
+!!$     write(*,*) geo%dawsr,geo%rawsr
+         geo%isptr = 0
+         
+         Call rep_geom (geo, log_stream_number)
+         Call do_log (1, 'Reading geometry:'//filename//' ...Done!')
+         Call do_log (1, '')
+      End Function read_geom
+
+      Function read_geom_EMTO (filename, atoms, lead) Result (geo)
+         Use logging
+         Implicit None
+         Character (Len=*) :: filename
+         Type (t_atoms_set_EMTO):: atoms
+         Type (t_geometry_EMTO) :: geo
+         logical           :: lead
+!!$ Local
+         Integer :: i, j, num, nat, Len, len_old, indx, ilmx, ilm
+         Character (Len=100) :: cwork
+         Character (Len=20) :: label, label_old
+         Integer, Parameter :: geof = 100
+         Real (Kind=DEF_DBL_PREC) :: scx (3), vol
+         Type (tsite), Pointer :: atp
+         Type (tclass), Pointer :: at
+         Integer :: itp
+         Integer, Allocatable :: temp_to_df(:)
+
+         Call do_log (1, 'Reading geometry:'//filename)
+
+         Open (Unit=geof, File=filename, Action='read')
+
+         Read (geof,*) cwork ! Skipping the comment line
+         Read (geof,*) geo%num, geo%ntrpar, geo%l_ntrperp
+         geo%r_ntrperp = geo%l_ntrperp
+         Read (geof,*) geo%cutrat, geo%alat
+         Read (geof,*) geo%sc_size(1), geo%sc_size(2)
+         geo%num_cells = geo%sc_size(1) * geo%sc_size(2)
+         Read (geof,*) scx (1:3)! Scaling of the coordinates
+         geo%scx = scx
+
+         Read (geof,*) geo%base(:, 1)!  The in-plane trans. vectors
+         Read (geof,*) geo%base(:, 2)
+
+         geo%base (:, 1) = geo%base(:, 1) * scx (1:2)!  Rescaling
+         geo%base (:, 2) = geo%base(:, 2) * scx (1:2)
+         Read (geof,*) geo%perp_trans(1:3)
+         geo%perp_trans = geo%perp_trans * scx
+         geo%l_perp_trans = geo%perp_trans
+         geo%r_perp_trans = geo%perp_trans
+
+         num = geo%num
+         geo%l_transnum = num
+         geo%r_transnum = num
+         Allocate (geo%atoms(num))
+         nat = atoms%num
+         label_old = ''
+         indx = 0
+         geo%rawsr = 0.0d0
+         geo%norbit = 0
+         geo%nlmax = 0
+
+         geo%nspin = atoms%nspin
+
+         itp=0
+         allocate(temp_to_df(geo%nspin*num*16)) !!$ the 16 is to make sure there is enough room for l=3
+         !!$ There must be a better way to do this...
+
+         Do i = 1, num
+            atp => geo%atoms (i)
+            Read (geof,*) atp%coord, label
+            atp%coord = atp%coord * scx
+            Len = len_trim (label)
+
+!!$ Now we need to associate this atom with atomic parameters for corresponded
+!atom from atom_set
+            If (trim(label) /= trim(label_old)) Then
+               indx = 0
+               Do j = 1, nat
+                  at => atoms%at (j)
+                  If (len == at%label_len) Then
+                     If (trim(label) == trim(at%label)) Then
+                        indx = j
+                        Exit
+                     End If
+                  End If
+               End Do
+               If (indx == 0) Then
+                  Write (*,*) 'No such atom in definitions! label=', trim (label)
+                  Stop
+               End If
+               label_old = label
+               len_old = len
+            End If
+            atp%iclass=indx
+            atp%ptr => atoms%at(indx)
+            geo%norbit = geo%norbit + (atp%ptr%lmx+1) ** 2
+            geo%nlmax = Max (geo%nlmax, atp%ptr%lmx+1)
+            !geo%rawsr = geo%rawsr + atp%ptr%s ** 3
+
+            
+
+            ilmx=atp%ptr%lmx+1
+            allocate(atp%idxdn_m(ilmx*ilmx),atp%idxsh(ilmx*ilmx))
+            if(lead) allocate(atp%idxlead(ilmx*ilmx))
+            do ilm=1,ilmx*ilmx
+               atp%idxdn_m(ilm)=1 !!$atp%ptr%idxdn(ll(ilm)) !!$ THIS WAS HERE BEFORE ME 
+               if (atp%ptr%idxdn(ll(ilm)) == 2) then
+                itp = itp+1
+                !temp_to_df(itp) = (i-1)*geo%nspin*(atp%ptr%lmx+1)**2 + ilm 
+                temp_to_df(itp) = geo%norbit*2 - 2*(atp%ptr%lmx+1) ** 2  + ilm 
+               endif
+            enddo
+                
+            if (geo%nspin == 2) then
+             do ilm=1,ilmx*ilmx
+               if (atp%ptr%idxdn(ll(ilm)) == 2) then
+                itp = itp+1
+                !temp_to_df(itp) = (i-1)*geo%nspin*(atp%ptr%lmx+1)**2 + (atp%ptr%lmx+1)**2 + ilm
+                temp_to_df(itp) = geo%norbit*2 -(atp%ptr%lmx+1)**2 + ilm
+               endif
+            enddo
+
+            endif       
+ 
+
+         End Do
+
+         allocate(geo%to_downfold(itp))
+         geo%to_downfold = temp_to_df(1:itp)
+
+         deallocate(temp_to_df)       
+
+
+         !geo%rawsr = (geo%rawsr/geo%num) ** (1.0d0/3.0d0)
+         vol = Abs ((geo%base(1, 1)*geo%base(2, 2)-geo%base(1, 2)*geo%base(2, 1))*geo%perp_trans(3))
+         geo%dawsr = (0.75d0*vol/(geo%num*DEF_M_PI)) ** (1.0d0/3.0d0)
+         geo%rawsr = geo%dawsr * geo%alat 
+         geo%scale=geo%dawsr / geo%rawsr
+         geo%isptr = 0
+         Call rep_geom_EMTO (geo, log_stream_number)
+         Call do_log (1, 'Reading geometry:'//filename//' ...Done!')
+         Call do_log (1, '')
+      End Function read_geom_EMTO
+
+
+      Subroutine rep_geom (geo, repf)
+!!$    Write geometry parameters to log-file
+         Use logging
+         Implicit None
+!!$    Arguments
+         Type (t_geometry) :: geo
+         Integer :: repf
+!!$    Local variables
+         Integer :: s
+         If (Log_Level < 4) Return
+         Write (repf,*) '------------------------------------------------------'
+         Write (repf,*) 'Geometry report:'
+         Write (repf,*)
+         Write (repf, '(" NAT=",i5," TR_PAR=",i3)') geo%num, geo%ntrpar
+         Write (repf, '(" Cutrat: ",f5.3)') geo%cutrat
+         Write (repf, '(" Supercel size: ",2(I3,1x))') geo%sc_size
+         Write (repf, '(" Base: ",2(g15.9,1x))') geo%base(:, 1)
+         Write (repf, '("       ",2(g15.9,1x))') geo%base(:, 2)
+         Write (repf, '("        TR_PERP_VEC: ",3(g15.9,1x))') geo%perp_trans
+         Write (repf, '(" Left side:  TR_PERP=",i3," trans.atoms=",i5)') geo%l_ntrperp, geo%l_transnum
+         Write (repf, '("             TR_PERP_VEC: ",3(g15.9,1x))') geo%l_perp_trans
+         Write (repf, '(" Right side: TR_PERP=",i3," trans.atoms=",i5)') geo%r_ntrperp, geo%r_transnum
+         Write (repf, '("             TR_PERP_VEC: ",3(g15.9,1x))') geo%r_perp_trans
+         If (Log_Level < 3) Return
+         Write (repf, '(" Atoms:")')
+         Do s = 1, geo%num
+            Write (repf, '(a12,": ",3(1x,g15.8))') trim (geo%atoms(s)%ptr%label), geo%atoms(s)%coord
+         End Do
+         Write (repf,*) '------------------------------------------------------'
+      End Subroutine rep_geom
+
+      Subroutine rep_geom_EMTO (geo, repf)
+!!$    Write geometry parameters to log-file
+         Use logging
+         Implicit None
+!!$    Arguments
+         Type (t_geometry_EMTO) :: geo
+         Integer :: repf
+!!$    Local variables
+         Integer :: s
+         If (Log_Level < 4) Return
+         Write (repf,*) '------------------------------------------------------'
+         Write (repf,*) 'Geometry report:'
+         Write (repf,*)
+         Write (repf, '(" NAT=",i5," TR_PAR=",i3)') geo%num, geo%ntrpar
+         Write (repf, '(" Cutrat: ",f5.3)') geo%cutrat
+         Write (repf, '(" Supercel size: ",2(I3,1x))') geo%sc_size
+         Write (repf, '(" Base: ",2(g15.9,1x))') geo%base(:, 1) !temp /geo%alat
+         Write (repf, '("       ",2(g15.9,1x))') geo%base(:, 2) !temp /geo%alat
+         Write (repf, '("        TR_PERP_VEC: ",3(g15.9,1x))') geo%perp_trans
+         Write (repf, '(" Left side:  TR_PERP=",i3," trans.atoms=",i5)') geo%l_ntrperp, geo%l_transnum
+         Write (repf, '("             TR_PERP_VEC: ",3(g15.9,1x))') geo%l_perp_trans
+         Write (repf, '(" Right side: TR_PERP=",i3," trans.atoms=",i5)') geo%r_ntrperp, geo%r_transnum
+         Write (repf, '("             TR_PERP_VEC: ",3(g15.9,1x))') geo%r_perp_trans
+         If (Log_Level < 3) Return
+         Write (repf, '(" Atoms:")')
+         Do s = 1, geo%num
+            Write (repf, '(a12,": ",3(1x,g15.8))') trim (geo%atoms(s)%ptr%label), geo%atoms(s)%coord
+         End Do
+         Write (repf,*) '------------------------------------------------------'
+      End Subroutine rep_geom_EMTO
+
+
+      Function make_leadgeom (lgeom, nadd, sign) Result (geo)
+         Use logging
+         Implicit None
+         Integer :: nadd, sign
+         Type (t_geometry) :: lgeom, geo
+!!$ Local
+         Integer :: i, j, l
+!!$ Code
+
+         Call do_log (3, 'Making lead  geometry...')
+
+         geo%num = nadd * lgeom%num
+         geo%norbit = nadd * lgeom%norbit
+         geo%tno=geo%norbit
+         geo%tna=geo%num
+         Allocate (geo%atoms(geo%num))
+!!$ set atoms pointers
+         i = 0
+         If (sign < 0) Then
+            Do j = 1, nadd
+               Do l = 1, lgeom%num
+                  geo%atoms (l+i) = lgeom%atoms(l)
+                  geo%atoms(l+i)%coord = geo%atoms(l+i)%coord + lgeom%perp_trans * (j-nadd)
+               End Do
+               i = i + lgeom%num
+            End Do
+         Else
+            Do j = 1, nadd
+               Do l = 1, lgeom%num
+                  geo%atoms (l+i) = lgeom%atoms(l)
+                  geo%atoms(l+i)%coord = geo%atoms(l+i)%coord + lgeom%perp_trans * (j-1)
+               End Do
+               i = i + lgeom%num
+            End Do
+         End If
+
+         geo%dawsr = lgeom%dawsr
+         geo%rawsr = lgeom%rawsr
+         geo%scale = lgeom%scale         
+         geo%ntrpar = lgeom%ntrpar
+         geo%nlmax = lgeom%nlmax
+         geo%base = lgeom%base
+         geo%scx = lgeom%scx
+         geo%sc_size = lgeom%sc_size
+         geo%l_ntrperp = lgeom%l_ntrperp
+         geo%r_ntrperp = lgeom%r_ntrperp
+         geo%l_transnum = lgeom%num * nadd
+         geo%r_transnum = lgeom%num * nadd
+         geo%cutrat = lgeom%cutrat
+         geo%perp_trans = nadd * lgeom%perp_trans
+         geo%l_perp_trans = nadd * lgeom%perp_trans
+         geo%r_perp_trans = nadd * lgeom%perp_trans
+         geo%isptr = 0
+         Call rep_geom (geo, log_stream_number)
+         Call do_log (3, 'Making lead  geometry...Done!')
+         Call do_log (3, '')
+      End Function make_leadgeom
+
+      Function make_leadgeom_EMTO (lgeom, nadd, sign) Result (geo)
+         Use logging
+         Implicit None
+         Integer :: nadd, sign
+         Type (t_geometry_EMTO) :: lgeom, geo
+         Integer :: i, j, l
+
+         Call do_log (3, 'Making lead  geometry...')
+
+         geo%num = nadd * lgeom%num
+         geo%norbit = nadd * lgeom%norbit
+         Allocate (geo%atoms(geo%num))
+         i = 0
+         If (sign < 0) Then
+            Do j = 1, nadd
+               Do l = 1, lgeom%num
+                  geo%atoms (l+i) = lgeom%atoms(l)
+                  geo%atoms(l+i)%coord = geo%atoms(l+i)%coord + lgeom%perp_trans * (j-nadd)
+               End Do
+               i = i + lgeom%num
+            End Do
+         Else
+            Do j = 1, nadd
+               Do l = 1, lgeom%num
+                  geo%atoms (l+i) = lgeom%atoms(l)
+                  geo%atoms(l+i)%coord = geo%atoms(l+i)%coord + lgeom%perp_trans * (j-1)
+               End Do
+               i = i + lgeom%num
+            End Do
+         End If
+
+         geo%dawsr = lgeom%dawsr
+         geo%rawsr = lgeom%rawsr
+         geo%scale = lgeom%scale         
+         geo%ntrpar = lgeom%ntrpar
+         geo%nlmax = lgeom%nlmax
+         geo%base = lgeom%base
+         geo%alat = lgeom%alat
+         geo%scx = lgeom%scx
+         geo%sc_size = lgeom%sc_size
+         geo%l_ntrperp = lgeom%l_ntrperp
+         geo%r_ntrperp = lgeom%r_ntrperp
+         geo%l_transnum = lgeom%num * nadd
+         geo%r_transnum = lgeom%num * nadd
+         geo%cutrat = lgeom%cutrat
+         geo%perp_trans = nadd * lgeom%perp_trans
+         geo%l_perp_trans = nadd * lgeom%perp_trans
+         geo%r_perp_trans = nadd * lgeom%perp_trans
+         geo%isptr = 0
+         geo%nspin = lgeom%nspin
+         geo%to_downfold = lgeom%to_downfold 
+
+         Call rep_geom_EMTO (geo, log_stream_number)
+         Call do_log (3, 'Making lead  geometry...Done!')
+         Call do_log (3, '')
+      End Function make_leadgeom_EMTO
+
+
+      Function make_transportgeom (lgeom, rgeom, mgeom) Result (geo)
+!!$ Generate geometry for transport problem from left and right lead and from scattering region
+!!$ All geometries can be for small cells
+         Use logging
+         Implicit None
+         Type (t_geometry) :: lgeom, rgeom, mgeom, geo
+
+!!$ Local
+         Integer :: i
+         Type (t_geometry) :: lscgeom, rscgeom, mscgeom
+!!$ Code
+
+         Call do_log (3, 'Making transport  geometry...')
+
+         lscgeom = make_scgeom (lgeom)
+         mscgeom = make_scgeom (mgeom)
+         rscgeom = make_scgeom (rgeom)
+
+         geo%num = lscgeom%num + rscgeom%num + mscgeom%num
+         geo%norbit = lscgeom%norbit + rscgeom%norbit + mscgeom%norbit
+         geo%tno=mscgeom%norbit
+         geo%tna=mscgeom%num
+         geo%ltno=lscgeom%norbit
+         geo%ltna=lscgeom%num
+         geo%rtno=rscgeom%norbit
+         geo%rtna=rscgeom%num
+         
+         
+         Allocate (geo%atoms(geo%num))
+!!$ set atoms pointers
+         i = 0
+         geo%atoms (i+1:i+lscgeom%num) = lscgeom%atoms(1:lscgeom%num)
+         i = i + lscgeom%num
+         geo%atoms (i+1:i+mscgeom%num) = mscgeom%atoms(1:mscgeom%num)
+         i = i + mscgeom%num
+         geo%atoms (i+1:i+rscgeom%num) = rscgeom%atoms(1:rscgeom%num)
+         i = i + rscgeom%num
+
+         geo%dawsr = lscgeom%dawsr
+         geo%rawsr = lscgeom%rawsr
+         geo%scale = lscgeom%scale
+
+         geo%ntrpar = Max (lscgeom%ntrpar, Max(mscgeom%ntrpar, rscgeom%ntrpar))
+         geo%nlmax = Max (lscgeom%nlmax, Max(mscgeom%nlmax, rscgeom%nlmax))
+
+         If ((sum(Abs(lscgeom%base-rscgeom%base)) > 1.0d-5) .Or. (sum(Abs(lscgeom%base-mscgeom%base)) > &
+        & 1.0d-5)) Then
+            Call do_log (0, 'Danger Will Robinson! Danger!')
+            Call do_log (0, 'In-plane translation vectors for left,right and scattering region aree different&
+           &!')
+            Stop
+         End If
+!!$    write(*,*) rscgeom%dawsr/rscgeom%rawsr,lscgeom%dawsr/lscgeom%rawsr,mgeom%dawsr/mgeom%rawsr
+         If (Abs(rscgeom%scale-lscgeom%scale) > 1.0d-5) Then
+            Call do_log (0, 'Danger Will Robinson! Danger!')
+            Call do_log (0, 'The units for left and right lead are not consistent!')
+!!$       write (repf, '("        DAWSR/RAWSR:",2(1x,f8.4))') lscgeom%dawsr/lscgeom%rawsr, rscgeom%dawsr/rscgeom%rawsr
+            Stop
+         End If
+         geo%base = lscgeom%base
+         geo%sc_size = 1
+         geo%l_ntrperp = lscgeom%l_ntrperp
+         geo%r_ntrperp = rscgeom%r_ntrperp
+         geo%l_transnum = lscgeom%num
+         geo%r_transnum = rscgeom%num
+         geo%cutrat = mscgeom%cutrat
+         geo%perp_trans = 0.0d0
+         geo%l_perp_trans = lscgeom%perp_trans
+         geo%r_perp_trans = rscgeom%perp_trans
+         geo%isptr = 0
+!!$ WTF is it? "lls,rrs"
+
+         Call free_geom (lscgeom)
+         Call free_geom (mscgeom)
+         Call free_geom (rscgeom)
+         Call rep_geom (geo, log_stream_number)
+         Call do_log (3, 'Making transport  geometry...Done!')
+         Call do_log (3, '')
+      End Function make_transportgeom
+
+      Function make_transportgeom_EMTO (lgeom, rgeom, mgeom) Result (geo)
+!!$ Generate geometry for transport problem from left and right lead and from
+!scattering region
+!!$ All geometries can be for small cells
+         Use logging
+         Implicit None
+         Type (t_geometry_EMTO) :: lgeom, rgeom, mgeom, geo
+!!$ Local
+         Integer :: i,j
+         Type (t_geometry_EMTO) :: lscgeom, rscgeom, mscgeom
+
+         Call do_log (3, 'Making transport  geometry...')
+
+         lscgeom = make_scgeom_EMTO (lgeom)
+         mscgeom = make_scgeom_EMTO (mgeom)
+         rscgeom = make_scgeom_EMTO (rgeom)
+
+         geo%num = lscgeom%num + rscgeom%num + mscgeom%num
+         geo%norbit = lscgeom%norbit + rscgeom%norbit + mscgeom%norbit
+         geo%tno=mscgeom%norbit
+         geo%tna=mscgeom%num
+         geo%ltno=lscgeom%norbit
+         geo%ltna=lscgeom%num
+         geo%rtno=rscgeom%norbit
+         geo%rtna=rscgeom%num
+
+!!$         geo%num_emb_l=lgeom%norbit*lgeom%nspin - size(lgeom%to_downfold)
+!!$         geo%num_emb_r=lgeom%norbit*rgeom%nspin - size(rgeom%to_downfold)
+
+         geo%num_emb_l = size(lscgeom%to_downfold)
+         geo%num_emb_m = size(mscgeom%to_downfold)
+         geo%num_emb_r = size(rscgeom%to_downfold)
+
+
+         Allocate (geo%atoms(geo%num))
+         i = 0
+         geo%atoms (i+1:i+lscgeom%num) = lscgeom%atoms(1:lscgeom%num)
+         i = i + lscgeom%num
+         geo%atoms (i+1:i+mscgeom%num) = mscgeom%atoms(1:mscgeom%num)
+         i = i + mscgeom%num
+         geo%atoms (i+1:i+rscgeom%num) = rscgeom%atoms(1:rscgeom%num)
+         i = i + rscgeom%num
+
+         geo%dawsr = lscgeom%dawsr
+         geo%rawsr = lscgeom%rawsr
+         geo%scale = lscgeom%scale
+
+         geo%ntrpar = Max (lscgeom%ntrpar, Max(mscgeom%ntrpar, rscgeom%ntrpar))
+         geo%nlmax = Max (lscgeom%nlmax, Max(mscgeom%nlmax, rscgeom%nlmax))
+
+         If ((sum(Abs(lscgeom%base-rscgeom%base)) > 1.0d-5) .Or. (sum(Abs(lscgeom%base-mscgeom%base)) > &
+        & 1.0d-5)) Then
+            Call do_log (0, 'Danger Will Robinson! Danger!')
+            Call do_log (0, 'In-plane translation vectors for left,right and scattering region aree different&
+           &!')
+            Stop
+         End If
+         If (Abs(rscgeom%dawsr/rscgeom%rawsr-lscgeom%dawsr/lscgeom%rawsr) > 1.0d-5) Then
+            Call do_log (0, 'Danger Will Robinson! Danger!')
+            Call do_log (0, 'The units for left and right lead are not consistent!')
+            Stop
+         End If
+         geo%base = lscgeom%base
+         geo%alat = lscgeom%alat
+         geo%sc_size = 1
+         geo%l_ntrperp = lscgeom%l_ntrperp
+         geo%r_ntrperp = rscgeom%r_ntrperp
+         geo%l_transnum = lscgeom%num
+         geo%r_transnum = rscgeom%num
+         geo%cutrat = mscgeom%cutrat
+         geo%perp_trans = 0.0d0
+         geo%l_perp_trans = lscgeom%perp_trans
+         geo%r_perp_trans = rscgeom%perp_trans
+         geo%isptr = 0
+
+         Allocate (geo%to_downfold(size(rscgeom%to_downfold)+size(mscgeom%to_downfold)+size(lscgeom%to_downfold)))
+         i = 0
+         geo%to_downfold(i+1:i+size(lscgeom%to_downfold)) = lscgeom%to_downfold(:)
+         i = i + size(lscgeom%to_downfold)
+         geo%to_downfold(i+1:i+size(mscgeom%to_downfold)) = mscgeom%to_downfold(:) + &
+        & lscgeom%norbit*lscgeom%nspin
+         i = i + size(mscgeom%to_downfold)
+         geo%to_downfold(i+1:i+size(rscgeom%to_downfold)) = rscgeom%to_downfold(:) + &
+        &lscgeom%norbit*lscgeom%nspin + mscgeom%norbit*mscgeom%nspin
+         i = i + size(rscgeom%to_downfold)
+
+         
+         !!$ not so trivial...
+         !!$ let's check the actual array
+         !!$do j=1,i
+         !!$       write(*,*) j,geo%to_downfold(j)
+         !!$enddo
+
+
+         Call free_geom_EMTO (lscgeom)
+         Call free_geom_EMTO (mscgeom)
+         Call free_geom_EMTO (rscgeom)
+         Call rep_geom_EMTO (geo, log_stream_number)
+         Call do_log (3, 'Making transport  geometry...Done!')
+         Call do_log (3, '')
+      End Function make_transportgeom_EMTO
+
+      Function make_transportgeom_EMTO_df (lgeom, rgeom, mgeom, atoms) Result (geo)
+!!$ Generate geometry for transport problem from left and right lead and from
+!scattering region
+!!$ All geometries can be for small cells
+         Use logging
+         Implicit None
+         Type (t_geometry_EMTO) :: lgeom, rgeom, mgeom, geo
+         Type (t_atoms_set_EMTO) :: atoms
+!!$ Local
+         Integer :: i,j,k, ilm, ilmx
+         Type (t_geometry_EMTO) :: lscgeom, rscgeom, mscgeom
+
+         Call do_log (3, 'Making transport  geometry...')
+
+         lscgeom = make_scgeom_EMTO (lgeom)
+         mscgeom = make_scgeom_EMTO (mgeom)
+         rscgeom = make_scgeom_EMTO (rgeom)
+
+         geo%num = 2*lscgeom%num + 2*rscgeom%num + mscgeom%num
+         geo%norbit = 2*lscgeom%norbit + 2*rscgeom%norbit + mscgeom%norbit
+         geo%tno=mscgeom%norbit + lscgeom%norbit + rscgeom%norbit
+         geo%tna=mscgeom%num + lscgeom%norbit + rscgeom%norbit
+         geo%ltno=lscgeom%norbit
+         geo%ltna=lscgeom%num
+         geo%rtno=rscgeom%norbit
+         geo%rtna=rscgeom%num
+
+         geo%num_emb_l = lscgeom%nspin*lscgeom%norbit - size(lscgeom%to_downfold)
+         geo%num_emb_r = rscgeom%nspin*rscgeom%norbit - size(rscgeom%to_downfold)
+
+         Allocate (geo%atoms(geo%num))
+         i = 0
+
+         do j=i+1,i+lscgeom%num
+          geo%atoms(j)%iclass = lscgeom%atoms(j-i)%iclass 
+          geo%atoms(j)%ptr => atoms%at(geo%atoms(j)%iclass) 
+          geo%atoms(j)%coord(:) =  lscgeom%atoms(j-i)%coord(:)-lscgeom%l_perp_trans
+          geo%atoms(j)%label = lscgeom%atoms(j-i)%label
+          ilmx = (geo%atoms(j)%ptr%lmx+1)
+          Allocate(geo%atoms(j)%idxsh(ilmx*ilmx))
+          Allocate(geo%atoms(j)%idxdn_m(ilmx*ilmx))
+          do ilm=1,ilmx*ilmx
+           geo%atoms(j)%idxdn_m(ilm) = 1 !!$geo%atoms(j)%ptr%idxdn(ll(ilm))
+          enddo
+         enddo
+
+         i = i + lscgeom%num
+         geo%atoms (i+1:i+lscgeom%num) = lscgeom%atoms(1:lscgeom%num)
+         i = i + lscgeom%num
+         geo%atoms (i+1:i+mscgeom%num) = mscgeom%atoms(1:mscgeom%num)
+         i = i + mscgeom%num
+         geo%atoms (i+1:i+rscgeom%num) = rscgeom%atoms(1:rscgeom%num)
+         i = i + rscgeom%num
+
+         do j=i+1,i+rscgeom%num
+          geo%atoms(j)%iclass = rscgeom%atoms(j-i)%iclass 
+          geo%atoms(j)%ptr => atoms%at(geo%atoms(j)%iclass) 
+          !geo%atoms(j)%idxdn_m = rscgeom%atoms(j-i)%idxdn_m
+          geo%atoms(j)%coord(:) =  rscgeom%atoms(j-i)%coord(:)+rscgeom%r_perp_trans
+          geo%atoms(j)%label = rscgeom%atoms(j-i)%label
+          ilmx = (geo%atoms(j)%ptr%lmx+1)
+          Allocate(geo%atoms(j)%idxsh(ilmx*ilmx))
+          Allocate(geo%atoms(j)%idxdn_m(ilmx*ilmx))
+          do ilm=1,ilmx*ilmx
+           geo%atoms(j)%idxdn_m(ilm) = 1 !!$geo%atoms(j)%ptr%idxdn(ll(ilm))
+          enddo
+         enddo
+         i = i + rscgeom%num
+
+
+         geo%dawsr = lscgeom%dawsr
+         geo%rawsr = lscgeom%rawsr
+         geo%scale = lscgeom%scale
+
+         geo%ntrpar = Max (lscgeom%ntrpar, Max(mscgeom%ntrpar, rscgeom%ntrpar))
+         geo%nlmax = Max (lscgeom%nlmax, Max(mscgeom%nlmax, rscgeom%nlmax))
+         If ((sum(Abs(lscgeom%base-rscgeom%base)) > 1.0d-5) .Or. (sum(Abs(lscgeom%base-mscgeom%base)) > &
+        & 1.0d-5)) Then
+            Call do_log (0, 'Danger Will Robinson! Danger!')
+            Call do_log (0, 'In-plane translation vectors for left,right and scattering region aree different&
+           &!')
+            Stop
+         End If
+         If (Abs(rscgeom%dawsr/rscgeom%rawsr-lscgeom%dawsr/lscgeom%rawsr) > 1.0d-5) Then
+            Call do_log (0, 'Danger Will Robinson! Danger!')
+            Call do_log (0, 'The units for left and right lead are not consistent!')
+            Stop
+         End If
+         geo%base = lscgeom%base
+         geo%alat = lscgeom%alat
+         geo%sc_size = 1
+         geo%l_ntrperp = lscgeom%l_ntrperp
+         geo%r_ntrperp = rscgeom%r_ntrperp
+         geo%l_transnum = lscgeom%num
+         geo%r_transnum = rscgeom%num
+         geo%cutrat = mscgeom%cutrat
+         geo%perp_trans = 0.0d0
+         geo%l_perp_trans = lscgeom%perp_trans
+         geo%r_perp_trans = rscgeom%perp_trans
+         geo%isptr = 0
+         !!$ make downfolding vector
+        
+         Allocate (geo%to_downfold(2*size(rscgeom%to_downfold)+size(mscgeom%to_downfold)+2*size(lscgeom%to_downfold)))
+
+         i = 0
+         geo%to_downfold(i+1:i+size(lscgeom%to_downfold)) = lscgeom%to_downfold(:)
+
+         i = i + size(lscgeom%to_downfold)
+         geo%to_downfold(i+1:i+size(lscgeom%to_downfold)) = lscgeom%to_downfold(:) + lscgeom%norbit*lscgeom%nspin
+
+         i = i + size(lscgeom%to_downfold)
+         geo%to_downfold(i+1:i+size(mscgeom%to_downfold)) = mscgeom%to_downfold(:) + 2*lscgeom%norbit*lscgeom%nspin
+
+         i = i + size(mscgeom%to_downfold)
+         geo%to_downfold(i+1:i+size(rscgeom%to_downfold)) = rscgeom%to_downfold(:) + 2*lscgeom%norbit*lscgeom%nspin &
+        &+ mscgeom%norbit*mscgeom%nspin
+
+         i = i + size(rscgeom%to_downfold)
+         geo%to_downfold(i+1:i+size(rscgeom%to_downfold)) = rscgeom%to_downfold(:) + 2*lscgeom%norbit*lscgeom%nspin &
+        &+ mscgeom%norbit*mscgeom%nspin + rscgeom%norbit*rscgeom%nspin
+
+         i = i + size(rscgeom%to_downfold)
+
+
+
+         Call free_geom_EMTO (lscgeom)
+         Call free_geom_EMTO (mscgeom)
+         Call free_geom_EMTO (rscgeom)
+         Call rep_geom_EMTO (geo, log_stream_number)
+         Call do_log (3, 'Making downfoldable transport geometry...Done!')
+         Call do_log (3, '')
+      End Function make_transportgeom_EMTO_df
+
+
+
+      Function make_scgeom (geo) Result (scgeo)
+!!$ Generates supercell geometry from simple one
+         Use logging
+         Implicit None
+         Type (t_geometry) :: geo, scgeo
+!!$ Local
+         Integer :: i, j, num_c, n, in
+         Real (Kind=DEF_DBL_PREC) :: pos (3)
+
+         num_c = geo%sc_size (1) * geo%sc_size(2)
+         scgeo = geo
+         If (num_c == 1) Then
+            scgeo%isptr = 1
+            Return
+         End If
+         Call do_log (6, 'Making SC geometry...')
+
+         scgeo%num = num_c * geo%num
+         scgeo%norbit = num_c * geo%norbit
+         scgeo%tno=scgeo%norbit
+         scgeo%tna=scgeo%num
+         
+         Allocate (scgeo%atoms(scgeo%num))
+         n = 1
+         Do i = 0, geo%sc_size(2) - 1
+            Do j = 0, geo%sc_size(1) - 1
+               Do in = 1, geo%num
+                  pos = geo%atoms(in)%coord
+                  pos (1:2) = pos (1:2) + real (j, kind=8) * geo%base(:, 1) + real (i, kind=8) * geo%base(:, &
+                 & 2)
+                  scgeo%atoms(n)%coord = pos
+                  scgeo%atoms(n)%ptr => geo%atoms(in)%ptr
+                  n = n + 1
+               End Do
+            End Do
+         End Do
+         scgeo%isptr = 0
+         scgeo%sc_size = 1
+         scgeo%base (:, 1) = geo%base(:, 1) * geo%sc_size(1)
+         scgeo%base (:, 2) = geo%base(:, 2) * geo%sc_size(2)
+         scgeo%l_transnum = geo%l_transnum
+         scgeo%r_transnum = geo%r_transnum
+         Call rep_geom (scgeo, log_stream_number)
+         Call do_log (6, 'Making SC geometry...Done!')
+         Call do_log (6, '')
+
+      End Function make_scgeom
+
+      Function make_scgeom_EMTO (geo) Result (scgeo)
+!!$ Generates supercell geometry from simple one
+         Use logging
+         Implicit None
+         Type (t_geometry_EMTO) :: geo, scgeo
+!!$ Local
+         Integer :: i, j, num_c, n, in, ilmx, ii, numcell
+         Real (Kind=DEF_DBL_PREC) :: pos (3)
+
+         num_c = geo%sc_size (1) * geo%sc_size(2)
+         scgeo = geo
+         If (num_c == 1) Then
+            scgeo%isptr = 1
+            Return
+         End If
+         Call do_log (6, 'Making SC geometry...')
+
+         scgeo%num = num_c * geo%num
+         scgeo%norbit = num_c * geo%norbit
+         scgeo%tno=scgeo%norbit
+         scgeo%tna=scgeo%num
+
+
+         Allocate (scgeo%atoms(scgeo%num))
+         If (Allocated(scgeo%to_downfold)) Deallocate(scgeo%to_downfold)
+         Allocate (scgeo%to_downfold(size(geo%to_downfold)*num_c))
+         ii = 0
+         numcell = 0
+         n = 1
+         Do i = 0, geo%sc_size(2) - 1
+            Do j = 0, geo%sc_size(1) - 1
+               Do in = 1, geo%num
+                  pos = geo%atoms(in)%coord
+                  pos (1:2) = pos (1:2) + real (j, kind=8) * geo%base(:, 1) + real (i, kind=8) * geo%base(:, &
+                 & 2)
+                  scgeo%atoms(n)%coord  = pos
+                  scgeo%atoms(n)%iclass = geo%atoms(in)%iclass
+                  ilmx=size(geo%atoms(in)%idxdn_m)
+                  allocate(scgeo%atoms(n)%idxdn_m(ilmx))
+                  scgeo%atoms(n)%idxdn_m(:)=geo%atoms(in)%idxdn_m(:)
+                  ilmx=size(geo%atoms(in)%idxsh)
+                  allocate(scgeo%atoms(n)%idxsh(ilmx))
+                  scgeo%atoms(n)%ptr => geo%atoms(in)%ptr
+                  n = n + 1
+               End Do
+               scgeo%to_downfold(ii+1:ii+size(geo%to_downfold)) = geo%to_downfold(:) + numcell*geo%nspin*geo%norbit
+               ii = ii + size(geo%to_downfold)
+               numcell = numcell+1
+            End Do
+         End Do
+         scgeo%isptr = 0
+         scgeo%sc_size = 1
+         scgeo%base (:, 1) = geo%base(:, 1) * geo%sc_size(1)
+         scgeo%base (:, 2) = geo%base(:, 2) * geo%sc_size(2)
+         scgeo%alat = geo%alat
+         scgeo%l_transnum = geo%l_transnum
+         scgeo%r_transnum = geo%r_transnum
+         Call rep_geom_EMTO (scgeo, log_stream_number)
+         Call do_log (6, 'Making SC geometry...Done!')
+         Call do_log (6, '')
+
+      End Function make_scgeom_EMTO
+
+      Subroutine free_geom (geo)
+         Implicit None
+         Type (t_geometry) :: geo
+!!$ Local
+         If (geo%isptr == 0) Then
+            Deallocate (geo%atoms)
+         End If
+         geo%isptr = 0
+      End Subroutine free_geom
+
+      Subroutine free_geom_EMTO (geo)
+         Implicit None
+         Type (t_geometry_EMTO) :: geo
+!!$ Local
+         If (geo%isptr == 0) Then
+            Deallocate (geo%atoms)
+         End If
+         geo%isptr = 0
+      End Subroutine free_geom_EMTO
+
+
+
+      Subroutine load_mask (mask, trgeo, scl, scr, rel)
+         Type (t_mask), Intent (Inout) :: mask
+         Type (t_geometry), Intent (In) :: trgeo
+         Integer, Intent (In) :: scl, scr, rel
+!!$         Local vars
+         Integer :: ddir, i, j, m
+         m = 1
+         If (rel /= 0) Then
+            m = 2
+         End If
+
+         Allocate (mask%a(trgeo%num))
+         Allocate (mask%o(trgeo%norbit*m))
+         mask%a (:) = 0.0d0
+         ddir = 1300
+         Open (Unit=ddir, File='mask', Action='read')
+         Read (ddir,*) mask%a(scl+1:trgeo%num-scr)
+         Close (Unit=ddir)
+         mask%a (1:scl) = mask%a(scl+1)
+         mask%a (trgeo%num-scr+1:trgeo%num) = mask%a(trgeo%num-scr)
+!!$         write(*,*)'q1',trgeo%norbit*m
+         j = 0
+         Do i = 1, trgeo%num, 1
+            mask%o (j+1:j+m*trgeo%atoms(i)%ptr%nm) = mask%a(i)
+            j = j + trgeo%atoms(i)%ptr%nm * 2
+         End Do
+
+      End Subroutine load_mask
+End Module geometry_module

@@ -1,0 +1,191 @@
+!!#   $Id: band.F90 149 2006-10-26 16:29:08Z antst $
+
+#include "math_def.h"
+
+Program band
+   Use transport
+   Use ando_module
+   Use atoms_module
+   Use geometry_module
+   Use structure
+   Use supercell
+   Use hamiltonian
+   Use logging
+   Use sparse_solvers
+   Use bzgrid
+   Use readcfg
+   Use mpi
+   Implicit None
+   !Include 'mpif.h'
+
+   Integer, Parameter :: clen = 200
+
+   Type(t_atoms_set) :: atoms
+   Type(t_bandopts) :: opt
+   Type(t_geometry) :: bgeo, tbgeo
+   Type(t_strconst) :: bsc
+   Type(t_mathop) :: msys, bsk
+   Type(t_potpar_mats) :: bpar(2)
+   Type(t_ando_options) :: aopts
+   Type(t_ando_sollution) :: ando
+   Real(Kind=DEF_DBL_PREC), Pointer :: k(:, :)
+   Real(Kind=DEF_DBL_PREC) :: stE, en
+   Integer :: is, n, nh, nn, pohops
+   Integer :: bandf(2) = (/292, 293/)
+   Complex(Kind=DEF_DBL_PREC), Pointer :: ons(:, :)
+   Complex(Kind=DEF_DBL_PREC), Pointer :: ofs(:, :)
+   Complex(Kind=DEF_DBL_PREC), Pointer :: hops(:, :)
+   Complex(Kind=DEF_DBL_PREC) :: ph
+   Character(Len=clen) :: cwork
+   Integer :: neloops, loop
+!!$ MPI vars
+   Integer :: ierr, my_mpi_id, local_comm, solve_comm, mpi_sz, root = 0, solsize
+   Integer :: mpi_loc_id
+
+   Call mpi_init(ierr)
+   solve_comm = mpi_comm_world
+   Call mpi_comm_rank(solve_comm, my_mpi_id, ierr)
+   Call mpi_comm_size(solve_comm, mpi_sz, ierr)
+
+   Log_Level = -1
+   If (my_mpi_id == root) Then
+!!$          Call unlink ('outp')
+      Log_Level = 1
+   End If
+
+#ifdef _VERS_
+   Call do_log(1, 'Band code v'//_VERS_//' by Antst')
+#else
+   Call do_log(1, 'Band code vXXXX by Antst')
+#endif
+
+   Call band_config_init(opt)
+!!$       Log_Level = opt%loglvl
+
+   Call MPI_COMM_SPLIT(solve_comm, my_mpi_id, 0, local_comm, ierr)
+   solsize = 1
+
+   Call mpi_comm_rank(local_comm, mpi_loc_id, ierr)
+
+   If (my_mpi_id == root) Then
+      Log_Level = opt%loglvl
+      Open (Unit=bandf(1), File='plotup.b', Action='write')
+      Open (Unit=bandf(2), File='plotdown.b', Action='write')
+   Else
+!!$ uncomment line bellow if you want output from rest of CPUs
+!!$     Log_Level=opt%loglvl
+      Write (cwork, '(i2.2)') my_mpi_id
+      Write (logfilename, '("log.",A)') trim(cwork)
+   End If
+
+   If (mpi_loc_id == 0) Then
+
+      atoms = read_atoms('atomlist')
+      tbgeo = read_geom('geom_b', atoms)
+      pohops = 1
+      If (opt%po%kind > 2) pohops = 2
+
+      bgeo = make_leadgeom(tbgeo, pohops, 1)
+      Call free_geom(tbgeo)
+
+      bsc = calc_screal(bgeo)
+      Call make_sk(bsk, bsc, opt%kpar, 1)
+
+      stE = (opt%eE - opt%bE)/(opt%nE - 1)
+      en = opt%bE
+
+      aopts%use_ev_solver = opt%actl%gensol
+      aopts%dir = 1
+      aopts%usestates = 1
+      aopts%needEmb = 0
+      aopts%needBound = 0
+
+      n = bsc%nrows/pohops
+      nh = pohops
+
+      Allocate (ons(bsc%nrows, bsc%nrows))
+      Allocate (ofs(bsc%nrows, bsc%nrows))
+      Allocate (hops(n, n*(nh + 1)))
+      Allocate (k(n + 1, 2))
+      ph = Exp(DEF_cmplx_Ione*DEF_M_PI)
+
+   End If
+
+   neloops = ceiling(opt%nE/real(mpi_sz/solsize, kind=DEF_DBL_PREC))
+!!$       optspp%dE=1.0d-6
+   Do loop = 0, neloops - 1
+      nn = 1 + loop*(mpi_sz/solsize) + my_mpi_id
+      Write (cwork, '("Doing calculation for ie=",i5)') nn
+      Call do_log(1, trim(cwork))
+
+      en = opt%bE + stE*real(nn - 1, kind=DEF_DBL_PREC)
+      Call calc_potpar(atoms, opt%atopt, en)
+
+      bpar = make_ppar(bgeo, opt%po)
+      Do is = 1, 2
+         Call prep_system(msys, bsk, bpar(is), opt%po, 1)
+         ons = sptofull(msys%c)
+         ofs = sptofull(msys%r)
+         Call free_mathop(msys)
+         hops(1:n, 1:n) = ons(1:n, 1:n)
+         hops(1:n, n + 1:n + nh*n) = ofs(n*nh - n + 1:n*nh, 1:nh*n)
+         Call free_mathop(msys)
+!!$ Solve ando problem
+         Call solve_ando(ofs, hops, n, nh, ando, aopts)
+         k(1, is) = en
+         k(2:ando%nin + 1, is) = Abs(imag(Log(ando%lin)))
+         k(ando%nin + 2:n + 1, is) = 0.0 !!$/ 0.0
+      End Do
+      Call log_bands(solve_comm, root, k, n + 1, bandf)
+
+      Call free_ppar(bpar)
+      en = en + stE
+   End Do
+   If (my_mpi_id == root) Then
+      Close (Unit=bandf(1))
+      Close (Unit=bandf(2))
+   End If
+
+   Call MPI_Barrier(solve_comm, ierr)
+!!$       !!$ End here you loop over E
+!!$
+!!$             If (my_mpi_id == 0) Then
+!!$                Write (timef, '(/"  Total Time = ", f12.4," seconds")') MPI_Wtime () - ttime
+!!$                Close (Unit=timef)
+!!$                Close (Unit=fermf)
+!!$             End If
+
+   Call mpi_finalize(ierr)
+
+Contains
+
+   Subroutine log_bands(comm, root, k, n, bandf)
+      Implicit None
+      Integer :: root, bandf(2), n, comm
+      Real(Kind=DEF_DBL_PREC) :: k(n, 2)
+!!$ Locals
+      Integer :: ierr, procnum, mpi_sz, my_mpi_id
+      Integer :: status(MPI_STATUS_SIZE)
+      Integer :: is, j
+      Call mpi_comm_rank(comm, my_mpi_id, ierr)
+      Call mpi_comm_size(comm, mpi_sz, ierr)
+      If (my_mpi_id /= root) Then
+         Call MPI_Send(k, n*2, MPI_DOUBLE_PRECISION, root, my_mpi_id + mpi_sz + 1000, comm, ierr)
+      Else
+         Do is = 1, 2
+            Write (bandf(is), '(250(1x,f12.8))') (k(j, is), j=1, n)
+         End Do
+         Do procnum = 2, mpi_sz
+            Call MPI_Recv(k, n*2, MPI_DOUBLE_PRECISION, procnum - 1, procnum + mpi_sz + 999, comm, status, &
+           & ierr)
+            Do is = 1, 2
+               Write (bandf(is), '(250(1x,f12.8))') (k(j, is), j=1, n)
+            End Do
+         End Do
+         flush (bandf(1))
+         flush (bandf(2))
+      End If
+
+   End Subroutine log_bands
+
+End Program band

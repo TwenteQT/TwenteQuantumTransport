@@ -1,0 +1,23 @@
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/codes/!svn/ver/1993/trans/trunk/src/hdamp
+END
+deps.mk
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/svn/codes/!svn/ver/1981/trans/trunk/src/hdamp/deps.mk
+END
+hdamp.F90
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/svn/codes/!svn/ver/1993/trans/trunk/src/hdamp/hdamp.F90
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/svn/codes/!svn/ver/1981/trans/trunk/src/hdamp/Makefile
+END

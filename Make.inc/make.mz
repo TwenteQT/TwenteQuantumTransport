@@ -1,0 +1,112 @@
+# Compilers
+F90=ifort
+F77=$(F90)
+CC=gcc
+
+# Linkers 
+FL=$(F90)
+CL=$(CC)
+
+# 
+RM = /bin/rm -f 
+
+# Library archiver
+AR = ar vr 
+RANLIB = ranlib
+
+EDITOR =emacs -nw
+NOHUP =setsid
+TAGS =etags
+
+#Prefx for preprocessor directives. Due to ugly XLF/XLC syntax.
+FDP=-D
+#FDP=-WF,-D
+
+CDP=-D
+#CDP=-Wp,-D
+
+#Sparse solver to use
+
+#Use MUMPS embedded with the code
+SP_SOLVER=USE_EMBED_MUMPS
+
+#Use available dbl-complex MUMPS library
+#SP_SOLVER=USE_ZMUMPS -I/home/tcmsstar/local/perf/include
+
+#Use SGI's SCSL library
+#SP_SOLVER=USE_SCSL
+
+#Use SPOOLES library, should be provided separately
+#SP_SOLVER=USE_SPOOLES -I/home/tcmsstar/work/codes/libsrc/spooles 
+
+#Use Pardiso library
+#SP_SOLVER=USE_PARDISO
+
+#Use IBM's WSMP library
+#SP_SOLVER=USE_WSMP
+
+#ARCH_DEFS=
+
+#Preprocessor defs for Fortran codes
+FDEFS= $(FDP)_LINUX \
+       $(FDP)ALLOW_NON_INIT \
+       $(FDP)HAVE_QUADPREC \
+       $(FDP)intel_ \
+       $(FDP)$(SP_SOLVER) 
+
+#       $(FDP)HAVE_NAN \
+#Preprocessor defs for calling Fortran from C (-DAdd_ or -DAdd__ or -DUPPER)    
+CDEFS   = $(CDP)$(SP_SOLVER) -I. -DAdd_ 
+
+
+#Begin Optimization options
+NOOPT= -O0  -align 
+
+OPTS=  -O2 -align 
+COPTS=  -O2 -lm 
+
+
+CFLAGS= $(COPTS) $(CDEFS)
+F90FLAGS= $(OPTS) $(FDEFS) -warn unused  -assume byterecl
+F77FLAGS=$(F90FLAGS)
+LFLAGS= 
+
+#End Optimization options
+#
+MKL_DIR = /opt/intel/composerxe-2011.1.107/mkl/lib/intel64
+LAPACK = -L$(MKL_DIR)  -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lpthread 
+
+#MKL_DIR = /opt/intel/composerxe-2011.1.107/mkl/lib/ia32
+#LAPACK = -L$(MKL_DIR)  -lmkl_intel -lmkl_sequential -lmkl_core -lpthread 
+
+
+# Serial Libraries (lapak,blas,sparse solver etc):
+
+SEQ_LIBS= -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 $(LAPACK)
+
+SEQ_INCS=
+
+
+# Parallel Libraries (lapak,blas, scalapack, blacs, mpi,,sparse solver etc):
+
+#LAMDIR        = 
+
+#MPI_INC = $(shell mpif90 --showme:compile)
+#MPI_LINK = $(shell mpif90 --showme:link)
+
+#PAR_LIBS= -L$(MKL_DIR) -lmkl_scalapack_core  -lmkl_blacs -lmkl_intel -lmkl_sequential -lmkl_core $(MPI_LINK) -lpthread -lm
+
+#PAR_INCS= $(MPI_INC) -I/opt/intel/composerxe-2011.1.107/mkl/include -I/opt/intel/composerxe-2011.1.107/mkl/include/ia32
+
+# Audrey
+#MPI_INC = $(shell mpif77 --showme:compile)
+#MPI_LINK = $(shell mpif77 --showme:link)
+#PAR_LIBS= -L$(MKL_DIR) -lmkl_scalapack_lp64  -lmkl_blacs_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core $(MPI_LINK) -liomp5 -lpthread -lm
+#AR_INCS= $(MPI_INC) -I/opt/intel/composerxe-2011.1.107/mkl/include -I/opt/intel/composerxe-2011.1.107/mkl/include/intel64
+
+# Judyta
+MPI_INC = $(shell mpif90 --showme:compile)
+MPI_LINK = $(shell mpif90 --showme:link)
+PAR_LIBS= -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5 -L$(MKL_DIR) -lmkl_scalapack_lp64 -lmkl_blacs_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core $(MPI_LINK) -liomp5 -lpthread -lm
+PAR_INCS= $(MPI_INC) -I/opt/intel/composerxe-2011.1.107/mkl/include -I/opt/intel/composerxe-2011.1.107/mkl/include/intel64
+

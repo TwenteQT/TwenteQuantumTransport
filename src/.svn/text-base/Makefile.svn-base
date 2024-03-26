@@ -1,0 +1,35 @@
+include ../make.sys
+
+DIRS= beta htrans hdamp fermproj bands trans_sk 
+DIRS_s= turek prepinp nies ascii2hdf systest sfproj qofz
+
+DIRSa=$(DIRS) $(DIRS_s)
+
+
+
+TAGEXT=*.F90 *.F *.f *.c *.h
+
+
+#.PHONY: pord par seq clean
+
+all: bin
+
+bin: 
+	+@make $(patsubst %,%-seq,$(DIRS_s))
+	+@make $(patsubst %,%-par,$(DIRS))
+
+%-par: 
+	+@(cd $* && make ISPAR=1 )
+
+%-seq: 
+	+@(cd $* && make ISPAR=0 )
+
+clean:
+	+@for dir in $(DIRSa); do \
+	(cd $$dir && make clean;) \
+	done
+
+tags:
+	for dir in $(DIRSa); do \
+	(cd $$dir && $(TAGS) $(TAGEXT)  $(patsubst %,../../libtrans/src/%,$(TAGEXT));) \
+	done

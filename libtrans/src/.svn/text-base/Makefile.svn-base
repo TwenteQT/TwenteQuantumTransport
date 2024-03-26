@@ -1,0 +1,39 @@
+include ../../make.sys
+
+OBJ= ando.o   bzgrid.o    hamiltonian.o  sparselib.o  supercell.o \
+     atoms.o  geometry.o  logging.o  structure.o  transport.o r16tomsqz.o \
+     r8tomsqz.o spsolvers.o readcfg.o potpars.o rotations.o heritage.o praxis.o \
+     pgsym.o postprocess.o hdf5io.o spherical.o sk_io.o sk_ham.o fmtlib.o setuplib.o \
+     itersolv.o zPackgmres.o compat.o helpers.o interatcur.o qofzlib.o timer.o
+
+LIB=../../lib/libtrans.a
+
+INC1= -I. -I../src
+
+all: $(LIB)
+
+$(OBJ): ../src/math_def.h
+
+clean:
+	@$(RM) *.o *.mod *.MOD *.lst  $(LIB) *~
+
+$(LIB): $(OBJ)
+	$(AR) $@ $(OBJ)
+	@$(RANLIB) $@  
+
+tags:
+	@$(TAGS)  *.F90 
+
+#.SUFFIXES :
+.SUFFIXES : .o .F .F90 .c
+
+%.o: ../src/%.F90
+	$(F90) $(F90FLAGS) $(INC1) -c ../src/$*.F90
+%.o: ../src/%.F
+	$(F77) $(F90FLAGS) $(INC1) -c ../src/$*.F
+%.o: ../src/%.f
+	$(F77) $(F77FLAGS) $(INC1) -c ../src/$*.f
+%.o: ../src/%.c
+	$(CC) $(CFLAGS)  $(INC1) $(CDEFS)  -c ../src/$*.c
+
+include ../src/deps.mk

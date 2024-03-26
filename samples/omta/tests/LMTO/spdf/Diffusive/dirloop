@@ -1,0 +1,16 @@
+#!/bin/sh 
+
+for d0 in D0.128
+do
+    for d1 in K20
+    do
+        for d2 in cf-1 cf-2 cf-3 cf-4 cf-5
+        do
+            #cp ./trans.conf ./$d0/$d1/$d2/trans.conf
+            #cp ./runscript ./$d0/$d1/$d2/runscript
+            #cd ./$d0/$d1/$d2
+            #sbatch runscript
+            #cd ../../../
+        done
+    done
+done

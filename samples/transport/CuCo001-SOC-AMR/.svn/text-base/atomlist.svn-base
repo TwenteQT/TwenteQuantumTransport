@@ -1,0 +1,51 @@
+-------=========== ATOM DEFINITIONS ===========-------
+#FORMAT OF LINES:  LABEL    FILENAME
+   47              # NUMBER OF ATOMS
+ Cu1-1             Cu1-1
+ Cu1-2             Cu1-2
+ Cu2-1             Cu2-1
+ Cu2-2             Cu2-2
+ Cu3-1             Cu3-1
+ Cu3-2             Cu3-2
+ Cu4-1             Cu4-1
+ Cu4-2             Cu4-2
+ Cu5-1             Cu5-1
+ Cu5-2             Cu5-2
+ Cu6-1             Cu6-1
+ Cu6-2             Cu6-2
+ Cu7-1             Cu7-1
+ Cu7-2             Cu7-2
+ Cu8-1             Cu8-1
+ Cu8-2             Cu8-2
+ Cu9-1             Cu9-1
+ Cu9-2             Cu9-2
+ CuI10-1           CuI10-1
+ CoI10-1           CoI10-1
+ CuI10-2           CuI10-2
+ CoI10-2           CoI10-2
+ CuI11-1           CuI11-1
+ CoI11-1           CoI11-1
+ CuI11-2           CuI11-2
+ CoI11-2           CoI11-2
+ Co12-1            Co12-1
+ Co12-2            Co12-2
+ Co13-1            Co13-1
+ Co13-2            Co13-2
+ Co14-1            Co14-1
+ Co14-2            Co14-2
+ Co15-1            Co15-1
+ Co15-2            Co15-2
+ Co16-1            Co16-1
+ Co16-2            Co16-2
+ Co17-1            Co17-1
+ Co17-2            Co17-2
+ Co18-1            Co18-1
+ Co18-2            Co18-2
+ Co19-1            Co19-1
+ Co19-2            Co19-2
+ Co20-1            Co20-1
+ Co20-2            Co20-2
+ Cu_B              Cu_B
+ Cu_Bm              Cu_Bm
+ Co_B              Co_B
+-------=========== END OF ATOM FILE ===========-------

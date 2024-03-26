@@ -1,0 +1,41 @@
+K 25
+svn:wc:ra_dav:version-url
+V 45
+/svn/codes/!svn/ver/1981/trans/trunk/Make.inc
+END
+make.all_intel
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1981/trans/trunk/Make.inc/make.all_intel
+END
+make.mz
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svn/codes/!svn/ver/1981/trans/trunk/Make.inc/make.mz
+END
+make.ifort_openmpi
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/codes/!svn/ver/1981/trans/trunk/Make.inc/make.ifort_openmpi
+END
+make.osx_intel_openmpi
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/codes/!svn/ver/1981/trans/trunk/Make.inc/make.osx_intel_openmpi
+END
+make.cartesius
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1981/trans/trunk/Make.inc/make.cartesius
+END
+make.huygens
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/codes/!svn/ver/1981/trans/trunk/Make.inc/make.huygens
+END

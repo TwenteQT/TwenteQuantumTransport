@@ -1,0 +1,37 @@
+Began at: 22:54:19
+Finished at: 22:55:37
+Began at: 22:55:37
+Finished at: 22:56:53
+Began at: 22:56:53
+Finished at: 22:58:09
+Began at: 22:58:09
+Finished at: 22:59:24
+Began at: 22:59:24
+Finished at: 23:00:40
+Began at: 23:00:40
+Finished at: 23:01:58
+Began at: 23:01:58
+Finished at: 23:03:15
+Began at: 23:03:15
+Finished at: 23:04:30
+Began at: 23:04:30
+Finished at: 23:05:55
+Began at: 23:05:55
+Finished at: 23:07:11
+Began at: 23:07:11
+Finished at: 23:08:50
+Began at: 23:08:50
+
+JOB STATISTICS
+==============
+Job ID: 9908196
+Cluster: sara
+User/Group: mrang/mrang
+State: TIMEOUT (exit code 0)
+Nodes: 1
+Cores per node: 32
+CPU Utilized: 2-15:31:23
+CPU Efficiency: 99.190f 2-16:02:40 core-walltime
+Job Wall-clock time: 02:00:05
+Memory Utilized: 40.90 GB
+Memory Efficiency: 16.420f 248.99 GB

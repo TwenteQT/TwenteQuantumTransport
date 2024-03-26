@@ -1,0 +1,136 @@
+# Make.inc for ASTER in SARA
+# work when next modules are loaded:
+#********************************************************#
+# fortraninteger/4 fortranreal/4 fortrandouble/8 mode/64 #
+# fortran/intel/9.1 c/intel/9.1 mpt  scsl scalapack      #
+#********************************************************#
+#
+# Compilers
+
+# gfortran compilers
+#F90=mpifort
+#F77=mpifort
+#CC=mpicc
+
+# ifortran compilers
+F90=mpiifort
+F77=mpiifort
+CC=mpiicc
+
+# Linkers 
+FL=$(F90)
+CL=$(CC)
+
+# 
+RM = /bin/rm -f 
+
+# Library archiver
+AR = ar vr 
+RANLIB = ranlib
+
+TAGS =etags
+
+#Prefx for preprocessor directives. Due to ugly XLF/XLC syntax.
+FDP=-D
+#FDP=-WF,-D
+
+CDP=-D
+#CDP=-Wp,-D
+
+LAPACK= -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -liomp5 -lmkl_blacs_intelmpi_lp64  -lpthread -lm
+SCALAPACK= -lmkl_scalapack_lp64  -lmkl_blacs_intelmpi_lp64
+
+# directory of the HDF5 installation
+HDF5SRC=/home/maxr/src/intel_impi/HDF5_1.12.1
+
+HDF5LIB= -L${HDF5SRC}/lib/ -lhdf5hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5
+HDF5INC=-I${HDF5SRC}/include/
+
+MPI_INC= 
+MPI_LIB= -lmpi
+
+XTRA_LIB = 
+#Sparse solver to use
+
+#Use available dbl-complex MUMPS library
+SP_SOLVER=USE_ZMUMPS 
+
+# Root directory of the MUMPS and scotch installations
+LIBSROOT=/home/maxr/src/intel_impi/ccp22
+LIBMUMPS=${LIBSROOT}/MUMPS_5.2.1/lib
+LIBSCOTCH=${LIBSROOT}/scotch-master/lib
+
+SOLVER_INC=-I${LIBSROOT}/MUMPS_5.2.1/include \
+           -I${LIBSROOT}/scotch-master/include 
+##SOLVER_LIB=-L${LIBSROOT}/MUMPS_5.2.1/lib -lzmumps -lmumps_common -lesmumps -lpord\
+echo $LIBMUMPS
+SOLVER_LIB=${LIBMUMPS}/libzmumps.a \
+	   ${LIBMUMPS}/libmumps_common.a \
+	   ${LIBSROOT}/ParMETIS_4.0.3/lib/libparmetis.a \
+	   ${LIBSROOT}/metis-5.1.0/build/Linux-x86_64/libmetis/libmetis.a \
+	   ${LIBMUMPS}/libpord.a \
+	   ${LIBSCOTCH}/libptesmumps.a \
+	   ${LIBSCOTCH}/libptscotch.a \
+	   ${LIBSCOTCH}/libptscotcherr.a \
+	   ${LIBSCOTCH}/libscotch.a \
+	   ${LIBSCOTCH}/libscotcherr.a 
+        
+
+#Use SGI's SCSL library
+#SP_SOLVER=USE_SCSL
+
+#Use SPOOLES library, should be provided separately
+#SP_SOLVER=USE_SPOOLES 
+#SOLVER_INC=-I/home/tcmsstar/work/codes/libsrc/spooles 
+
+#Use Pardiso library
+#SP_SOLVER=USE_PARDISO
+
+#Use IBM's WSMP library
+#SP_SOLVER=USE_WSMP
+
+# Potential link to PETSC
+##PETSC_INC=-I/home/maxr/src/petsc/arch-linux-c-opt/include \
+##	  -I/home/maxr/src/petsc/include
+##PETSC_LIB=-L/home/maxr/src/petsc/arch-linux-c-opt/lib \
+	  -lpetsc
+
+#Preprocessor defs for C
+CDEFS   = $(CDP)$(SP_SOLVER) 
+
+#Preprocessor defs for Fortran    
+FDEFS= $(FDP)HAVE_QUADPREC \
+       $(FDP)$(SP_SOLVER)
+
+#       $(FDP)NTS_LPK
+       
+#       $(FDP)DO_SC_SYM
+#       $(FDP)HAVE_NAN \
+
+
+#Optimization or debug options for ifortran compiler
+
+#OPTS = -xHost -g -traceback -qopenmp ##-check
+OPTS=  -O3 -xHost -align -ip -qopt-matmul -qopenmp ##$(PETSC_LIB) #-parallel 
+#OPTS=  -O3 -xHost -align -ip -qopt-matmul ##$(PETSC_LIB) #-parallel 
+#OPTS=  -O3 -xHost -ip -qopenmp -qopt-matmul #-align -parallel -qopt-subscript-in-range
+
+
+#Optimization or debug options for gfortran compiler
+
+#OPTS=  -g -fbacktrace -lm
+#OPTS = -O3 -fopenmp 
+
+
+##INCS=$(PETSC_INC) $(MPI_INC) $(SOLVER_INC) $(HDF5INC) 
+INCS=$(MPI_INC) $(SOLVER_INC) $(HDF5INC) 
+
+CFLAGS= $(OPTS) $(CDEFS)  $(INCS)
+F90FLAGS= $(OPTS) $(FDEFS) $(INCS) #-warn unused -assume byterecl  
+F77FLAGS=$(F90FLAGS) $(INCS)
+
+LOPTS= $(OPTS) 
+
+LFLAGS= $(LOPTS) $(HDF5LIB) $(SOLVER_LIB) $(SCALAPACK) $(LAPACK) $(MPI_LIB) $(XTRA_LIB)
+#End Optimization options
+

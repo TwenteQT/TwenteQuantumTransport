@@ -1,0 +1,2655 @@
+#include "math_def.h"
+
+Module pgsym
+      Implicit None
+
+      Integer :: nAtoms
+      Integer :: nmg
+      Parameter (nmg=120)
+
+      Real (Kind=DEF_DBL_PREC), Dimension (:, :), Allocatable :: X
+      Real (Kind=DEF_DBL_PREC), Dimension (:), Allocatable :: AMAS
+      Real (Kind=DEF_DBL_PREC), Dimension (:), Allocatable :: MSP
+      Real (Kind=DEF_DBL_PREC), Dimension (:, :), Allocatable :: SX
+      Real (Kind=DEF_DBL_PREC), Dimension (:), Allocatable :: SIG
+      Real (Kind=DEF_DBL_PREC), Dimension (:), Allocatable :: DXM
+      Real (Kind=DEF_DBL_PREC), Dimension (:), Allocatable :: MLG
+
+      Real (Kind=DEF_DBL_PREC) :: PC (7), PCR (7), o (3, 3), OI (3, 3), G (3, 3), GI (3, 3), CS (12)
+      Real (Kind=DEF_DBL_PREC) :: OR (3, 3), OT (3, 3), OTI (3, 3), BARC (3), BARO (3), RIN (3)
+
+!!$     SIMME
+      Real (Kind=DEF_DBL_PREC), Dimension (:, :, :), Allocatable :: SIM
+      Real (Kind=DEF_DBL_PREC), Dimension (:), Allocatable :: DEV
+      Real (Kind=DEF_DBL_PREC), Dimension (:), Allocatable :: CSM
+      Real (Kind=DEF_DBL_PREC), Dimension (:, :), Allocatable :: MTG
+
+      Real (Kind=DEF_DBL_PREC) :: CSMT
+      Integer :: NMS
+
+!!$     SIMME1
+      Real (Kind=DEF_DBL_PREC), Dimension (:, :), Allocatable :: RMS
+      Real (Kind=DEF_DBL_PREC) :: RMST
+
+!!$     RMSMIN
+      Real (Kind=DEF_DBL_PREC), Dimension (:, :), Allocatable :: ppu
+      Real (Kind=DEF_DBL_PREC), Dimension (:, :), Allocatable :: ppo
+
+      Real (Kind=DEF_DBL_PREC) :: RV (3, 3)
+      Integer :: npu
+
+!!$     AT2
+      Real (Kind=DEF_DBL_PREC) :: DCM, DCME
+      Integer :: indwgh, indtol
+Contains
+
+!!$     -----------------------------------------------------------------
+      Subroutine SymMol (nat, tolerance, coordinates, atomicNumbers, pointGroup)
+!!$     -----------------------------------------------------------------
+
+         Implicit None
+
+         Character (Len=*) :: pointGroup
+         Real (Kind=DEF_DBL_PREC) :: coordinates (:, :), tolerance
+         Integer :: atomicNumbers (:)
+         Integer :: i, nat, na
+
+         nAtoms = nat
+
+         Allocate (X(3, nAtoms))
+         Allocate (AMAS(nAtoms))
+         Allocate (MSP(nAtoms))
+         Allocate (SX(3, nAtoms))
+         Allocate (SIG(nAtoms))
+         Allocate (DXM(nAtoms))
+         Allocate (MLG(nAtoms))
+
+         Allocate (SIM(3, 3, nmg))
+         Allocate (DEV(nmg))
+         Allocate (CSM(nmg))
+         Allocate (MTG(nmg, nmg))
+
+         Allocate (RMS(3, nat))
+         Allocate (ppu(3, nAtoms*nmg))
+         Allocate (ppo(3, nAtoms*nmg))
+
+!!$     Hard-wired cell parameters
+         PC (1) = 1.0d0
+         PC (2) = 1.0d0
+         PC (3) = 1.0d0
+         PC (4) = 90.0d0
+         PC (5) = 90.0d0
+         PC (6) = 90.0d0
+
+         pointGroup = 'C1 '
+
+!!$     Only use weights based on atomic masses
+         indwgh = 1
+!!$     Use a constant tolerance (2 => distance based)
+         indtol = 1
+         DCM = tolerance
+         DCME = DCM
+
+!!$     Subsequent lines are all atomic coordinates
+
+         Do i = 1, nAtoms
+            X (1, i) = coordinates (1, i)
+            X (2, i) = coordinates (2, i)
+            X (3, i) = coordinates (3, i)
+         End Do
+
+         na = nAtoms
+
+         Call massdata (atomicNumbers)
+         Call cella
+         Call work (coordinates, pointGroup)
+         Deallocate (X, AMAS, MSP, SX, SIG, DXM, MLG)
+         Deallocate (SIM, DEV, CSM, MTG, RMS, ppu, ppo)
+
+      End Subroutine
+
+
+
+!!$     ------------------------------------------------------------------
+      Subroutine asymunit (MK, IASU, N)
+!!$     ------------------------------------------------------------------
+         Implicit None
+
+         Integer :: MK (:, :), IASU (:)
+         Integer :: i, N, J, k
+         Do i = 1, N
+            IASU (i) = 2
+         End Do
+
+         Do 2800 i = 1, N
+            If (IASU(i) .Ne. 2) Go To 2800
+            Do J = 1, NMS
+               k = IABS (MK(i, J))
+               If (k .Ne. i) Then
+                  If (k .Eq. 0) Then
+                     IASU (i) = 0
+                     Go To 2800
+                  End If
+                  IASU (k) = 1
+               End If
+            End Do
+
+2800     Continue
+
+         Return
+      End Subroutine
+
+      Subroutine ax_order (a, i, m, msign, invers)
+
+!!$     m = group order for the matrix SIM(i)
+!!$     msign = 1 asse di rotazione propria
+!!$     msign =-1 asse di rotazione impropria
+
+         Implicit None
+
+         Integer, Parameter :: maxorder = 8
+         Real (Kind=DEF_DBL_PREC) :: a (3, 3,*), B (3, 3), C (3, 3, 2)
+         Integer :: m, m1, invers, i, msign
+         C (:, :, :) = 0.0d0
+
+         C (1, 1, 1) = 1.d0
+         C (2, 2, 1) = 1.d0
+         C (3, 3, 1) = 1.d0
+         C (1, 1, 2) = - 1.d0
+         C (2, 2, 2) = - 1.d0
+         C (3, 3, 2) = - 1.d0
+
+         invers = 2
+         msign = Nint (det(a, i))
+         Call prodmm (a, C, B, i, 1, 1)
+
+         Do m = 1, 2 * maxorder
+            If (ium(C, B, 1.d-2, 2, 1) .Eq. 1) invers = 1
+            If (ium(C, B, 1.d-2, 1, 1) .Eq. 1) Go To 1000
+            Call prodmm (a, B, B, i, 1, 1)
+         End Do
+
+         Write (*,*) 'INPUT PARAMETER DCM probably too HIGH. Reduce it!'
+         Stop
+
+1000     If (m .Lt. 6 .Or. msign .Eq. 1) Return
+         m1 = (m/4) * 4
+         If (m1 .Ne. m) m = m / invers
+
+         Return
+      End Subroutine
+
+
+
+!!$     -----------------------------------------------------------------
+!!$       Subroutine vrload (a, const, N)
+!!$ !!$     -----------------------------------------------------------------
+!!$          Implicit None
+!!$
+!!$          Real (Kind=DEF_DBL_PREC) :: a (N), const
+!!$          Integer :: i, N
+!!$          Do i = 1, N
+!!$             a (i) = const
+!!$          End Do
+!!$
+!!$          Return
+!!$       End Subroutine
+
+
+
+      Subroutine cella
+         Implicit None
+         Real (Kind=DEF_DBL_PREC) :: COM, ARAD, RAD
+         Integer :: i, k
+         RAD = 57.29577951308232D0
+         ARAD = 1.D0 / RAD
+         PC (7) = 1.D0
+         PCR (7) = 1.D0
+         COM = 1.D0
+
+         Do 1030 i = 1, 3
+            k = i + 3
+            CS (i) = Cos (PC(k)*ARAD)
+            CS (k) = Sin (PC(k)*ARAD)
+            If (PC(k) .Gt. 0.D0) Go To 1030
+            PC (k) = 90.D0
+            CS (i) = 0.D0
+            CS (k) = 1.D0
+1030     COM = COM - CS (i) * CS (i)
+
+
+
+
+
+         COM = Sqrt (COM+2.D0*CS(1)*CS(2)*CS(3))
+         o (1, 1) = PC (1) * CS (6)
+         o (1, 2) = 0.D0
+         o (1, 3) = PC (3) * (CS(2)-CS(1)*CS(3)) / CS (6)
+         o (2, 1) = PC (1) * CS (3)
+         o (2, 2) = PC (2)
+         o (2, 3) = PC (3) * CS (1)
+         o (3, 1) = 0.D0
+         o (3, 2) = 0.D0
+         o (3, 3) = PC (3) * COM / CS (6)
+
+         If (Abs(o(2, 1)) .Lt. 1.D-10) o (2, 1) = 0.D0
+         If (Abs(o(2, 3)) .Lt. 1.D-10) o (2, 3) = 0.D0
+         If (Abs(o(1, 3)) .Lt. 1.D-10) o (1, 3) = 0.D0
+
+         PC (7) = det (o, 1)
+!!$       Call TransposeMatrix (o, G, 1, 1)
+         G (:, :) = transpose (o(:, :))
+         Call prodmm (G, o, G, 1, 1, 1)
+         Call Invert3x3 (o, OI, 1, 1)
+
+         PCR (7) = det (OI, 1)
+
+         Call Invert3x3 (G, GI, 1, 1)
+
+         PCR (1) = Sqrt (GI(1, 1))
+         PCR (2) = Sqrt (GI(2, 2))
+         PCR (3) = Sqrt (GI(3, 3))
+
+         CS (7) = GI (2, 3) / (PCR(2)*PCR(3))
+         CS (8) = GI (1, 3) / (PCR(1)*PCR(3))
+         CS (9) = GI (1, 2) / (PCR(1)*PCR(2))
+
+         PCR (4) = RAD * DACOS (CS(7))
+         PCR (5) = RAD * DACOS (CS(8))
+         PCR (6) = RAD * DACOS (CS(9))
+         CS (10) = Sin (ARAD*PCR(4))
+         CS (11) = Sin (ARAD*PCR(5))
+         CS (12) = Sin (ARAD*PCR(6))
+
+         Return
+      End Subroutine
+
+
+
+!!$     ------------------------------------------------------------------
+      Subroutine LinearCombination (a, B, C, D, E, i, J, k)
+!!$     ------------------------------------------------------------------
+
+         Implicit None
+
+         Real (Kind=DEF_DBL_PREC) :: a (3, *), B (3, *), C (3, *), D, E
+         Integer :: i, J, k
+         C (1:3, k) = a (1:3, i) * D + B (1:3, J) * E 
+
+         Return
+      End Subroutine
+
+
+      Subroutine compatta (WORD, L, k)
+         Implicit None
+         Character * (*) WORD
+         Integer :: k, i, L, N
+         k = 0
+         Do 1 i = 1, L
+            If (WORD(i:i) .Le. ' ' .Or. WORD(i:i) .Gt. '~') Go To 1
+            k = k + 1
+            WORD (k:k) = WORD (i:i)
+1        Continue
+
+         N = k + 1
+         Do i = N, L
+            WORD (i:i) = ' '
+         End Do
+
+         Return
+      End Subroutine
+
+
+
+
+!!$     ------------------------------------------------------------------
+      Subroutine CompleteGroup (MK, N,*)
+!!$     ------------------------------------------------------------------
+
+         Implicit None
+
+         Real (Kind=DEF_DBL_PREC) :: CO (3, 3)
+         Integer :: N, MK (:, :), i, J, jj, L, NN, k, k1
+2520     NN = NMS
+         Do i = 1, NN
+            Do J = 1, NN
+               Call prodmm (SIM, SIM, CO, i, J, 1)
+               Do jj = 1, NN
+                  L = ium (CO, SIM, 1.d-2, 1, jj)
+                  If (L .Eq. 1) Go To 2590
+               End Do
+               Go To 2610
+2590           MTG (i, J) = jj
+            End Do
+         End Do
+
+         Return
+
+!!$     We have found a new matrix
+2610     NMS = NMS + 1
+         If (NMS .Le. nmg) Go To 2630
+
+         Write (6, 2)
+2        Format (' ERROR: TOO MANY MATRICES FOUND')
+
+         Write (6, '(3(3F10.5,/),/)') (((SIM(i, J, k), J=1, 3), i=1, 3), k=1, NMS)
+
+!!$     ritorno per errore
+         Return 1
+
+2630     SIM (1:3, 1:3, NMS) = CO (1:3, 1:3)
+
+         Do k = 1, N
+            k1 = MK (k, J)
+            MK (k, NMS) = MK (k1, i)
+         End Do
+
+         Go To 2520
+      End Subroutine
+
+
+
+!!$     ------------------------------------------------------------------
+      Double Precision Function crms (t)
+!!$     ------------------------------------------------------------------
+
+         Implicit None
+
+         Integer :: i
+!!$     PPU is the vector XO repeated NMS times
+!!$     ppo=vettore XS trasformato da MK(NMA,NMS)
+!!$     t(3) = vettore variazione angolare in radianti
+
+
+         Real (Kind=DEF_DBL_PREC) :: t (3), po (3), pu (3), func
+         Real (Kind=DEF_DBL_PREC) :: RX (3, 3), RY (3, 3), RZ (3, 3), RR (3, 3)
+
+         RX (:, :) = 0.0d0
+         RY (:, :) = 0.0d0
+         RZ (:, :) = 0.0d0
+         RR (:, :) = 0.0d0
+
+         RX (1, 1) = 1.d0
+         RX (2, 2) = dcos (t(1))
+         RX (2, 3) = - dsin (t(1))
+         RX (3, 2) = - RX (2, 3)
+         RX (3, 3) = dcos (t(1))
+         RY (2, 2) = 1.d0
+         RY (1, 1) = dcos (t(2))
+         RY (1, 3) = - dsin (t(2))
+         RY (3, 1) = - RY (1, 3)
+         RY (3, 3) = dcos (t(2))
+         RZ (1, 1) = dcos (t(3))
+         RZ (1, 2) = - dsin (t(3))
+         RZ (2, 1) = - RZ (1, 2)
+         RZ (2, 2) = dcos (t(3))
+         RZ (3, 3) = 1.d0
+
+         Call prodmm (RY, RX, RR, 1, 1, 1)
+         Call prodmm (RZ, RR, RV, 1, 1, 1)
+!!$ ortonormalizzazione di precisione
+         Call prodv (RV, RV, RV, 1, 2, 3)
+         Call prodv (RV, RV, RV, 3, 1, 2)
+         Call prodv (RV, RV, RV, 2, 3, 1)
+         Call norm (RV, 1)
+         Call norm (RV, 2)
+         Call norm (RV, 3)
+!!$ fine ortonormalizzazione di precisione
+         func = 0.d0
+
+         Do i = 1, npu
+            po (1) = ppo (1, i)
+            po (2) = ppo (2, i)
+            po (3) = ppo (3, i)
+            pu (1) = ppu (1, i)
+            pu (2) = ppu (2, i)
+            pu (3) = ppu (3, i)
+            Call prodmv (RV, pu, pu, 1, 1, 1)
+            func = func + (po(1)-pu(1)) ** 2 + (po(2)-pu(2)) ** 2 + (po(3)-pu(3)) ** 2
+         End Do
+
+         crms = func
+         Return
+      End Function
+
+
+
+      Double Precision Function det (X, N)
+         Implicit None
+         Integer N
+         Double Precision X (3, 3,*)
+
+         det = + X (1, 1, N) * X (2, 2, N) * X (3, 3, N) - X (1, 1, N) * X (2, 3, N) * X (3, 2, N)
+         det = det + X (1, 2, N) * X (2, 3, N) * X (3, 1, N) - X (1, 2, N) * X (2, 1, N) * X (3, 3, N)
+         det = det + X (1, 3, N) * X (2, 1, N) * X (3, 2, N) - X (1, 3, N) * X (2, 2, N) * X (3, 1, N)
+
+         Return
+      End Function
+
+
+
+!!$     ------------------------------------------------------------------
+      Subroutine eq_plane (t, U, v, a)
+!!$     ------------------------------------------------------------------
+         Implicit None
+
+         Real (Kind=DEF_DBL_PREC) :: t (3), U (3), v (3), AA (3, 3), DD (3, 3), a (4), dist
+         Integer :: i
+!!$     Equazione del piano passante per i punti t,u,v nella forma canonica
+!!$     a(1).x+a(2).y+a(3).z+a(4)=0
+!!$     con a(1),a(2),a(3)=coseni direttori a(4)=-distanza piano-origine
+!!$     vedi International Tables for Crystallography II, p. 43, equaz. 2,3,4, 6
+
+         DD (1, 1) = t (1)
+         DD (1, 2) = t (2)
+         DD (1, 3) = t (3)
+         DD (2, 1) = U (1)
+         DD (2, 2) = U (2)
+         DD (2, 3) = U (3)
+         DD (3, 1) = v (1)
+         DD (3, 2) = v (2)
+         DD (3, 3) = v (3)
+
+         Do i = 1, 3
+!!$          Call MatrixCopy (DD, AA, 1, 1)
+            AA (:, :) = DD (:, :)
+            AA (:, i) = 1.0d0
+            a (i) = det (AA, 1)
+         End Do
+
+         Call prods (a, a, dist, 1, 1, 2)
+
+         a (1) = a (1) / dist
+         a (2) = a (2) / dist
+         a (3) = a (3) / dist
+         a (4) = - det (DD, 1) / dist
+
+         Return
+      End Subroutine
+
+
+
+!!$     ------------------------------------------------------------------
+      Subroutine icosahed (XO, PESO, N, MN, MK, MD, II, MDEG,*)
+!!$     ------------------------------------------------------------------
+
+         Implicit None
+
+         Real (Kind=DEF_DBL_PREC) :: XO (:, :), PESO (:)
+         Real (Kind=DEF_DBL_PREC) :: eqp (4), dp (5), vd (3, 5), a (3, 3), B (3, 3), v (3)
+         Integer :: io (5), mp (5), MN (:), MK (:, :), MD (:, :), i1, i2, i3, in1, in2, in3
+         Integer :: N, II, i4, in4, i5,  i, jj, kk, k, k1, me, MDEG, L, mv
+
+         Real (Kind=DEF_DBL_PREC), Dimension (:), Allocatable :: DA
+         Integer, Dimension (:), Allocatable :: meq
+         Real (Kind=DEF_DBL_PREC) :: rot18, cost, dp1, dm, COM, RAD, ROT, CA, CB, dmed, d2, dmin, cosa, d1
+         Allocate (DA(N))
+         Allocate (meq(N))
+
+         RAD = 57.29577951308232D0
+
+         Do 2000 i1 = 1, N - 4
+            If (MD(i1, 1) .Ne. II) Go To 2000
+            mp (1) = i1
+            io (1) = i1
+            in1 = i1 + 1
+            Do 1900 i2 = in1, N - 3
+               If (MD(i1, 1) .Ne. II) Go To 1900
+               mp (2) = i2
+               in2 = i2 + 1
+               Do 1800 i3 = in2, N - 2
+                  If (MD(i3, 1) .Ne. II) Go To 1800
+                  mp (3) = i3
+                  Call eq_plane (XO(:, i1), XO(:, i2), XO(:, i3), eqp)
+!!$              se il piano e' troppo vicino all'origine viene scartato
+                  If (eqp(4) .Lt. 0.5) Go To 1800
+                  in3 = i3 + 1
+                  Do 1700 i4 = in3, N - 1
+                     If (MD(i4, 1) .Ne. II) Go To 1700
+                     mp (4) = i4
+                     d2 = eqp (1) * XO (1, i4) + eqp (2) * XO (2, i4) + eqp (3) * XO (3, i4) + eqp (4)
+                     If (DABS(d2) .Gt. DXM(i4)) Go To 1700
+1300                 in4 = i4 + 1
+                     Do 1600 i5 = in4, N
+                        If (MD(i5, 1) .Ne. II) Go To 1600
+                        mp (5) = i5
+                        d2 = eqp (1) * XO (1, i5) + eqp (2) * XO (2, i5) + eqp (3) * XO (3, i5) + eqp (4)
+                        If (DABS(d2) .Gt. DXM(i5)) Go To 1600
+!!$ in mp ci sono i possibili 5 atomi equivalenti rispetto all'asse 5
+                        dmin = 100.
+                        dp (1) = dmin
+                        Do i = 2, 5
+                           io (i) = 0
+                           dp (i) = 0.d0
+                           Call LinearCombination (XO, XO, vd, 1.d0,-1.d0, i1, mp(i), 1)
+                           Call prods (vd, vd, dp(i), 1, 1, 2)
+                           If (dp(i) .Lt. dmin) Then
+                              dmin = dp (i)
+                              jj = i
+                           End If
+                        End Do
+                        io (2) = mp (jj)
+                        dp (jj) = 100.
+                        dmin = 100.
+                        Do i = 2, 5
+                           If (dp(i) .Lt. dmin .And. io(2) .Ne. mp(i)) Then
+                              dmin = dp (i)
+                              kk = i
+                           End If
+                        End Do
+                        io (5) = mp (kk)
+                        Do i = 2, 5
+                           If (mp(i) .Ne. io(2) .And. mp(i) .Ne. io(5) .And. io(3) .Eq. 0) io (3) = mp (i)
+                           If (mp(i) .Ne. io(2) .And. mp(i) .Ne. io(5) .And. mp(i) .Ne. io(3)) jj = mp (i)
+                        End Do
+                        Call LinearCombination (XO, XO, vd, 1.d0,-1.d0, io(2), io(3), 1)
+                        Call prods (vd, vd, d1, 1, 1, 1)
+                        Call LinearCombination (XO, XO, vd, 1.d0,-1.d0, io(2), jj, 1)
+                        Call prods (vd, vd, d2, 1, 1, 1)
+                        io (4) = jj
+                        If (d2 .Lt. d1) Then
+                           io (4) = io (3)
+                           io (3) = jj
+                        End If
+!!$ ora i cinque atomi sono ordinati
+!!$ per controllo preliminare prima di passare alla verify, controllo
+!he siano uguali ( a meno della tolleranza) le distanze 1-2
+                        dmed = 0.
+                        Do i = 1, 5
+                           k = i + 1
+                           If (k .Gt. 5) k = k - 5
+                           Call LinearCombination (XO, XO, vd, 1.d0,-1.d0, io(i), io(k), i)
+                           Call prods (vd, vd, dp(i), i, i, 2)
+                           dmed = dmed + dp (i)
+                        End Do
+                        dmed = dmed * 0.2d0
+!!$     write(out,'(a5,5i5)')'io',io
+!!$     write(out,'(a5,5f10.5)')'dp',dp
+!!$     write(out,'(a5,5f10.5)')'dmed',dmed
+                        a (:, :) = 0.0d0
+                        Do i = 1, 5
+                           If (DABS(dmed-dp(i)) .Gt. DXM(i)*.5) Go To 1600
+!!$ asse C5 come somma dei vertici del pentagono
+                           a (1, 3) = a (1, 3) + XO (1, io(i))
+                           a (2, 3) = a (2, 3) + XO (2, io(i))
+                           a (3, 3) = a (3, 3) + XO (3, io(i))
+                        End Do
+!!$     write(out,'(a5,3f10.6)')'A(3)',(A(i,3),i=1,3)
+!!$ mette il riferimento in modo che il primo asse 5 coincida con z e che
+!!$ il secondo sia nel piano xz
+                        a (1, 1) = XO (1, io(1)) + XO (1, io(2)) - XO (1, io(3)) - XO (1, io(4)) + XO (1, &
+                       & io(5))
+                        a (2, 1) = XO (2, io(1)) + XO (2, io(2)) - XO (2, io(3)) - XO (2, io(4)) + XO (2, &
+                       & io(5))
+                        a (3, 1) = XO (3, io(1)) + XO (3, io(2)) - XO (3, io(3)) - XO (3, io(4)) + XO (3, &
+                       & io(5))
+!!$ se la somma dei cinque atomi da' un vettore nullo, cioe' il pentagono
+!!$ e' sul cerchio massimo (caso possibile per un gruppo di 30 atomi sugli
+!!$ assi C2) passo ad altro pentagono
+1400                    Call norm (a, 3)
+                        Call norm (a, 1)
+                        Call prodv (a, a, a, 3, 1, 2)
+                        Call norm (a, 2)
+                        Call prodv (a, a, a, 2, 3, 1)
+!!$                      Call TransposeMatrix (a, a, 1, 1)
+                        a = transpose (a)
+!!$     write(out,'(a5,3(/,3f10.6))')'A',((A(i,k),i=1,3),k=1,3)
+                        Call RotateFrame (a, XO, N)
+!ostruzione dell'asse C5
+                        B (:, :) = 0.0d0
+                        ROT = 72.d0 / RAD
+                        CA = Cos (ROT)
+                        CB = Sin (ROT)
+                        B (1, 1) = CA
+                        B (2, 2) = CA
+                        B (1, 2) = - CB
+                        B (2, 1) = CB
+                        B (3, 3) = 1.d0
+!!$     write(out,'(a5,3(/,3f10.6))')'B',((B(i,k),i=1,3),k=1,3)
+!!$ verifica e ottimizza il primo asse 5
+                        Call verify (XO, B, MK, MN, mv, N)
+!!$     write(out,*)'primo asse C5 MV,NMS',MV,NMS
+!!$     write(out,'(30i3)')(MK(ll,NMS),ll=1,N)
+                        If (mv .Eq. 0) Go To 1600
+                        Call opt_axis (XO, PESO, v, MK, N, 2)
+!!$ ottimizza l'sse x con la stessa tecnica precedente
+                        a (:, :) = 0.0d0
+                        If (v(3) .Lt. 0) Then
+                           v (1) = - v (1)
+                           v (2) = - v (2)
+                           v (3) = - v (3)
+                        End If
+                        Call VectorCopy (v, a, 1, 3)
+                        a (1, 1) = XO (1, io(1)) + XO (1, io(2)) - XO (1, io(3)) - XO (1, io(4)) + XO (1, &
+                       & io(5))
+                        a (2, 1) = XO (2, io(1)) + XO (2, io(2)) - XO (2, io(3)) - XO (2, io(4)) + XO (2, &
+                       & io(5))
+                        a (3, 1) = XO (3, io(1)) + XO (3, io(2)) - XO (3, io(3)) - XO (3, io(4)) + XO (3, &
+                       & io(5))
+1500                    Call norm (a, 3)
+                        Call norm (a, 1)
+                        Call prodv (a, a, a, 3, 1, 2)
+                        Call norm (a, 2)
+                        Call prodv (a, a, a, 2, 3, 1)
+!!$                      Call TransposeMatrix (a, a, 1, 1)
+                        a = transpose (a)
+!!$     write(out,'(a5,3(/,3f10.6))')'A',((A(i,k),i=1,3),k=1,3)
+                        Call RotateFrame (a, XO, N)
+                        Go To 2010
+1600                 Continue
+1700              Continue
+1800           Continue
+1900        Continue
+2000     Continue
+
+!!$     uscita normale (non ha trovato nessun asse C5)
+         If (NMS .Eq. 1) Then
+            Deallocate (DA, meq)
+            Return
+         End If
+
+!ompleta il gruppo C5. Indispensabile qui!!!
+2010     Call CompleteGroup (MK, N,*2015)
+!!$ scelgo i due pentagoni piu' distanti dall'asse C5 per trovare
+!!$  un asse C2. nel caso che gli atomi del sottoset non siano
+!!$ tutti indipendenti, postrebbero esserci piu' di cinque atomi
+!!$ sul piano parallelo al primo pentagono e quindi devo
+!!$ testare tutti i possibili pentagoni
+2015     dm = 0.d0
+         Do 2020 i = 1, N
+            If (MD(i1, 1) .Ne. II) Go To 2020
+            DA (i) = XO (1, i) ** 2 + XO (2, i) ** 2
+            If (dm .Gt. DA(i)) Go To 2020
+            kk = i
+            dm = DA (i)
+2020     Continue
+         io (1) = kk
+         dp1 = XO (3, kk)
+!!$     write(out,*)'io(1),dp1',io(1),dp1
+         Do k = 1, 4
+            k1 = k + 1
+            io (k1) = MK (io(k), 2)
+            dp1 = dp1 + XO (3, io(k1))
+         End Do
+         dp1 = - 0.2d0 * dp1
+!!$ in io(i) ci sono i cinque atomi del primo pentagono
+!!$ in meq(i) vanno gli atomi del piano parallelo
+         me = 0
+         Do 2030 i = 1, N
+            COM = DABS (dp1-XO(3, i))
+            If (COM .Gt. DXM(i)) Go To 2030
+!!$ eliminazione (eventuale) degli atomi del primo piano
+            Do k = 1, 5
+               If (i .Eq. io(k)) Go To 2030
+            End Do
+            me = me + 1
+            meq (me) = i
+2030     Continue
+!!$     write(out,*)'me,meq',me
+!!$     write(out,'(30i4)')(meq(i),i=1,me)
+!!$ scelta degli atomi del secondo pentagono
+2040     Do i = 1, me
+            If (meq(i) .Ne. 0) Go To 2050
+         End Do
+!!$ non ci sono assi C2!!!
+         MDEG = 1
+
+         Deallocate (DA, meq)
+         Return
+
+!!$     i e' il primo atomo del nuovo pentagono
+2050     mp (1) = meq (i)
+         meq (i) = 0
+         k = 1
+
+!!$     cerca gli altri atomi del secondo penatgono e annulla i relativi meq
+         Do k = 1, 4
+            k1 = k + 1
+            mp (k1) = MK (mp(k), 2)
+            Do L = 1, me
+               If (mp(k1) .Eq. meq(L)) meq (L) = 0
+            End Do
+         End Do
+
+!!$ somma vettori del primo pentagono opportunamente ruotati
+!!$ costruzione dell'asse C2 perpendicolare a C5 e parallelo a x
+2210     a (:, :) = 0.0d0
+         vd (:, :) = 0.0d0
+!!$     write(out,*)'io,mp'
+!!$     write(out,'(5i4)')io,mp
+         Do 2250 i = 1, 5
+            k = io (i)
+            Do 2220 L = 1, NMS
+               If (MK(k, L) .Ne. io(1)) Go To 2220
+               Call prodmv (SIM, XO, vd, L, k, 3)
+               Call LinearCombination (vd, vd, vd, 1.d0, 1.d0, 3, 1, 1)
+!!$     write(out,'(a20,i5,3f10.5)')'io(i),vd(1)',io(i),(vd(kk,1),kk=1,3)
+               Go To 2230
+2220        Continue
+2230        k = mp (i)
+            Do 2240 L = 1, NMS
+               If (MK(k, L) .Ne. mp(1)) Go To 2240
+               Call prodmv (SIM, XO, vd, L, k, 3)
+               Call LinearCombination (vd, vd, vd, 1.d0, 1.d0, 3, 2, 2)
+!!$     write(out,'(a20,i5,3f10.5)')'mp(i),vd(2)',mp(i),(vd(kk,2),kk=1,3)
+               Go To 2250
+2240        Continue
+2250     Continue
+
+         vd (3, 1) = 0.d0
+         vd (3, 2) = 0.d0
+         Call norm (vd, 1)
+         Call norm (vd, 2)
+!!$     write(out,'(a20,3f10.5)')'vd(1)',(vd(kk,1),kk=1,3)
+!!$     write(out,'(a20,3f10.5)')'vd(2)',(vd(kk,2),kk=1,3)
+         cost = dcos (36.1/RAD)
+         Do i = 1, 5
+            Call prodmv (SIM, vd, vd, 2, 2, 2)
+            Call prods (vd, vd, cosa, 1, 2, 1)
+!!$     write(out,'(a14,8f9.5)')'vd(1),vd(2)',(vd(kk,1),kk=1,3),
+!!$    *(vd(kk,2),kk=1,3),cosa,cost
+            If (cosa .Ge. cost) Go To 2300
+         End Do
+2300     Call LinearCombination (vd, vd, a, 1.d0, 1.d0, 1, 2, 1)
+         Call norm (a, 1)
+!!$     write(out,'(a20,3f10.5)') 'A(1)',(A(kk,1),kk=1,3)
+         a (3, 3) = 1.d0
+         Call prodv (a, a, a, 3, 1, 2)
+         Call norm (a, 2)
+         Call prodv (a, a, a, 2, 3, 1)
+         Call norm (a, 1)
+!!$       Call TransposeMatrix (a, a, 1, 1)
+         a = transpose (a)
+         Call RotateFrame (a, XO, N)
+!!$     write(out,'(i4,3f9.5)')(lll,(XO(kk,lll),kk=1,3),lll=1,N)
+         B (:, :) = 0.0d0
+         B (1, 1) = 1.d0
+         B (2, 2) = - 1.d0
+         B (3, 3) = - 1.d0
+         Call verify (XO, B, MK, MN, mv, N)
+!!$     write(out,*)'asse C2 MV,NMS',MV,NMS
+         If (mv .Eq. 1) Go To 2310
+!!$       Call TransposeMatrix (a, a, 1, 1)
+         a = transpose (a)
+         Call RotateFrame (a, XO, N)
+         a (:, :) = 0.0d0
+         a (1, 2) = - 1.d0
+         a (2, 1) = 1.d0
+         a (3, 3) = 1.d0
+         Call RotateFrame (a, XO, N)
+         Call verify (XO, B, MK, MN, mv, N)
+!!$     write(out,*)'asse C2 MV,NMS',MV,NMS
+         If (mv .Eq. 1) Go To 2310
+         a = transpose (a)
+!!$       Call TransposeMatrix (a, a, 1, 1)
+         Call RotateFrame (a, XO, N)
+         Go To 2040
+!!$     ico=.true.
+!!$     call CompleteGroup(MK,N,*5000)
+!!$     write(out,*)'asse C2,NMS',NMS
+!!$     ontrolla il centro
+
+2310     B (:, :) = 0.0d0
+         B (1, 1) = - 1.d0
+         B (2, 2) = - 1.d0
+         B (3, 3) = - 1.d0
+         Call verify (XO, B, MK, MN, mv, N)
+
+!!$     write(out,*)'CENTRO MV,NMS',MV,NMS
+!ostruzione dell'asse C5 a |x|=63.43494882 da z e la cui priezione e' a 18 da x
+         a (:, :) = 0.0d0
+         ROT = - 63.43494882d0 / RAD
+3000     CA = Cos (ROT)
+         CB = Sin (ROT)
+         a (:, :) = 0.0d0
+         a (1, 1) = 1.d0
+         a (2, 2) = CA
+         a (3, 3) = CA
+         a (2, 3) = - CB
+         a (3, 2) = CB
+!!$ rotazione 18 su z
+         B (:, :) = 0.0d0
+         rot18 = - 18.d0 / RAD
+3100     CA = Cos (rot18)
+         CB = Sin (rot18)
+         B (:, :) = 0.0d0
+         B (1, 1) = CA
+         B (2, 2) = CA
+         B (1, 2) = - CB
+         B (2, 1) = CB
+         B (3, 3) = 1.d0
+         Call prodmm (B, a, a, 1, 1, 1)
+!!$     write(out,*)' matrice di rotazione'
+!!$     write(out,'(a12,2f10.6)')'ROT,ROT18',ROT,ROT18
+!!$     write(out,'(3f10.6)')((A(i,k),k=1,3),i=1,3)
+         Call prodmm (SIM, a, B, 2, 1, 1)
+!!$       Call TransposeMatrix (a, a, 1, 1)
+         a = transpose (a)
+         Call prodmm (a, B, a, 1, 1, 1)
+         Call verify (XO, a, MK, MN, mv, N)
+!!$     write(out,*)'secondo asse C5 ,MV,NMS',MV,NMS
+         If (mv .Eq. 1) Go To 4000
+         If (rot18 .Lt. 0.d0) Then
+            rot18 = - rot18
+            Go To 3100
+         End If
+
+         If (ROT .Gt. 0.d0) Then
+            Deallocate (DA, meq)
+            Return
+         End If
+
+         ROT = - ROT
+         Go To 3000
+
+4000     Call CompleteGroup (MK, N,*5000)
+
+         Deallocate (DA, meq)
+5000     Return 1
+
+      End Subroutine
+
+
+
+      Subroutine intpe (RIGA, B, C, IA, NB,*,*)
+         Implicit None
+
+         Character * (*) RIGA
+         Character (Len=23) CAR, CARA
+!!$          Real (Kind=DEF_DBL_PREC) :: C
+         Integer :: IA, NB, k, J, i, MCM, LR, KM, L, MA, MS, KM1, k1
+
+!!$     INTERPRETA IL VETTORE  A COME POSIZIONE EQUIVALENTE O
+!!$     PREPARA LO STESSO PER LA STAMPA A PARTIRE DA B E C
+         Real (Kind=DEF_DBL_PREC) :: B (3, 3,*), C (3,*), cost, CA
+
+         CAR = '1234567890 /,+-xyz[]XYZ'
+
+         Go To (10, 500), NB
+!!$ INTERPRETAZIONE DI A
+10       MCM = 1
+         LR = LEN (RIGA)
+         Call compatta (RIGA, LR, KM)
+         k = 1
+         cost = 1.d0
+         Do 15 i = 1, 3
+            C (i, IA) = 0.d0
+            Do 15 J = 1, 3
+15       B (i, J, IA) = 0.d0
+         Do 200 i = 1, KM
+!!$ IDENTIFICAZIONE DEL CARATTERE
+            CARA = RIGA (i:i)
+            Do 20 J = 1, 23
+               If (CAR(J:J) .Eq. CARA) Go To 30
+20          Continue
+25          Return 2
+30          If (J-11) 40, 200, 100
+!!$ CARATTERE NUMERICO
+40          If (J .Eq. 10) J = 0
+            Go To (50, 60), MCM
+!!$ NUMERATORE
+50          If (C(k, IA) .Ne. 0.d0) C (k, IA) = C (k, IA) * 10
+            C (k, IA) = C (k, IA) + cost * J
+            cost = 1.d0
+            Go To 200
+!!$ DENOMINATORE
+60          C (k, IA) = C (k, IA) / J
+            MCM = 1
+            Go To 200
+!ARATTERI ALFABETICI
+100         If (J .Gt. 20) J = J - 5
+            J = J - 11
+            Go To (110, 120, 130, 140, 150, 150, 150, 200, 210), J
+!!$ BARRA
+110         MCM = 2
+            Go To 200
+!AMBIO RIGA MATRICE (VIRGOLA)
+120         k = k + 1
+            Go To 200
+!!$ SEGNO +
+130         cost = 1.d0
+            Go To 200
+!!$ SEGNO -
+140         cost = - 1.d0
+            Go To 200
+!!$  X,Y O Z
+150         J = J - 4
+            B (k, J, IA) = cost
+            cost = 1.d0
+200      Continue
+210      Return 1
+!!$ SCRITTURA  DEL VETTORE POSIZIONE EQUIVALENTE ALFANUMERICA
+500      KM = LEN (RIGA)
+         Do 510 i = 1, KM
+510      RIGA (i:i) = CAR (11:11)
+         RIGA (12:12) = ','
+         RIGA (23:23) = ','
+         Do 1000 i = 1, 3
+            MCM = 11 * i
+            Do 600 J = 1, 3
+               L = 4 - J
+               If (Nint(B(i, L, IA)) .Eq. 0) Go To 600
+               MA = L + 15
+               RIGA (MCM:MCM) = CAR (MA:MA)
+               k = 14
+               If (B(i, L, IA) .Lt. (-0.1d0)) k = 15
+               MCM = MCM - 1
+               RIGA (MCM:MCM) = CAR (k:k)
+               MCM = MCM - 1
+600         Continue
+            MS = 11
+            If (Abs(C(i, IA)) .Lt. 0.1d0) Go To 1000
+            If (C(i, IA) .Lt. 0.d0) MS = 15
+            Do 700 J = 1, 6
+               CA = C (i, IA) * J
+               k = Nint (CA)
+               If (Abs(FLOAT(k)-CA) .Lt. 0.1d0) Go To 800
+700         Continue
+800         If (J .Eq. 1) Go To 900
+            RIGA (MCM:MCM) = CAR (J:J)
+            MCM = MCM - 1
+            RIGA (MCM:MCM) = CAR (12:12)
+            MCM = MCM - 1
+900         J = IABS (Mod(k, 10))
+            RIGA (MCM:MCM) = CAR (J:J)
+            k = k / 10
+            MCM = MCM - 1
+            If (k .Gt. 0) Go To 900
+            RIGA (MCM:MCM) = CAR (MS:MS)
+1000     Continue
+         KM1 = KM - 1
+         Call compatta (RIGA(2:KM), KM1, k)
+         If (RIGA(2:2) .Eq. '+') RIGA (2:2) = ' '
+         Do 1010 i = 1, 2
+            k = index (RIGA, ',+')
+            k1 = k + 1
+            If (k .Ne. 0) RIGA (k1:k1) = ' '
+1010     Continue
+         Call compatta (RIGA(2:KM), KM1, k)
+         Return 1
+      End Subroutine
+
+
+
+!!$     Inversion of a 3x3 matrix
+!!$     ------------------------------------------------------------------
+      Subroutine Invert3x3 (X, Y, k, L)
+!!$     ------------------------------------------------------------------
+
+         Implicit None
+
+         Integer :: k, L
+         Real (Kind=DEF_DBL_PREC) :: X (3, 3, 1), Y (3, 3, 1), C
+
+         C = 1.0 / det (X, k)
+         Y (1, 1, L) = (X(2, 2, k)*X(3, 3, k)-X(2, 3, k)*X(3, 2, k)) * C
+         Y (2, 1, L) = (X(2, 3, k)*X(3, 1, k)-X(2, 1, k)*X(3, 3, k)) * C
+         Y (3, 1, L) = (X(2, 1, k)*X(3, 2, k)-X(2, 2, k)*X(3, 1, k)) * C
+         Y (1, 2, L) = (X(1, 3, k)*X(3, 2, k)-X(1, 2, k)*X(3, 3, k)) * C
+         Y (2, 2, L) = (X(1, 1, k)*X(3, 3, k)-X(1, 3, k)*X(3, 1, k)) * C
+         Y (3, 2, L) = (X(1, 2, k)*X(3, 1, k)-X(1, 1, k)*X(3, 2, k)) * C
+         Y (1, 3, L) = (X(1, 2, k)*X(2, 3, k)-X(1, 3, k)*X(2, 2, k)) * C
+         Y (2, 3, L) = (X(1, 3, k)*X(2, 1, k)-X(1, 1, k)*X(2, 3, k)) * C
+         Y (3, 3, L) = (X(1, 1, k)*X(2, 2, k)-X(1, 2, k)*X(2, 1, k)) * C
+
+         Return
+      End Subroutine
+
+
+
+      Function ium (a, B, C, m, N)
+!!$     Returns if (A-B) < C
+!!$     ONTROLLA  SE A=B A MENO DI C
+!!$     True ium=1      False  ium=0
+         Implicit None
+
+         Real (Kind=DEF_DBL_PREC) :: a (3, 3,*), B (3, 3,*), C
+         Integer :: ium, i, J, m, N
+         ium = 0
+         Do i = 1, 3
+            Do J = 1, 3
+               If (Abs(a(i, J, m)-B(i, J, N)) .Gt. C) Return
+            End Do
+         End Do
+         ium = 1
+
+         Return
+      End Function
+
+      Subroutine massdata (atomicNumbers)
+         Implicit None
+         Integer, Parameter :: MaxAtomicNumber = 103
+         Integer :: atomicNumbers (:), z, ITT, i, J, m, k
+!!$          Character (Len=2) :: SIMBO (MaxAtomicNumber)
+         Real (Kind=DEF_DBL_PREC) :: AtomicMass (MaxAtomicNumber)
+
+         Data (AtomicMass(i), i=1, 2) / 1.00794, 4.002602 /
+         Data (AtomicMass(i), i=3, 10) / 6.941, 9.012182, 10.811, 12.011, 14.00674, 15.9994, 18.9984032, &
+        & 20.1797 /
+         Data (AtomicMass(i), i=11, 18) / 22.989768, 24.3050, 26.981539, 28.0855, 30.97362, 32.066, 35.4527, &
+        & 39.948 /
+         Data (AtomicMass(i), i=19, 36) / 39.0983, 40.078, 44.955910, 47.88, 50.9415, 51.9961, 54.93085, &
+        & 55.847, 58.93320, 58.69, 63.546, 65.39, 69.723, 72.61, 74.92159, 78.96, 79.904, 83.80 /
+         Data (AtomicMass(i), i=37, 54) / 85.4678, 87.62, 88.90585, 91.224, 92.90638, 95.94, 98, 101.07, &
+        & 102.90550, 106.42, 107.8682, 112.411, 114.82, 118.710, 121.75, 127.60, 126.90447, 131.29 /
+         Data (AtomicMass(i), i=55, 86) / 132.90543, 137.327, 138.9055, 140.115, 140.90765, 144.24, 145, &
+        & 150.36, 151.965, 157.25, 158.92534, 162.50, 164.93032, 167.26, 168.93421, 173.04, 174.967, 178.49, &
+        & 180.9479, 183.85, 186.207, 190.2, 192.22, 195.08, 196.96654, 200.59, 204.3833, 207.2, 208.98037, &
+        & 209, 210.0, 222 /
+         Data (AtomicMass(i), i=87, 103) / 223, 226.025, 227.028, 232.0381, 231.03588, 238.0289, 237.048, &
+        & 244., 243., 247., 247., 251., 252., 257., 258., 259., 260.0 /
+
+!!$ 
+!!$          Data (SIMBO(i), i=1, 2) / ' H', 'HE' /
+!!$          Data (SIMBO(i), i=3, 10) / 'LI', 'BE', ' B', ' C', ' N', ' O', ' F', 'NE' /
+!!$          Data (SIMBO(i), i=11, 18) / 'NA', 'MG', 'AL', 'SI', ' P', ' S', 'CL', 'AR' /
+!!$          Data (SIMBO(i), i=19, 36) / ' K', 'CA', 'SC', 'TI', ' V', 'CR', 'MN', 'FE', 'CO', 'NI', 'CU', 'ZN', &
+!!$         & 'GA', 'GE', 'AS', 'SE', 'BR', 'KR' /
+!!$          Data (SIMBO(i), i=37, 54) / 'RB', 'SR', ' Y', 'ZR', 'Nb', 'MO', 'TC', 'RU', 'RH', 'PD', 'AG', 'CD', &
+!!$         & 'IN', 'SN', 'SB', 'TE', ' I', 'XE' /
+!!$          Data (SIMBO(i), i=55, 86) / 'CS', 'BA', 'LA', 'CE', 'PR', 'ND', 'PM', 'SM', 'EU', 'GD', 'TB', 'DY', &
+!!$         & 'HO', 'ER', 'TM', 'YB', 'LU', 'HF', 'TA', ' W', 'RE', 'OS', 'IR', 'PT', 'AU', 'HG', 'TL', 'PB', 'BI&
+!!$         &', 'PO', 'AT', 'RN' /
+!!$          Data (SIMBO(i), i=87, 103) / 'FR', 'RA', 'AC', 'TH', 'PA', ' U', 'NP', 'PU', 'AM', 'CM', 'BK', 'CF', &
+!!$         & 'ES', 'FM', 'MD', 'NO', 'LR' /
+
+
+         Do J = 1, nAtoms
+            z = atomicNumbers (J)
+
+            AMAS (J) = AtomicMass (z)
+         End Do
+
+         Do J = 1, nAtoms
+            MSP (J) = 0
+         End Do
+
+         m = 1
+         ITT = atomicNumbers (1)
+10       Do k = 1, nAtoms
+            If (atomicNumbers(k) .Eq. ITT) MSP (k) = m
+         End Do
+         m = m + 1
+
+         Do J = 1, nAtoms
+            If (MSP(J) .Eq. 0) Then
+               ITT = atomicNumbers (J)
+               MSP (J) = m
+               Go To 10
+            End If
+         End Do
+
+         Return
+      End Subroutine
+
+
+
+      Subroutine momin (XO, P, RO, N)
+
+         Implicit None
+
+!!$       Implicit DOUBLEPRECISION (a-h, o-z)
+!!$ da un set di coordinate XO che vengono moltiplicate per la matrice RO
+!!$ che puo' essere una matrice di ortogonalizzazione calcola i momenti di
+!!$ inerzia utilizzando i pesi P
+
+         Real (Kind=DEF_DBL_PREC), Intent (Inout) :: XO (3,*), RO (3, 3), P (*)
+         Integer, Intent (In) :: N
+
+!!$          Real (Kind=DEF_DBL_PREC) :: evec (3, 3), eval (3), 
+         Real (Kind=DEF_DBL_PREC) :: worka (30)
+         Real (Kind=DEF_DBL_PREC) :: amom (6), am1, am2, CAM (3), sum,  ORI (3, 3), amom1 (6)
+         Integer :: info, i, n1, n2
+
+         RIN (:) = 0.0d0
+         amom (:) = 0.0d0
+         amom1 (:) = 0.0d0
+         sum = 0.d0
+
+         Do i = 1, N
+            Call prodmv (RO, XO, XO, 1, i, i)
+
+!!$ ANTST !
+            am1 = P (i)
+            RIN (:) = RIN (:) + am1 * XO (:, i)
+            sum = sum + am1
+         End Do
+
+         RIN = RIN / sum
+         BARO = RIN
+
+         Do i = 1, N
+            XO (:, i) = XO (:, i) - BARO (:)
+            CAM (:) = XO (:, i) * P (i)
+            amom (1) = amom (1) + CAM (1) * XO (1, i)
+            amom (2) = amom (2) - CAM (1) * XO (2, i)
+            amom (3) = amom (3) - CAM (1) * XO (3, i)
+            amom (4) = amom (4) + CAM (2) * XO (2, i)
+            amom (5) = amom (5) - CAM (2) * XO (3, i)
+            amom (6) = amom (6) + CAM (3) * XO (3, i)
+         End Do
+
+         OR (1, 1) = amom (4) + amom (6)
+         OR (2, 2) = amom (1) + amom (6)
+         OR (3, 3) = amom (1) + amom (4)
+         OR (2, 1) = amom (2)
+         OR (3, 1) = amom (3)
+         OR (3, 2) = amom (5)
+
+         Call dsyev ('V', 'L', 3, OR, 3, RIN, worka, 10, info)
+         RIN = RIN ( (/ 3, 2, 1 /))
+         OR = OR (:, (/ 3, 2, 1 /))
+!__________________
+!!$ modifica per rendere OR machine-independent
+         am1 = - 1.0d0
+         am2 = - 1.0d0
+         Do i = 1, 3
+            If (DABS(OR(i, 1)) .Gt. am1) Then
+               am1 = DABS (OR(i, 1))
+               n1 = i
+            End If
+            If (DABS(OR(i, 2)) .Gt. am2) Then
+               am2 = DABS (OR(i, 2))
+               n2 = i
+            End If
+         End Do
+         If (OR(n1, 1) .Lt. 0.0) Then
+            Do i = 1, 3
+               OR (i, 1) = - OR (i, 1)
+            End Do
+         End If
+         If (OR(n2, 1) .Lt. 0.0) Then
+            Do i = 1, 3
+               OR (i, 2) = - OR (i, 2)
+            End Do
+         End If
+         Call prodv (OR, OR, OR, 1, 2, 3)
+!__________________
+         OR = transpose (OR)
+         Call prodmm (OR, RO, OT, 1, 1, 1)
+         Call Invert3x3 (OT, OTI, 1, 1)
+         Call Invert3x3 (RO, ORI, 1, 1)
+         Call prodmv (ORI, BARO, BARC, 1, 1, 1)
+         Do 130 i = 1, N
+130      Call prodmv (OR, XO, XO, 1, i, i)
+         Return
+      End Subroutine
+
+
+
+
+!!$     ------------------------------------------------------------------
+      Subroutine norm (a, i)
+!!$     ------------------------------------------------------------------
+         Implicit None
+
+         Real (Kind=DEF_DBL_PREC) :: a (3,*), B
+         Integer :: J, i
+         Call prods (a, a, B, i, i, 2)
+
+         Do J = 1, 3
+            a (J, i) = a (J, i) / B
+         End Do
+
+         Return
+      End Subroutine
+
+
+
+      Subroutine opt_axis (XO, PESO, V3, MK, N, IAX)
+         Implicit None
+         Real (Kind=DEF_DBL_PREC) :: XO (:, :), V3 (:), PESO (:), VS (3), CO (3, 3), W (N)
+         Integer :: IV (N), nge (N), MK (:, :), N, IAX, i, ng, J, L, im, k
+         Real (Kind=DEF_DBL_PREC) :: dim, abcos, absabcos, di, dism, cost, dis
+!!$ it makes so that the sum of the distances dall' element of symmetry IAX is minimal
+!!$ fa in modo che gli la somma delle distanze dall'elemento di simmetria IAX
+!!$ sia minimo
+         Do i = 1, N
+            IV (i) = 0
+         End Do
+         ng = 0
+         cost = det (SIM, IAX)
+1000     Do i = 1, N
+            If (IV(i) .Eq. 0) Go To 1100
+         End Do
+         Go To 1300
+1100     ng = ng + 1
+!!$ ng = number of the equivalent group of atoms respect all' operation IAX
+!!$ ng = numero del gruppo di atomi equivalente rispetto all'operazione IAX
+         IV (i) = ng
+         Do J = 1, 3
+            CO (J, ng) = XO (J, i)
+         End Do
+         W (ng) = PESO (i)
+         nge (ng) = 1
+         k = i
+1200     L = MK (k, IAX)
+         If (L .Eq. i) Go To 1000
+         IV (L) = ng
+!!$ somma tutti gli atomi del gruppo con segno opportuno
+         Do J = 1, 3
+            CO (J, ng) = CO (J, ng) + cost * XO (J, L)
+         End Do
+         W (ng) = W (ng) + PESO (L)
+         nge (ng) = nge (ng) + 1
+         k = L
+         Go To 1200
+!!$ it has assigned to all atoms to a group and the weight to the groups
+!!$ ha assegnato tutti gli atomi ad un gruppo ed il peso ai gruppi
+1300     Continue
+         Do i = 1, ng
+            W (i) = W (i) / nge (i)
+         End Do
+         V3 (:) = 0.0d0
+         dism = 0.d0
+!it tries the group piu' far away dall' element of symmetry (im)
+!erca il gruppo piu' lontano dall'elemento di simmetria (im)
+         Do i = 1, ng
+            Call prodmv (SIM, CO, VS, IAX, i, 1)
+            Call LinearCombination (CO, VS, VS, 1.d0, cost, i, 1, 1)
+            Call prods (VS, VS, dis, 1, 1, 1)
+            If (dis .Gt. dism) Then
+               dism = dis
+               im = i
+            End If
+         End Do
+         V3 (:) = 0.0d0
+         Call prods (CO, CO, dim, im, im, 2)
+!!$ somma fra loro tutti i gruppi con un segno determinato dall'angolo
+!!$ fra il gruppo in esame ed il gruppo im
+         Do i = 1, ng
+            Call prods (CO, CO, abcos, im, i, 1)
+            Call prods (CO, CO, di, i, i, 2)
+            absabcos = Abs (abcos)
+            If (absabcos .Gt. 1.d-5) Then
+               cost = W (i) * abcos / absabcos
+               Call LinearCombination (V3, CO, V3, 1.d0, cost, 1, i, 1)
+            End If
+         End Do
+!!$ il vettore risultante e' normalizzato e diventera' una riga della
+!!$ matrice di rotazione definitiva
+         Call norm (V3, 1)
+         If (V3(1) .Gt. 0.d0) Return
+         V3 (1) = - V3 (1)
+         V3 (2) = - V3 (2)
+         V3 (3) = - V3 (3)
+         Return
+      End Subroutine
+
+
+!!$     ------------------------------------------------------------------
+      Subroutine prodmm (a, B, C, i, J, N)
+!!$     ------------------------------------------------------------------
+
+         Implicit None
+         Real (Kind=DEF_DBL_PREC) :: a (3, 3,*), B (3, 3,*), C (3, 3,*), X (3, 3)
+         Integer :: i, J, k, L, m, N
+         Real (Kind=DEF_DBL_PREC) :: Y, z
+         Do k = 1, 3
+            Do L = 1, 3
+               X (k, L) = 0.0d0
+               Do m = 1, 3
+                  Y = a (k, m, i)
+                  z = B (m, L, J)
+                  X (k, L) = X (k, L) + Y * z
+               End Do
+            End Do
+         End Do
+
+         Do k = 1, 3
+            Do L = 1, 3
+               C (k, L, N) = X (k, L)
+            End Do
+         End Do
+
+         Return
+      End Subroutine
+
+
+
+!!$     ------------------------------------------------------------------
+      Subroutine prodmv (a, B, C, i, J, k)
+!!$     ------------------------------------------------------------------
+
+         Implicit None
+         Real (Kind=DEF_DBL_PREC) :: a (3, 3,*), B (3,*), C (3,*), X (3)
+         Integer :: i, J, k, L, m
+         Real (Kind=DEF_DBL_PREC) :: Y, z
+         Do L = 1, 3
+            X (L) = 0.0d0
+            Do m = 1, 3
+               Y = a (L, m, i)
+               z = B (m, J)
+               X (L) = X (L) + Y * z
+            End Do
+         End Do
+
+         Do L = 1, 3
+            C (L, k) = X (L)
+         End Do
+
+         Return
+      End Subroutine
+
+
+
+!!$     ------------------------------------------------------------------
+      Subroutine prods (a, B, C, i, J, k)
+!!$     ------------------------------------------------------------------
+
+         Implicit None
+
+!!$     PRODOTTO SCALARE A*B=C (K=1)
+!!$     MODULO VETTORE A  (K=2)
+         Real (Kind=DEF_DBL_PREC) :: a (3,*), B (3,*), C, X
+         Integer :: i, J, k, L
+         Real (Kind=DEF_DBL_PREC) :: z, Y
+         X = 0.0d0
+
+         Do 1 L = 1, 3
+            Y = a (L, i)
+            z = B (L, J)
+1        X = X + Y * z
+
+         C = X
+
+         If (k .Eq. 2) C = DSQRT (X)
+
+         Return
+      End Subroutine
+
+
+!!$     Vector cross product
+      Subroutine prodv (a, B, C, i, J, k)
+         Implicit None
+         Real (Kind=DEF_DBL_PREC) :: a (3, 1), B (3, 1), C (3, 1)
+         Integer :: i, J, k
+         Real (Kind=DEF_DBL_PREC) :: x1, x2, x3, y1, y2, y3
+         x1 = a (1, i)
+         x2 = a (2, i)
+         x3 = a (3, i)
+         y1 = B (1, J)
+         y2 = B (2, J)
+         y3 = B (3, J)
+         C (1, k) = x2 * y3 - x3 * y2
+         C (2, k) = - x1 * y3 + x3 * y1
+         C (3, k) = x1 * y2 - x2 * y1
+
+         Return
+      End Subroutine
+
+
+!!$     ------------------------------------------------------------------
+!!$     Rotates the reference and coordinates
+      Subroutine RotateFrame (CO, XO, N)
+!!$     ------------------------------------------------------------------
+
+         Implicit None
+         Real (Kind=DEF_DBL_PREC) :: CO (3, 3), XO (3,*)
+         Integer :: i, N
+         Do i = 1, N
+            Call prodmv (CO, XO, XO, 1, i, i)
+         End Do
+
+         Call prodmm (CO, OR, OR, 1, 1, 1)
+         Call prodmm (CO, OT, OT, 1, 1, 1)
+         Call Invert3x3 (OT, OTI, 1, 1)
+
+         Return
+      End Subroutine
+
+
+
+
+!!$     ------------------------------------------------------------------
+      Subroutine rms_min (tm)
+!!$     ------------------------------------------------------------------
+         Implicit None
+         Real (Kind=DEF_DBL_PREC) :: tm (3), t (3), passo, arms, rm
+         Integer :: i1, i2, i3, ind1
+         passo = 0.02
+         RV (:, :) = 0.0d0
+         tm (:) = 0.0d0
+         rm = crms (tm)
+
+1        ind1 = 0
+
+         Do i1 = 1, 3
+            t (1) = tm (1) + (2-i1) * passo
+            Do i2 = 1, 3
+               t (2) = tm (2) + (2-i2) * passo
+               Do i3 = 1, 3
+                  t (3) = tm (3) + (2-i3) * passo
+                  arms = crms (t)
+                  If (arms .Lt. rm) Then
+                     ind1 = 1
+                     rm = arms
+                     Call VectorCopy (t, tm, 1, 1)
+                  End If
+               End Do
+            End Do
+         End Do
+
+         If (ind1 .Eq. 1) Go To 1
+         If (passo .Lt. 0.0002) Return
+         passo = passo * 0.5
+         Go To 1
+
+      End Subroutine
+
+
+
+!!$     ------------------------------------------------------------------
+      Subroutine s_coor (SI, XO, XS, CO, D, DEL, DLM, CSMloc, MK, ID, ISU, nes, N)
+!!$     ------------------------------------------------------------------
+
+         Implicit None
+         Real (Kind=DEF_DBL_PREC) :: SI (:, :, :), XO (:, :), XS (:, :), CO (:, :), D (:)
+         Real (Kind=DEF_DBL_PREC) :: DEL (:), DLM (:)
+         Integer :: MK (:, :), ID (:), ISU (:), nes, naz, N, i, J, k
+
+         Real (Kind=DEF_DBL_PREC) :: V3 (3)
+         Real (Kind=DEF_DBL_PREC), Dimension (:), Allocatable :: dc
+         Real (Kind=DEF_DBL_PREC), Dimension (:), Allocatable :: cf
+         Real (Kind=DEF_DBL_PREC) :: cost, CSMloc, COM
+         Allocate (cf(N))
+         Allocate (dc(N))
+
+!!$     Allocate(?) the symmetrized coordinates
+         naz = 3 * N
+         CO (:, :) = 0.0d0
+         XS (:, :) = 0.0d0
+         RMS (:, :) = 0.0d0
+         DEL (:) = 0.0d0
+         DLM (:) = 0.0d0
+         cf (:) = 0.0d0
+
+!!$     ISU=indice delle matrici del sottogruppo in considerazione
+!!$     nes=numero di elementi del sottogruppo
+         Do i = 1, N
+            Call prods (XO, XO, D(i), i, i, 2)
+            Do J = 1, nes
+               k = MK (i, ISU(J))
+               Call prodmv (SI, XO, V3, ISU(J), i, 1)
+               Call LinearCombination (XS, V3, XS, 1.d0, 1.d0, k, 1, k)
+            End Do
+         End Do
+
+         Do i = 1, N
+            Do J = 1, 3
+               XS (J, i) = XS (J, i) / dfloat (nes)
+            End Do
+            Call prods (XS, XS, dc(i), i, i, 2)
+         End Do
+
+         Do i = 1, N
+            Do J = 1, nes
+               k = MK (i, ISU(J))
+               cf (i) = cf (i) + D (k)
+            End Do
+            If (dc(i) .Gt. 1.d-01) cf (i) = cf (i) / (dc(i)*nes)
+            Do J = 1, 3
+               XS (J, i) = XS (J, i) * cf (i)
+            End Do
+         End Do
+
+!!$ il fattore di correzione cf=media delle distanze atomi equivalenti baricentro,
+!!$ corregge le coordinate simmetrizzate facendo si che queste equivalgano alla
+!!$ media per pura rotazione degli atomi equivalenti
+!alcola le rms e gli scostamenti medi (DEL) e massimi DLM
+         Do J = 1, 4
+            ID (J) = 0
+         End Do
+         Do 2820 i = 1, N
+            Do J = 1, 3
+               V3 (J) = XO (J, i) - XS (J, i)
+               COM = DABS (V3(J))
+               DEL (J) = DEL (J) + COM
+               If (COM .Gt. DLM(J)) Then
+                  DLM (J) = COM
+                  ID (J) = i
+               End If
+            End Do
+!!$ massima deviazione dalla simmetria in angstrom
+            Call prods (V3, V3, COM, 1, 1, 2)
+
+            DEL (4) = DEL (4) + COM
+
+            If (DLM(4) .Lt. COM) Then
+               DLM (4) = COM
+               ID (4) = i
+            End If
+
+2820     Continue
+
+!alcola la continuous symmetry measure (CSM)
+         CSMloc = 0.d0
+
+         Do J = 1, nes
+            Do i = 1, N
+               k = MK (i, ISU(J))
+               Call prodmv (SI, XO, V3, ISU(J), i, 1)
+               Call LinearCombination (XS, V3, V3, 1.d0,-1.d0, k, 1, 1)
+               RMS (1, k) = RMS (1, k) + V3 (1) * V3 (1)
+               RMS (2, k) = RMS (2, k) + V3 (2) * V3 (2)
+               RMS (3, k) = RMS (3, k) + V3 (3) * V3 (3)
+               Call prods (V3, V3, COM, 1, 1, 1)
+               CSMloc = CSMloc + COM
+            End Do
+         End Do
+
+         cost = 1.d0 / dfloat (nes)
+         RMST = 0.d0
+
+         Do i = 1, N
+            Do J = 1, 3
+               RMST = RMST + RMS (J, i)
+               RMS (J, i) = Sqrt (RMS(J, i)*cost)
+            End Do
+         End Do
+
+         RMST = Sqrt (RMST/dfloat(nes*N))
+         CSMloc = CSMloc * 1.d2 / dfloat (nes*N)
+
+         Deallocate (dc, cf)
+
+         Return
+      End Subroutine
+
+
+
+!!$     Determines the Schoenflies symbol from the group matrices
+!!$     ------------------------------------------------------------------
+      Subroutine schoenfl (MDEG, pointGroup)
+!!$     ------------------------------------------------------------------
+
+         Implicit None
+         Character (Len=3) :: pointGroup
+         Character S1, S2, Sn * 2, tot * 4
+!!$          Character (Len=5) :: pointgr (32)
+         Character (Len=3) :: lbls (nmg)
+         Integer :: maxasi, maxasp, mplane, invers, i, nplane, MDEG, m, msign, inv, IPOGROU, k
+!!$          Data (pointgr(i), i=1, 32) / 'C1 ', 'Ci ', 'C2 ', 'Cs ', 'C2h', 'D2 ', 'C2v', 'D2h', 'C4 ', 'S4 ', '&
+!!$         &C4h', 'D4 ', 'C4v', 'D2d', 'D4h', 'C3 ', 'C3i', 'D3 ', 'C3v', 'D3d', 'C6 ', 'C3h', 'C6h', 'D6 ', 'C6&
+!!$         &v', 'D3h', 'D6h', 'T  ', 'Th ', 'O  ', 'Td ', 'Oh ' /
+
+         maxasp = 0
+         maxasi = 0
+         mplane = 0
+         invers = 0
+         nplane = 0
+         lbls (1) = 'E'
+
+!!$     linear groups for these groups not stamp the symmetry matrices but only the group
+         If (MDEG .Eq. 5) Then
+            pointGroup = 'Civ'
+            Do i = 1, NMS
+               Call ax_order (SIM, i, m, msign, inv)
+               If (inv .Eq. 1) Go To 1000
+            End Do
+            NMS = 1
+            Go To 5200
+1000        pointGroup = 'Dih'
+            NMS = 1
+            Go To 5200
+         End If
+
+         If (NMS .Eq. 1) Then
+            pointGroup = 'C1 '
+            IPOGROU = 1
+            Return
+         End If
+
+         Do i = 2, NMS
+            tot = '    '
+            S1 = ' '
+            S2 = ' '
+            Sn = '  '
+            Call ax_order (SIM, i, m, msign, inv)
+            If (m .Gt. maxasp .And. msign .Eq. 1) maxasp = m
+            If (m .Gt. maxasi .And. msign .Eq.-1) maxasi = m
+            If (m .Eq. 2 .And. mplane .Eq. 0) mplane = 1
+!!$     write(*,'(a20,4i3)')'i,msign,m,inv',i,msign,m,inv
+            S1 = 'C'
+            If (m .Eq. 2) Then
+!entro
+               If (inv .Eq. 1) Then
+                  invers = 1
+                  Sn = 'i '
+                  Go To 1100
+               End If
+!!$ piano
+               Sn = '2 '
+!!$ asse 2
+               If (msign .Eq.-1) Then
+                  Sn = 's '
+                  nplane = nplane + 1
+               End If
+               Go To 1100
+            End If
+!!$ asse improprio m>2
+            Write (Sn, '(i2)') m
+            If (msign .Eq.-1) S1 = 'S'
+1100        tot = S1 // Sn // S2
+            Call compatta (tot, 4, k)
+            lbls (i) = tot (1:3)
+         End Do
+!!$     write(*,*)'maxasp maxasi mplane nplane invers   MDEG    NMS'
+!!$     write(*,'(7i7)')maxasp,maxasi,mplane,nplane,invers,MDEG,NMS
+         pointGroup = '   '
+
+         If (NMS .Eq. 48) pointGroup = 'Oh '
+         If (NMS .Eq. 60) pointGroup = 'I  '
+         If (NMS .Eq. 120) pointGroup = 'Ih '
+         If (pointGroup .Ne. '   ') Go To 5100
+
+         If (MDEG .Eq. 3) Then
+            If (NMS .Eq. 12) pointGroup = 'T23'
+            If (invers .Eq. 1) pointGroup = 'Th '
+            If (maxasi .Eq. 4) pointGroup = 'Td '
+            If (pointGroup .Eq. '   ') pointGroup = 'O  '
+            Go To 5100
+         End If
+
+         If (NMS .Eq. 2) Then
+            pointGroup = lbls (2)
+            Go To 5000
+         End If
+
+         S2 = ' '
+         S1 = 'C'
+
+!!$     Cn e S2n dove n=maxasp
+         Write (Sn, '(I2)') maxasp
+         If (Mod(NMS, 2) .Eq. 0 .And. maxasi .Eq. NMS) Then
+            S1 = 'S'
+            Write (Sn, '(I2)') maxasi
+            If (NMS .Ne. 6) Go To 5000
+            pointGroup = 'C3i'
+            Go To 5100
+         End If
+         If (NMS .Eq. maxasp) Go To 5000
+         If (NMS .Lt. maxasi) Then
+            Write (Sn, '(I2)') maxasi
+            S1 = 'S'
+            Go To 5000
+         End If
+!!$ Dn, Cnv e Cnh
+         S1 = 'D'
+         If (NMS .Eq. maxasp*2) Then
+            If (nplane .Eq. 0) Go To 5000
+            S1 = 'C'
+            S2 = 'v'
+            If (nplane .Eq. maxasp) Go To 5000
+            S2 = 'h'
+            Go To 5000
+         End If
+         S2 = 'h'
+         If (nplane .Eq. maxasp) S2 = 'd'
+5000     tot = '    '
+         tot = S1 // Sn // S2
+         Call compatta (tot, 4, k)
+         pointGroup = tot (1:3)
+
+5100     Continue
+
+5200     Return
+      End Subroutine
+
+
+
+
+!!$     ------------------------------------------------------------------
+      Subroutine VectorCopy (a, B, i, J)
+!!$     ------------------------------------------------------------------
+         Implicit None
+         Real (Kind=DEF_DBL_PREC) :: a (3, 1), B (3, 1)
+         Integer :: i, J
+         B (1, J) = a (1, i)
+         B (2, J) = a (2, i)
+         B (3, J) = a (3, i)
+
+         Return
+      End Subroutine
+
+
+
+!!$     VERIFICA SE A E' UNA MATRICE DI SIMMETRIA A MENO DI DXM
+!!$     IN CASO AFFERMATIVO PONE MV=1,  NMS=NMS + 1, SIM(I,J,NMS=A(I,J)
+!!$     MK(I,NMS) CONTIENE IL NUMERO DELL'ATOMO OTTENUTO STASFORMANDO I CON
+!!$     L'OPERAZIONE NMS
+!!$     ------------------------------------------------------------------
+      Subroutine verify (XO, a, MK, MN, mv, N)
+!!$     ------------------------------------------------------------------
+
+
+         Implicit None
+         Real (Kind=DEF_DBL_PREC) :: XO (3, 1), a (3, 3)
+         Integer :: MK (:, :), MN (:), m, mv, jj, J, k, neq, L, nord, msign, inv
+
+         Real (Kind=DEF_DBL_PREC) :: v (3), W (3), fmin, f
+         Integer, Dimension (:), Allocatable :: iat
+         Integer :: i, N
+         Allocate (iat(N))
+
+         mv = 1
+!!$     controlla per prima cosa che ls matrice A non sia gia' compresa in SIM
+         Do i = 1, NMS
+            If (ium(a, SIM, 1.d-2, 1, i) .Eq. 1) Go To 6
+         End Do
+
+         NMS = NMS + 1
+
+         Do 4 i = 1, N
+            MK (i, NMS) = 0
+            jj = 0
+            fmin = DXM (i)
+            Call prodmv (a, XO, v, 1, i, 1)
+
+            Do 2 J = 1, N
+               If (MN(i) .Ne. MN(J)) Go To 2
+               Call LinearCombination (XO, v, W, 1.d0,-1.d0, J, 1, 1)
+               Call prods (W, W, f, 1, 1, 2)
+               If (f .Gt. fmin) Go To 2
+               fmin = f
+               jj = J
+2           Continue
+            If (jj .Eq. 0) Go To 5
+            MK (i, NMS) = jj
+4        Continue
+
+!!$     Analysis of the multiplication matrix
+
+         Do k = 1, N
+            iat (k) = 0
+         End Do
+
+         Do 10 k = 1, N
+            If (iat(k) .Ne. 0) Go To 10
+            iat (k) = 1
+            neq = 1
+            L = k
+7           m = MK (L, NMS)
+            If (m .Eq. k) Go To 9
+            iat (m) = 1
+            neq = neq + 1
+            If (neq .Gt. N) Go To 5
+            L = m
+            Go To 7
+9           Continue
+
+            Call ax_order (a, 1, nord, msign, inv)
+!!$ il numero di atomi equivalenti per l'operazione di ordine m puo' essere
+!!$ solo 1 o 2 (atomi giacenti sull'elemento di simmetria) m (caso normale)
+!!$ o 2m ( quando si ha un elemento riducibile 3/m 5/m etc.)
+            If (neq .Eq. 1 .Or. neq .Eq. 2) Go To 10
+            If (neq .Eq. nord) Go To 10
+            If (neq .Eq. 2*nord) Go To 10
+            Go To 5
+
+10       Continue
+
+         SIM (:, :, NMS) = a (:, :)
+
+         Deallocate (iat)
+         Return
+
+5        NMS = NMS - 1
+6        mv = 0
+
+         Deallocate (iat)
+         Return
+      End Subroutine
+
+
+!!$     X       = fractional coordinates originate them
+!!$     NA      = Total number of atoms
+!!$     MSP(I)  = pointer of the species of atom I
+!!$     AMAS(I) = mass of atom I
+!!$     XO      = coordinate of the singel atoms to symmetrize
+!!$     N       = number of atoms to symmetrize
+!!$     SIM     = symmetry matrices of the molecular group
+!!$     NMS     = Order of the symmetry group
+!!$     ------------------------------------------------------------------
+      Subroutine work (coordinates, pointGroup)
+!!$     ------------------------------------------------------------------
+
+         Implicit None
+         Integer, Parameter :: maxorder = 8
+
+!!$          Character (Len=3) :: lbls
+         Character (Len=3) :: pointGroup
+
+         Real (Kind=DEF_DBL_PREC) :: coordinates (:, :)
+
+         Integer, Dimension (:, :), Allocatable :: MK
+         Integer, Dimension (:), Allocatable :: MN
+         Integer, Dimension (:), Allocatable :: IEQAT
+         Integer, Dimension (:, :), Allocatable :: MD
+         Integer, Dimension (:), Allocatable :: ISU
+         Integer, Dimension (:), Allocatable :: IASU
+
+         Real (Kind=DEF_DBL_PREC), Dimension (:, :), Allocatable :: XO
+         Real (Kind=DEF_DBL_PREC), Dimension (:, :), Allocatable :: XS
+         Real (Kind=DEF_DBL_PREC), Dimension (:), Allocatable :: D
+         Real (Kind=DEF_DBL_PREC), Dimension (:, :), Allocatable :: CO
+         Real (Kind=DEF_DBL_PREC), Dimension (:, :), Allocatable :: delta
+         Real (Kind=DEF_DBL_PREC), Dimension (:), Allocatable :: PESO
+         Integer :: MO, IES, N, i, k, MDEG, ndega, nd, iu, ib, ic, mord, nass, mmez, m2, iai, n1, jj, II, i1, &
+        & in1, i2, in2, n2
+         Integer :: J, mmd, nms1, i3, ntest, nax2, lax2, itrac, iabst, L, idm, npb, nes, nstart, kk, mv
+         Dimension v (3), W (3), DEL (4), AA (3, 3), AL (3, 3), DELM (4), idm (4)
+         Character :: Type (2)
+         Real (Kind=DEF_DBL_PREC) :: aaa, cosa, sina, ang, arms, v, W, fmin, comt, DELM, DEL
+         Real (Kind=DEF_DBL_PREC) :: pro, CA, CB, cc, CAM, ROT, cost, COM, dm, porig, den, delr, deliner, f, &
+        & pig, AL, AA
+
+!!$         write(*,*)'wwwwwwwwww',nAtoms
+         Allocate (MK(nAtoms, nmg))
+         Allocate (MN(nAtoms))
+         Allocate (IEQAT(nAtoms))
+         Allocate (MD(nAtoms, 2))
+         Allocate (ISU(nmg))
+         Allocate (IASU(nAtoms))
+
+         Allocate (XO(3, nAtoms))
+         Allocate (XS(3, nAtoms))
+         Allocate (D(nAtoms))
+!!$       Allocate (CO(3, NMA))
+         Allocate (CO(3, nAtoms))
+         Allocate (delta(3, nAtoms))
+         Allocate (PESO(nAtoms))
+
+
+         MO = 1
+
+         Type (1) = ' '
+         Type (2) = '*'
+         pig = 3.14159265358979D0
+         deliner = 0.1d0
+         SIM (:, :, :) = 0.0d0
+         AL (:, :) = 0.0d0
+
+         SIM (1, 1, 1) = 1.d0
+         SIM (2, 2, 1) = 1.d0
+         SIM (3, 3, 1) = 1.d0
+         AL (1, 1) = 1.d0
+         AL (2, 2) = 1.d0
+         AL (3, 3) = 1.d0
+
+         f = 0.d0
+         IES = 0
+         N = 0
+         NMS = 1
+
+!!$ selezione gruppo atomi da simmetrizzare
+         Do 450 i = 1, nAtoms
+            AA (1:3, 1:3) = 0.0d0
+            AA (1, 1) = SX (1, i)
+            AA (2, 2) = SX (2, i)
+            AA (3, 3) = SX (3, i)
+            Call prodmv (o, SX, AA, 1, i, 1)
+            SIG (i) = 0.d0
+            den = 0.d0
+
+            Do 435 k = 1, 3
+               If (AA(k, k) .Le. 0.d0) Go To 435
+               SIG (i) = SIG (i) + AA (k, k)
+               den = den + 1.d0
+435         Continue
+
+            If (den .Ne. 0.d0) Then
+               SIG (i) = SIG (i) / den
+            End If
+
+            If (MO .Ne. 1) Go To 450
+
+            N = N + 1
+            IASU (i) = 2
+            IEQAT (N) = i
+
+            XO (1, N) = X (1, i)
+            XO (2, N) = X (2, i)
+            XO (3, N) = X (3, i)
+
+            MN (N) = MSP (i)
+            If (indwgh .Eq. 1) PESO (N) = AMAS (i)
+            If (indwgh .Eq. 2) PESO (N) = 1.0D0
+
+            MK (N, 1) = N
+
+450      Continue
+
+         porig = PESO (1)
+
+         If (N .Le. 2) Then
+            Write (*,*) ' GROUP WITH LESS THAN THREE ATOMS'
+            Deallocate (MK, MN, IEQAT, MD, ISU, IASU)
+            Deallocate (XO, XS, D, CO, delta, PESO)
+            Return
+         End If
+
+!!$     ORTOGONALIZZAZIONE DELLE COORDINATE DEGLI ATOMI DA SIMMETRIZZARE
+!!$     CALCOLO DELLA DISTANZA MEDIA DAL BARICENTRO DEL GRUPPO
+
+460      Call momin (XO, PESO, o, N)
+
+!!$     DM=maximum length of vectors XO(I)
+
+         dm = 0.d0
+         Do i = 1, N
+            Call prods (XO, XO, D(i), i, i, 2)
+            If (D(i) .Gt. dm) Then
+               dm = D (i)
+            End If
+         End Do
+
+
+         Do i = 1, N
+            DXM (i) = DCM
+            If (indtol .Eq. 2) DXM (i) = DCM * D (i) / dm
+            If (indtol .Eq. 3) DXM (i) = SIG (i) * DCM
+         End Do
+
+         MDEG = 0
+         delr = DABS (RIN(1)-RIN(2)) / RIN (1)
+
+         If (delr .Le. deliner) Then
+            MDEG = 1
+         End If
+         delr = DABS (RIN(2)-RIN(3)) / RIN (1)
+         If (delr .Le. deliner) Then
+            MDEG = MDEG + 2
+         End If
+         ndega = MDEG + 1
+         nd = (MDEG+1) / 2 + 1
+
+!atg  write(*,*)'PRINCIPAL INERTIA MOMENTS and DEGENERATION DEGREE'
+!atg  write(*,'(3f10.2,i10,/)')RIN,nd
+!_______________________________________________________________________
+!!$ gruppi lineari
+         If (MDEG .Eq. 1) Then
+            Do i = 1, N
+               COM = DSQRT (XO(1, i)*XO(1, i)+XO(2, i)*XO(2, i))
+               If (COM .Gt. DXM(i)) Go To 990
+            End Do
+            CO (:, :) = 0.0d0
+            CO (1, 1) = - 1.d0
+            CO (2, 2) = - 1.d0
+            CO (3, 3) = 1.d0
+            Call verify (XO, CO, MK, MN, mv, N)
+            CO (3, 3) = - 1.d0
+            Call verify (XO, CO, MK, MN, mv, N)
+            MDEG = 5
+            Go To 2520
+         End If
+!_______________________________________________________________________
+990      Go To (1020, 1020, 1000, 2000), ndega
+
+!!$ ASSE UNICO=X  RUOTA LE COORDINATE IN MODO DA AVERE Z COME ASSE UNICO
+!!$ MODIFICA DI CONSEGUENZA ANCHE LA MATRICE DI ORIENTAZIONE
+
+1000     CO (:, :) = 0.0d0
+         MDEG = 1
+         CO (3, 1) = 1.d0
+         CO (1, 3) = 1.d0
+         CO (2, 2) = - 1.d0
+         Call RotateFrame (CO, XO, N)
+         COM = RIN (3)
+         RIN (3) = RIN (1)
+         RIN (1) = COM
+!!$ ASSE UNICO Z
+1020     iu = 3
+         ib = 2
+         ic = 1
+!!$ RICERCA DELL'ASSE DI ORDINE MORD
+1100     mord = maxorder + 1
+         If (MDEG .Eq. 0) mord = 3
+         nass = 1
+1110     mord = mord - 1
+         If (mord .Eq. 3 .And. MDEG .Eq. 3) mord = 2
+         If (mord .Eq. 1) Go To 1210
+!!$ GENERAZIONE DELLA MATRICE DI SIMMETRIA
+1120     cost = 1.d0
+         CO (:, :) = 0.0d0
+         ROT = 2.d0 * pig / dfloat (mord)
+         CA = Cos (ROT)
+         CB = Sin (ROT)
+1140     CO (ib, ib) = CA * cost
+         CO (ic, ic) = CO (ib, ib)
+         CO (ib, ic) = CB * cost
+         CO (ic, ib) = - CO (ib, ic)
+         CO (iu, iu) = cost
+         Call verify (XO, CO, MK, MN, mv, N)
+
+         If (mv .Eq. 1) Go To 1150
+         If (cost .Eq.-1.d0) Go To 1110
+         cost = - 1.d0
+         mmez = mord / 2
+         m2 = 2 * mmez
+         If (m2 .Ne. mord) Go To 1140
+!!$ se MORD=2*mmez ed mmez=dispari (assi -6=3/m -10=5/m)  si ha un
+!!$ elemento riducibile quindi e' inutile testarlo
+         m2 = 2 * mmez / 2
+         If (mmez-m2 .Eq. 1) Go To 1110
+         Go To 1140
+!!$ HA TROVATO UN ELEMENTO DI SIMMETRIA
+1150     If (mord .Eq. 3 .Or. mord .Eq. 6) IES = 1
+
+         If (MDEG .Eq. 1 .And. mord .Gt. 2) Go To 1300
+!!$ RICERCA ELEMENTI DI SIMMETRIA SU NUOVI ASSI
+1205     If (mord .Gt. 2) Go To 1110
+1210     nass = nass + 1
+!!$ AL COMPLETAMENTO DEL GRUPPO
+         If (nass .Eq. 4) Go To 2500
+!!$ RICICLO SUL SECONDO O TERZO ASSE
+         mord = 2
+         i = iu
+         iu = ib
+         ib = ic
+         ic = i
+         Go To 1120
+
+!!$ RICERCA DELLA ROTAZIONE PER PORTARE EVENTUALI ELEMENTI DI SIMMETRIA
+!!$ A COINCIDERE CON GLI ASSI DI RIFERIMENTO
+1300     If (N .Le. 1) Then
+            Write (*,*) 'Single atom, not a molecule'
+            Deallocate (MK, MN, IEQAT, MD, ISU, IASU)
+            Deallocate (XO, XS, D, CO, delta, PESO)
+            Return
+         End If
+
+!!$ SELEZIONE DELL'ATOMO DA USARE PER DETERMINARE LA ROTAZIONE
+         CO (:, :) = 0.0d0
+         CO (3, 3) = 1.d0
+!!$ divisione in gruppi equidistanti dall'asse unico
+         Do i = 1, N
+            D (i) = DSQRT (XO(1, i)*XO(1, i)+XO(2, i)*XO(2, i))
+            MD (i, 1) = 0
+            MD (i, 2) = 0
+         End Do
+         iai = 0
+!!$ IAI=NUMERO DI ENNUPLE DI ATOMI AVENTI DISTANZE COMPRESE IN UN RANGE
+!!$         X< D <X+DXM*.5
+!!$ MD(I,1)=NUMERO DELLA ENNUPLA DI CUI L'ATOMO I FA PARTE
+!!$ MD(IAI,2)=N PER IL PRIMO ATOMO DELLA ENNUPLA DOVE N E' IL NUMERO DI
+!!$         ATOMI DELLA STESSA
+         n1 = N - 1
+         Do 1320 i = 1, n1
+            If (MD(i, 1) .Ne. 0) Go To 1320
+            iai = iai + 1
+            MD (i, 1) = iai
+            MD (iai, 2) = 1
+            J = i + 1
+            Do 1310 k = J, N
+               If (MN(i) .Ne. MN(k) .Or. k .Eq. i .Or. MD(k, 1) .Ne. 0) Go To 1310
+               If (Abs(D(i)-D(k)) .Gt. 0.5d0*DXM(i)) Go To 1310
+               MD (k, 1) = iai
+               MD (iai, 2) = MD (iai, 2) + 1
+1310        Continue
+1320     Continue
+!!$ ricerca del sottogruppo minimo
+         jj = 10000
+         Do 1330 i = 1, iai
+            If (MD(i, 2) .Ge. jj .Or. MD(i, 2) .Le. 2) Go To 1330
+            jj = MD (i, 2)
+1330     Continue
+!!$ fra i sottogruppi minimi viene scelto il piu' distante
+!!$ dall'asse unico
+         dm = 0.
+         Do 1350 i = 1, iai
+            If (MD(i, 2) .Ne. jj) Go To 1350
+            Do 1340 k = 1, N
+               If (MD(k, 1) .Ne. i) Go To 1340
+               If (D(k) .Gt. dm) Then
+                  dm = D (k)
+                  II = i
+               End If
+1340        Continue
+1350     Continue
+
+!!$          Call vrload (AA, 0.d0, 9)
+         AA (:, :) = 0.0d0
+         n1 = N - 1
+         Do 1370 i1 = 1, n1
+            If (MD(i1, 1) .Ne. II) Go To 1370
+            in1 = i1 + 1
+            Do 1360 i2 = in1, N
+               If (MD(i2, 1) .Ne. II) Go To 1360
+               Call LinearCombination (XO, XO, CO, 1.d0, 1.d0, i1, i2, 1)
+               Call prodv (CO, CO, CO, 3, 1, 2)
+               CAM = CO (1, 2) * CO (1, 2) + CO (2, 2) * CO (2, 2) + CO (3, 2) * CO (3, 2)
+               If (CAM .Le. 0.00001) Go To 1360
+               Call norm (CO, 2)
+               Call prodv (CO, CO, CO, 2, 3, 1)
+!!$             Call TransposeMatrix (CO, CO, 1, 1)
+!!$ write(*,*) size(CO,1),size(CO,2),size(transpose(CO),1),size(transpose(CO),2)
+               CO (1:3, 1:3) = transpose (CO(1:3, 1:3))
+               Call RotateFrame (CO, XO, N)
+               COM = 1.d0
+1355           AA (1, 1) = - 1.0d0
+               AA (2, 2) = - 1.0d0
+               AA (3, 3) = COM
+               Call verify (XO, AA, MK, MN, mv, N)
+
+               AA (1, 1) = - 1.0d0
+               AA (2, 2) = 1.0d0
+               AA (3, 3) = COM
+               Call verify (XO, AA, MK, MN, mv, N)
+               AA (1, 1) = 1.0d0
+               AA (2, 2) = - 1.0d0
+               AA (3, 3) = COM
+               Call verify (XO, AA, MK, MN, mv, N)
+               AA (1, 1) = 0
+               AA (1, 2) = 1.0d0
+               AA (2, 1) = 1.0d0
+               AA (2, 2) = 0
+               AA (3, 3) = COM
+               Call verify (XO, AA, MK, MN, mv, N)
+               If (NMS .Ge. 3) Go To 1110
+               If (COM .Le. 0.0) Go To 1360
+               COM = - COM
+               AA (:, :) = 0.0d0
+               Go To 1355
+!di ognuna di queste quattro  matrici fare l'equivalente con -z!!!!!
+1360        Continue
+1370     Continue
+         Go To 2500
+
+!ASO TRIPLAMENTE DEGENERE
+2000     n1 = N - 1
+         n2 = N - 2
+         Do 2010 i = 1, N
+            MD (i, 1) = 0
+            MD (i, 2) = 0
+            Do 2010 J = 2, nmg
+2010     MK (i, J) = 0
+         iai = 0
+!!$ IAI=NUMERO DI ENNUPLE DI ATOMI AVENTI DISTANZE COMPRESE IN UN RANGE
+!!$         X< D <X+DXM*.5
+!!$ MD(I,1)=NUMERO DELLA ENNUPLA DI CUI L'ATOMO I FA PARTE
+!!$ MD(IAI,2)=N PER IL PRIMO ATOMO DELLA ENNUPLA DOVE N E' IL NUMERO DI
+!!$         ATOMI DELLA STESSA
+         Do 2050 i = 1, n1
+            If (MD(i, 1) .Ne. 0) Go To 2050
+            iai = iai + 1
+            MD (i, 1) = iai
+            MD (iai, 2) = 1
+            J = i + 1
+            Do 2040 k = J, N
+               If (MN(i) .Ne. MN(k) .Or. k .Eq. i .Or. MD(k, 1) .Ne. 0) Go To 2040
+               If (Abs(D(i)-D(k)) .Gt. 0.5d0*DXM(i)) Go To 2040
+               MD (k, 1) = iai
+               MD (iai, 2) = MD (iai, 2) + 1
+2040        Continue
+2050     Continue
+!!$ SE CI SONO ATOMI SU POSIZIONI SPECIALI USA QUESTI PER TROVARE LA
+!!$ MATRICE DI ROTAZIONE
+2100     CO (:, :) = 0.0d0
+         mmd = 1000
+         Do i = 1, iai
+            If (MD(i, 2) .Lt. mmd .And. MD(i, 2) .Gt. 1) Then
+               mmd = MD (i, 2)
+               II = i
+            End If
+         End Do
+!!$ perche' ci sia simmetria I o Ih ci devono essere almeno 12 atomi equivalenti
+         If (MD(II, 2) .Eq. 12 .Or. MD(II, 2) .Eq. 20 .Or. MD(II, 2) .Eq. 30 .Or. MD(II, 2) .Gt. 48) Call &
+        & icosahed (XO, PESO, N, MN, MK, MD, II, MDEG,*2780)
+
+         If (MDEG .Eq. 1) Go To 1020
+
+         If (NMS .Ge. 5) Then
+            MDEG = 1
+            AA (:, :) = 0.0d0
+
+            Write (*, '(i3,3f9.5)') (i, (XO(k, i), k=1, 3), i=1, N)
+            AA (1, 1) = 1.0d0
+            AA (2, 2) = 1.0d0
+            AA (3, 3) = - 1.0d0
+            Call verify (XO, AA, MK, MN, mv, N)
+            AA (1, 1) = 1.0d0
+            AA (2, 2) = - 1.0d0
+            AA (3, 3) = 1.0d0
+            Call verify (XO, AA, MK, MN, mv, N)
+            AA (1, 1) = - 1.0d0
+            AA (2, 2) = 1.0d0
+            AA (3, 3) = 1.0d0
+            Call verify (XO, AA, MK, MN, mv, N)
+            Go To 2500
+         End If
+
+!!$ RICERCA ASSE 3 SU ATOMI IN POSIZIONE GENERALE
+!!$ NOTA: TRE ATOMI EQUIVALANTI PER UN ASSE 3 DEVONO FORMARE UN TRIANGOLO
+!!$ EQUILATERO
+!!$ II E' IL NUMERO DI ATOMI DEL SOTTOGRUPPO
+
+2110     CA = 0.d0
+!!$ matrice di rotazione 3 coincidente con z
+         AA (:, :) = 0.0d0
+         AA (3, 3) = 1.d0
+         AA (1, 1) = - .5d0
+         AA (2, 2) = - .5d0
+         AA (2, 1) = 0.5d0 * DSQRT (3.d0)
+         AA (1, 2) = - AA (2, 1)
+         nms1 = 1
+
+!!$     I1,I2,I3=INDICATORI DEI TRE ATOMI POSSIBILE GENERATORI DELL'ASSE 3
+
+         n2 = N - 2
+         n1 = N - 1
+         Do 2200 i1 = 1, n2
+            If (MD(i1, 1) .Ne. II) Go To 2200
+            in1 = i1 + 1
+            Do 2190 i2 = in1, n1
+               If (MD(i2, 1) .Ne. II) Go To 2190
+               Call LinearCombination (XO, XO, CO, 1.d0,-1.d0, i1, i2, 4)
+               Call prods (CO, CO, CA, 4, 4, 2)
+               in2 = i2 + 1
+               Do 2180 i3 = in2, N
+                  If (MD(i3, 1) .Ne. II) Go To 2180
+                  Call LinearCombination (XO, XO, CO, 1.d0,-1.d0, i1, i3, 5)
+                  Call prods (CO, CO, CB, 5, 5, 2)
+                  Call LinearCombination (XO, XO, CO, 1.d0,-1.d0, i2, i3, 6)
+                  Call prods (CO, CO, cc, 6, 6, 2)
+                  If (DABS(CA-CB) .Gt. DXM(i1)) Go To 2180
+                  If (DABS(CA-cc) .Gt. DXM(i1)) Go To 2180
+                  If (DABS(CB-cc) .Gt. DXM(i1)) Go To 2180
+                  CO (1, 3) = XO (1, i1) + XO (1, i2) + XO (1, i3)
+                  CO (2, 3) = XO (2, i1) + XO (2, i2) + XO (2, i3)
+                  CO (3, 3) = XO (3, i1) + XO (3, i2) + XO (3, i3)
+                  Call norm (CO, 3)
+!!$ salvataggio del possibile asse 3
+                  CO (1, 6+nms1) = CO (1, 3)
+                  CO (2, 6+nms1) = CO (2, 3)
+                  CO (3, 6+nms1) = CO (3, 3)
+!ontrollo che l'asse trovato non coincida gia' con z cioe'
+!on il primo asse C3 trovato
+                  If (nms1 .Gt. 1) Then
+                     Call prods (CO, CO, pro, 7, 8, 1)
+                     If (DABS(pro) .Gt. 0.9d0) Go To 2180
+                     If (pro .Gt. 0.d0) Then
+                        CO (1, 8) = - CO (1, 8)
+                        CO (2, 8) = - CO (2, 8)
+                        CO (3, 8) = - CO (3, 8)
+                     End If
+                  End If
+!!$ definizione di un secondo asse
+                  Do i = 1, 3
+                     CO (:, 1) = 0.0d0
+                     CO (i, 1) = 1.d0
+                     Call prods (CO, CO, pro, 1, 3, 1)
+                     If (DABS(pro) .Gt. 0.5) Go To 2150
+                  End Do
+!!$ verifica se l' asse trovato e' un C3
+!!$ rotazione per portare il C3 a coincidere con z
+2150              Call prodv (CO, CO, CO, 3, 1, 2)
+                  Call norm (CO, 2)
+                  Call prodv (CO, CO, CO, 2, 3, 1)
+                  CO (1:3, 1:3) = transpose (CO(1:3, 1:3))
+                  Call RotateFrame (CO, XO, N)
+                  Call verify (XO, AA, MK, MN, mv, N)
+                  NMS = 1
+                  nms1 = nms1 + mv
+                  CO (1:3, 1:3) = transpose (CO(1:3, 1:3))
+                  Call RotateFrame (CO, XO, N)
+                  If (nms1 .Eq. 3) Go To 2350
+2180           Continue
+2190        Continue
+2200     Continue
+         Write (*, 2)
+2        Format ('********************** WARNING **********************',//, '       INCREASING THE TOLERANCE&
+        & COULD BE USEFUL',//, '*****************************************************')
+         If (nms1 .Eq. 1) Then
+!!$ se ha gia' modificato una volta i pesi non li modifica ulteriormente
+!!$ ma riduce la tolleranza accettata fra i momenti di inerzia per il
+!alcolo della degenerazione
+            If (porig .Ne. PESO(1)) Then
+               deliner = deliner * 0.1d0
+               Go To 460
+            End If
+
+!!$ pseudodegenerazione 3 senza assi C3. Esiste ancora la possibilita'
+!!$ che la pseudodegenerazione sia completa (MDEG=0) o che ci sia una
+!!$ asse 4,-4,5,-5,7,-7,8,-8
+
+            Write (*,*) 'Weights are changed'
+            Do k = 1, N
+               PESO (k) = PESO (k) * (D(k)/dm) ** 4
+            End Do
+            Go To 460
+         End If
+!!$ ha trovato un solo asse 3 [ = CO(7)] e si riporta in quel
+!!$ riferimento ripristinando NMS
+!!$ definizione di un secondo asse
+         CO (1, 3) = CO (1, 7)
+         CO (2, 3) = CO (2, 7)
+         CO (3, 3) = CO (3, 7)
+         Do i = 1, 3
+            CO (:, 1) = 0.0d0
+            CO (i, 1) = 1.d0
+            Call prods (CO, CO, pro, 1, 3, 1)
+            If (DABS(pro) .Gt. 0.5) Go To 2310
+         End Do
+2310     Call prodv (CO, CO, CO, 3, 1, 2)
+         Call norm (CO, 2)
+         Call prodv (CO, CO, CO, 2, 3, 1)
+         CO (1:3, 1:3) = transpose (CO(1:3, 1:3))
+
+         Call RotateFrame (CO, XO, N)
+         Go To 2490
+!!$ ha trovato due assi C3 [CO(7) e CO(8)] e li usa per
+!!$ determinare il riferimento definitivo
+2350     Call LinearCombination (CO, CO, CO, 1.d0, 1.d0, 7, 8, 1)
+         Call norm (CO, 1)
+         Call LinearCombination (CO, CO, CO, 1.d0,-1.d0, 7, 8, 3)
+         Call prodv (CO, CO, CO, 3, 1, 2)
+         Call norm (CO, 2)
+         Call prodv (CO, CO, CO, 1, 2, 3)
+         CO (1:3, 1:3) = transpose (CO(1:3, 1:3))
+
+         Call RotateFrame (CO, XO, N)
+         CO (:, :) = 0.0d0
+         CO (1, 1) = 1.d0
+         CO (2, 2) = DSQRT (0.5d0)
+         CO (3, 3) = CO (2, 2)
+         CO (2, 3) = CO (2, 2)
+         CO (3, 2) = - CO (2, 2)
+         Go To 2410
+!!$ ORTONORMALIZZAZIONE DELLA MATRICE DI ROTAZIONE
+2400     Call norm (CO, 5)
+!!$     write(out,'(30i4)')(MD(i,2),i=1,N)
+         Call prodv (CO, CO, CO, 5, 6, 7)
+         Call norm (CO, 7)
+         Call prodv (CO, CO, CO, 7, 5, 6)
+         Call VectorCopy (CO, CO, 5, 1)
+         Call VectorCopy (CO, CO, 6, 2)
+         Call VectorCopy (CO, CO, 7, 3)
+         CO (1:3, 1:3) = transpose (CO(1:3, 1:3))
+
+!!$ ROTAZIONE SU NUOVA TERNA
+!!$     write(out,*)' CO prima di RotateFrame'
+!!$     write(out,'(3f10.5)')((CO(kk,ii),ii=1,3),kk=1,3)
+2410     Call RotateFrame (CO, XO, N)
+!!$ VERIFICA GENERALE ESISTENZA ASSE TERNARIO
+!!$     write(out,*)' 2410 coordinate'
+!!$     write(out,'(i2,3f9.5)')(lll,(XO(kkk,lll),kkk=1,3),lll=1,N)
+         AA (:, :) = 0.0d0
+         AA (1, 2) = 1.d0
+         AA (2, 3) = 1.d0
+         AA (3, 1) = 1.d0
+         Call verify (XO, AA, MK, MN, mv, N)
+!!$     write(out,*)' 2400 tentativo con la matrice:'
+!!$     write(out,'(3f9.5)')((CO(kkk,lll),lll=1,3),kkk=1,3)
+!!$     write(out,*)'NMS,MV',NMS,MV
+         nass = 1
+!!$ ha torvato un asse 3 (diagonale) ora cerca un asse 2
+         iu = 1
+         ib = 2
+         ic = 3
+         mord = 4
+         CO (:, :) = 0.0d0
+         CO (1, 1) = - 1.d0
+         CO (2, 2) = - 1.d0
+         CO (3, 3) = 1.d0
+         Call verify (XO, CO, MK, MN, mv, N)
+!!$     write(out,*)' 2400 tentativo con la matrice:'
+!!$     write(out,'(3f9.5)')((CO(kkk,lll),lll=1,3),kkk=1,3)
+!!$     write(out,*)'NMS,MV',NMS,MV
+         If (mv .Eq. 1) Go To 1120
+!!$ non esiste l'asse 2 allineato su x: si tratta di una pseudodegenerazione
+!!$ mi metto in modo che l'asse 3 sia allineato a z
+         CO (:, :) = 0.0d0
+         AA (:, :) = 0.0d0
+         cost = DSQRT (0.5d0)
+         CO (1, 1) = cost
+         CO (2, 2) = cost
+         CO (1, 2) = - cost
+         CO (2, 1) = cost
+         CO (3, 3) = 1.d0
+         ang = 0.5d0 * DACOS (-1.d0/3.d0)
+         aaa = ang * 180.d0 / pig
+         cosa = dcos (ang)
+         sina = dsin (ang)
+         AA (2, 2) = cosa
+         AA (3, 3) = cosa
+         AA (2, 3) = - sina
+         AA (3, 2) = sina
+         AA (1, 1) = 1.d0
+         Call prodmm (AA, CO, CO, 1, 1, 1)
+         Call RotateFrame (CO, XO, N)
+2490     NMS = 1
+         mord = 6
+         MDEG = 1
+         iu = 3
+         ib = 2
+         ic = 1
+         Write (*, 5)
+5        Format ('***********************************************************',/, 'WARNING: the degeneration &
+        &degree is 3 but no cubic',/, '         or icosahedral group can be found.',/, 'IF YOU SUSPECT THE EX&
+        &ISTENCE OF ONE OF THEM, PLEASE CHANGE:',/, '1) the weighting scheme   OR',/, '2) put MOL<0 to the at&
+        &oms farest from the baricenter   OR',/, '3) enlarge DCM',/, '***************************************&
+        &********************')
+         Go To 1120
+!!$ RICERCA DEL CENTRO DI SIMMETRIA
+2500     II = 2
+         CO (:, :) = 0.0d0
+         CO (1, 1) = - 1.d0
+         CO (2, 2) = - 1.d0
+         CO (3, 3) = - 1.d0
+         Call verify (XO, CO, MK, MN, mv, N)
+         If (NMS .Ne. 1) Go To 2520
+
+         Write (*, 3)
+         Deallocate (MK, MN, IEQAT, MD, ISU, IASU)
+         Deallocate (XO, XS, D, CO, delta, PESO)
+         Return
+
+!!$     complete the group
+2520     Call CompleteGroup (MK, N,*4100)
+
+!!$     Linear group
+         If (MDEG .Eq. 5) Go To 2790
+         ntest = 0
+
+         Do i = 1, NMS
+            If (MTG(i, i) .Ne. 1) ntest = 1
+         End Do
+
+!!$ variazione per far si che in un C2 o C2v l'asse 2 coincida con z
+         If (NMS .Eq. 2 .Or. NMS .Eq. 4) Then
+            nax2 = 0
+            lax2 = 0
+            Do i = 2, NMS
+               itrac = Nint (SIM(1, 1, i)+SIM(2, 2, i)+SIM(3, 3, i))
+               iabst = Nint (DABS(SIM(1, 1, i))+DABS(SIM(2, 2, i))+DABS(SIM(3, 3, i)))
+               If (iabst .Ne. 3) Go To 2740
+               If (itrac .Eq.-1) Then
+                  nax2 = nax2 + 1
+                  lax2 = i
+               End If
+            End Do
+            If (nax2 .Eq. 0 .Or. nax2 .Eq. 3) Go To 2780
+            If (nax2 .Eq. 1) Then
+               Do L = 1, 3
+                  If (Nint(SIM(L, L, lax2)) .Eq. 1) Go To 2730
+               End Do
+2730           If (L .Eq. 3) Go To 2780
+               CO (:, :) = 0.0d0
+               i = 3 - L
+               k = 6 - i - L
+               CO (k, L) = 1.d0
+               CO (L, k) = - 1.d0
+               CO (i, i) = 1.d0
+               Call RotateFrame (CO, XO, N)
+               COM = RIN (3)
+               RIN (3) = RIN (L)
+               RIN (L) = COM
+            End If
+            NMS = 1
+            Go To 1020
+         End If
+2740     If (ntest .Eq. 0) Go To 2780
+!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+!!$ Ottimizzazione del riferimento per MDEG>0
+2780     If (MDEG .Eq. 0) Go To 2790
+         Do i = 1, NMS
+            ISU (i) = i
+         End Do
+         Call s_coor (SIM, XO, XS, CO, D, DEL, DELM, CSMT, MK, idm, ISU, NMS, N)
+         npb = 0
+         Do k = 1, NMS
+            Do i = 1, N
+               npu = npb + i
+               Call VectorCopy (XO, ppu, i, npu)
+               npu = npb + MK (i, k)
+               Call prodmv (SIM, XS, ppo, k, i, npu)
+            End Do
+            npb = npb + N
+         End Do
+         npu = npb
+         Call rms_min (v)
+         arms = crms (v)
+!!$     write(6,*)'v,RV'
+!!$     write(6,'(3f10.5)')V,RV
+         Call RotateFrame (RV, XO, N)
+!alcolo simmetria per sottogruppi di operazioni
+2790     CSM (1) = 0.d0
+         DEV (1) = 0.d0
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+!!$     write(out,*)'GROUP MULTIPLICATION TABLE'
+!!$     write(out,*)
+!!$     nst=NMS
+!!$     nis=25
+!!$     if(NMS.gt.24)nst=24
+!!$     do i=1,NMS
+!!$      write(out,'(24i3)')(MTG(i,j),j=1,nst)
+!!$     enddo
+!!$     write(out,*)
+!!$     if(nst.ne.NMS)then
+!!$      do i=1,NMS
+!!$       write(out,'(24i3)')(MTG(i,j),j=nis,NMS)
+!!$      enddo
+!!$     endif
+!++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+!!$ simmetrizzazione per sottogruppi di una solo elemento (e sue potenze)
+
+         Do 2950 i = 2, NMS
+            nes = 1
+            ISU (1) = nes
+            k = i
+2800        nes = nes + 1
+            ISU (nes) = k
+            L = MTG (i, k)
+
+            If (L .Eq. 1) Go To 2900
+
+            k = L
+            Go To 2800
+
+2900        Call s_coor (SIM, XO, XS, CO, D, DEL, DELM, comt, MK, idm, ISU, nes, N)
+
+            DEV (i) = DELM (4)
+            CSM (i) = comt
+2950     Continue
+
+!ALCOLA LE COORDINATEE SIMMETRIZZATE PER L'INTERO GRUPPO
+
+3000     Do i = 1, NMS
+            ISU (i) = i
+         End Do
+
+         Call s_coor (SIM, XO, XS, CO, D, DEL, DELM, CSMT, MK, idm, ISU, NMS, N)
+
+!!$ Recupero degli atomi con MOL<0
+
+         n1 = N
+
+
+         Do i = 1, nAtoms
+!!$     DO i = 1,NA
+            If (1 .Eq.-MO) Then
+               n1 = n1 + 1
+               IEQAT (n1) = i
+               MN (n1) = MSP (i)
+               MK (n1, 1) = - n1
+               Call LinearCombination (X, BARC, XO, 1.d0,-1.d0, i, 1, n1)
+               Call prodmv (OT, XO, XO, 1, n1, n1)
+               XS (1, n1) = XO (1, n1)
+               XS (2, n1) = XO (2, n1)
+               XS (3, n1) = XO (3, n1)
+            End If
+         End Do
+
+         nstart = N + 1
+
+         If (n1 .Eq. N) Go To 3400
+
+         Do i = nstart, n1
+            Do L = 2, NMS
+               MK (i, L) = 0
+               fmin = 10000.
+               Call prodmv (SIM, XO, v, L, i, 1)
+               Do 3150 k = nstart, n1
+                  If (MN(i) .Ne. MN(k)) Go To 3150
+                  Call LinearCombination (XO, v, W, 1.d0,-1.d0, k, 1, 1)
+                  Call prods (W, W, f, 1, 1, 2)
+                  If (f .Le. fmin) Then
+                     kk = k
+                     fmin = f
+                  End If
+3150           Continue
+               If (fmin .Lt. 2.*DCME) Then
+                  MK (i, L) = kk
+               Else
+                  MK (i, 1) = 0
+               End If
+            End Do
+         End Do
+
+
+         Do 3350 i = nstart, n1
+            If (MK(i, 1) .Eq. 0) Go To 3350
+            Do k = 2, NMS
+               Call prodmv (SIM, XO, v, k, i, 1)
+               L = MK (i, k)
+               Call LinearCombination (XS, v, XS, 1.d0, 1.d0, L, 1, L)
+            End Do
+3350     Continue
+
+         Do 3360 i = nstart, n1
+            If (MK(i, 1) .Eq. 0) Go To 3360
+            Do k = 1, 3
+               XS (k, i) = XS (k, i) / dfloat (NMS)
+            End Do
+3360     Continue
+
+
+3400     Continue
+
+         Call asymunit (MK, IASU, n1)
+
+         Do i = 1, nAtoms
+            Call LinearCombination (XS, XO, delta, 1.d0,-1.d0, i, i, i)
+         End Do
+
+         Call schoenfl (MDEG, pointGroup)
+
+         Do i = 1, nAtoms
+            coordinates (1, i) = XS (1, i)
+            coordinates (2, i) = XS (2, i)
+            coordinates (3, i) = XS (3, i)
+         End Do
+
+4100     Deallocate (MK, MN, IEQAT, MD, ISU, IASU)
+         Deallocate (XO, XS, D, CO, delta, PESO)
+
+         Return
+
+
+3        Format (' NO SYMMETRY EXISTS WITHIN GIVEN TOLERANCE')
+6        Format (/, ' SYMMETRY GROUP MATRICES', /)
+7        Format (3(1 X, 3 F16.10, /))
+
+      End Subroutine
+End Module

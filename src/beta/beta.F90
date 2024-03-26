@@ -1,0 +1,734 @@
+!!$ $Id:trans.F90 425 2007-05-23 18:18:58Z antst $
+!!$    This program calculates the condactance of
+!!$    "ideal lead|scattering region|ideal lead" system using Landauer
+!!$    formula. The transmission coefficients are calculated according to
+!!$    the method described in T.Ando PRB 44, 8017 (1991) modified for
+!!$    KKR (P-S) equation in screened representation (K.Xia et al, unpublished).
+!!$    The current incarnation is strongly influenced by the previous
+!!$    implementation by K.Xia and "enriched" by the outright theft of the
+!!$    parts of the self-consistent LMTO code by I.Turek.
+#include "math_def.h"
+
+Program trans
+      Use transport
+      Use ando_module
+      Use atoms_module
+      Use geometry_module
+      Use structure
+      Use supercell
+      Use hamiltonian
+      Use logging
+      Use sparse_solvers
+      Use bzgrid
+      Use rotations
+      Use readcfg
+      Use postprocess
+      Use compat
+      Use helpers
+      Use mpi
+      Implicit None
+      !Include 'mpif.h'
+!!$ Local
+      Type t_dw_torque
+         Complex (Kind=DEF_DBL_PREC) :: damp (2, 2), beta (1)
+      End Type t_dw_torque
+      Integer, Parameter :: clen = 200, timef = 201
+      Integer, Parameter :: trfiles (2) = (/ 202, 203 /)
+      Type (t_options) :: opt
+      Type (t_atoms_set) :: atoms
+      Type (t_geometry) :: mgeo, lgeo, rgeo, trgeo, llgeo, rlgeo
+      Type (t_strconst) :: msc, lsc, rsc
+      Type (t_ando_sollution) :: l_ando, r_ando
+      Type (t_potpar_mats) :: mpar, lpar, rpar
+      Type (t_mathop) :: msys, sk
+      Type (t_supercell) :: lscell, rscell
+      Type (bzone) :: bz
+      Type (t_tranrefl) :: tran (2)
+      Type (zdensemat) :: rhs, xdiffs (2)
+      Real (Kind=DEF_DBL_PREC) :: iitime, ttime
+      Integer :: ik, havelr, haverl, needsolve, nkloops, loop, hasdata = 0
+      Real (Kind=DEF_DBL_PREC) :: k (2), consv (1), cons1, cons, consw (1) = 0.0d0
+      Real (Kind=DEF_DBL_PREC) :: t_lr (2, 2) = 0.0d0, r_lr (2, 2) = 0.0d0, t_lr_spec (2, 2) = 0.0d0, &
+     & r_lr_spec (2, 2) = 0.0d0
+      Real (Kind=DEF_DBL_PREC) :: t_rl (2, 2) = 0.0d0, r_rl (2, 2) = 0.0d0, t_rl_spec (2, 2) = 0.0d0, &
+     & r_rl_spec (2, 2) = 0.0d0
+      Real (Kind=DEF_DBL_PREC) :: r_shc (2) = 0.0d0, l_shc (2) = 0.0d0, l_polj = 0.d0, r_polj = 0.d0
+      Type (t_dw_torque) :: dw, dw1
+
+      Real (Kind=DEF_DBL_PREC), Pointer :: rotm (:, :)
+      Integer :: rnm = 0, lnm = 0, hops, ngc (3), ngr (3), ntr
+      Character (Len=clen) :: cwork
+      Type (zcsrmat) :: hdiffs (2)
+      Type (torqsigmas) :: tors, tors1
+      Real (Kind=DEF_DBL_PREC), Allocatable :: zcurr (:, :, :), zcurr1 (:, :, :)
+
+
+!!$ MPI vars
+      Integer, Allocatable :: jobs (:), nsols (:)
+      Integer :: ierr, my_mpi_id, local_comm, solve_comm, mpi_sz, boss, havejob, root = 0
+      Integer :: mpi_loc_id
+      Integer :: solsize, ngrps, grpid
+      Integer, External :: OMP_GET_MAX_THREADS
+!!$ Porgram starts here
+!!$ -----------------------------------------------------------------------------
+
+      Call mpi_init (ierr)
+      solve_comm = mpi_comm_world
+      Call mpi_comm_rank (solve_comm, my_mpi_id, ierr)
+      Call mpi_comm_size (solve_comm, mpi_sz, ierr)
+
+      Log_Level = - 1
+      If (my_mpi_id == root) Then
+         Call unlink ('andout')
+         Log_Level = 1
+      End If
+#ifdef _VERS_
+      Call do_log (1, 'Transport code v'//_VERS_//' by Antst')
+#else
+      Call do_log (1, 'Transport code vXXXX by Antst')
+#endif
+!!$ Read  file with parameters
+
+      Call trans_config_init (opt, ispar_in=(mpi_sz > 1))
+      opt%po%need_current_pol = 1
+      opt%po%full = 1
+      dw%damp = dcmplx (0.d0, 0.d0)
+      dw%beta = dcmplx (0.d0, 0.d0)
+
+      Call redistcomm (opt%par_nprock, solve_comm, local_comm, ngrps, grpid)
+      Call mpi_comm_rank (local_comm, mpi_loc_id, ierr)
+      Call mpi_comm_size (local_comm, solsize, ierr)
+      If (mpi_loc_id == 0) boss = 1
+      Allocate (nsols(solsize))
+
+!!$ Set LogLevel and open output files
+      Allocate (jobs(mpi_sz))
+      If (my_mpi_id == root) Then
+         Log_Level = opt%loglvl
+         Open (Unit=timef, File='times', Action='write')
+!$$ Create directories if need
+         If (opt%writewf /= 0) Call c_mkdir ('wf', 2)
+         If (opt%writeham /= 0) Call c_mkdir ('ham', 3)
+         If (opt%writerhs /= 0) Call c_mkdir ('rhs', 3)
+         If (opt%writetm /= 0) Call c_mkdir ('tmx', 3)
+      Else
+!!$ uncomment line bellow if you want output from rest of CPUs
+!!$     Log_Level=opt%loglvl
+         Write (cwork, '(i2.2)') my_mpi_id
+         Write (logfilename, '("log.",A)') trim (cwork)
+      End If
+
+
+      ttime = MPI_Wtime ()
+      iitime = MPI_Wtime ()
+
+      Call init_mathop (msys)
+      Call init_mathop (sk)
+      hops = 1
+      If (opt%po%kind == 3) hops = 2
+
+      If (mpi_loc_id == 0) Then
+         hasdata = 1
+         If (opt%po%kind <= 3) Then
+!!$ Read atomic potentials
+            atoms = read_atoms ('atomlist')
+!!$ Read geometries
+            lgeo = read_geom ('geom_l', atoms)
+            rgeo = read_geom ('geom_r', atoms)
+            mgeo = read_geom ('geom_m', atoms, lgeo%scale)
+
+!!$ Prepare geometry for leads
+            llgeo = make_leadgeom (lgeo, hops,-1)
+            rlgeo = make_leadgeom (rgeo, hops, 1)
+!!$ Free original geometry for leads, we don't need it anymore
+            Call free_geom (lgeo)
+            Call free_geom (rgeo)
+!!$ Prepare geometry for transport region
+            trgeo = make_transportgeom (llgeo, rlgeo, mgeo)
+!!$ Free geometry for 'm' region, we don't need it anymore
+            Call free_geom (mgeo)
+!!$ Prepare parameters for supercell calculation
+            Call prepare_supercell (llgeo, lscell, 1, split=1)
+            Call prepare_supercell (rlgeo, rscell, 1, split=1)
+
+            rotm => prep_rot_mask (trgeo, opt%po)
+
+!!$ Calculate S(R)
+            msc = calc_screal (trgeo, 1)
+            lsc = calc_screal (llgeo, 1)
+            rsc = calc_screal (rlgeo, 1)
+
+!!$ Calculate potential parameters
+            Call calc_potpar (atoms, opt%atopt, opt%Eoffset)
+!!$ Prepare potential parameters matrices
+!!$ for leads and transport region
+            lpar = make_ppar_full (llgeo, opt%po, rotm(:, 1:1))
+            rpar = make_ppar_full (rlgeo, opt%po, rotm(:, size(rotm, 2) :size(rotm, 2)))
+            mpar = make_ppar_full (trgeo, opt%po, rotm)
+            If (opt%sdcdir /= 0) Then
+               lscell%rot = spinrm (rotm(:, 1:1))
+               rscell%rot = spinrm (rotm(:, size(rotm, 2) :size(rotm, 2)))
+            End If
+
+         Else If (opt%po%kind == 5) Then
+!!$ Do some preparing parts before constructing Hamiltonian
+!!$ Brillouin zone information to be fixed
+            If (Mod(opt%po%ngridx, opt%po%nlx) /= 0 .Or. Mod(opt%po%ngridy, opt%po%nly) /= 0) Then
+               Call do_log (1, 'Model Hamiltonian setting; supercell error')
+               Stop
+            Else
+               llgeo%sc_size (1) = opt%po%ngridx / opt%po%nlx
+               llgeo%sc_size (2) = opt%po%ngridy / opt%po%nly
+            End If
+            llgeo%base (1, 1) = dble (opt%po%nlx) * opt%po%dx
+            llgeo%base (1, 2) = 0.d0
+            llgeo%base (2, 2) = dble (opt%po%nly) * opt%po%dy
+            llgeo%base (2, 1) = 0.d0
+            llgeo%norbit = 2 * opt%po%nlx * opt%po%nly * opt%po%nlz
+            If (Mod(opt%po%ngridx, opt%po%nrx) /= 0 .Or. Mod(opt%po%ngridy, opt%po%nry) /= 0) Then
+               Call do_log (1, 'Model Hamiltonian setting; supercell error')
+               Stop
+            Else
+               rlgeo%sc_size (1) = opt%po%ngridx / opt%po%nrx
+               rlgeo%sc_size (2) = opt%po%ngridy / opt%po%nry
+            End If
+            trgeo%base (1, 1) = dble (llgeo%sc_size(1)) * llgeo%base(1, 1)
+            trgeo%base (1, 2) = 0.d0
+            trgeo%base (2, 1) = 0.d0
+            trgeo%base (2, 2) = dble (llgeo%sc_size(2)) * llgeo%base(2, 2)
+
+            rlgeo%base (1, 1) = dble (opt%po%nrx) * opt%po%dx
+            rlgeo%base (1, 2) = 0.d0
+            rlgeo%base (2, 2) = dble (opt%po%nry) * opt%po%dy
+            rlgeo%base (2, 1) = 0.d0
+            rlgeo%norbit = 2 * opt%po%nrx * opt%po%nry * opt%po%nrz
+
+            Call prepare_supercell (llgeo, lscell, 1, split=1, ngrid=opt%po%nlx*opt%po%nly*opt%po%nlz)
+            Call prepare_supercell (rlgeo, rscell, 1, split=1, ngrid=opt%po%nrx*opt%po%nry*opt%po%nrz)
+
+            ntr = dble (opt%po%ngridx*opt%po%ngridy*(opt%po%nlz+opt%po%nrz+opt%po%ngridz))
+            rotm => read_rot_mask (ntr)
+
+            If (opt%sdcdir /= 0) Then
+               lscell%rot = spinrm (rotm(:, 1:1))
+               rscell%rot = spinrm (rotm(:, size(rotm, 2) :size(rotm, 2)))
+            End If
+         End If !opt%po%kind
+
+         Call alloc_torque (tors, trgeo%tna, trgeo%ltna, trgeo%rtna)
+         Call alloc_torque (tors1, trgeo%tna, trgeo%ltna, trgeo%rtna)
+
+         Allocate (zcurr(trgeo%tna, 2, 2))
+         Allocate (zcurr1(trgeo%tna, 2, 2))
+         zcurr (:, :, :) = 0.0d0
+!!$ Prepare grid for BZ integration
+
+         Call gibz (bz, trgeo%base, opt%bzo)
+
+      Else
+         Call alloc_torque (tors, 1, 1, 1)
+         Call alloc_torque (tors1, 1, 1, 1)
+         Allocate (zcurr(1, 2, 2))
+         Allocate (zcurr1(1, 2, 2))
+      End If
+
+
+      If (my_mpi_id == 0) Then
+          nkloops = ceiling (bz%nkgrid/real(ngrps, kind=DEF_DBL_PREC))
+         Write (timef, '("   Init Time = ", f12.4," seconds"/)') MPI_Wtime () - iitime
+         flush (timef)
+      End If
+
+      Call mpi_bcast (nkloops, 1, mpi_integer, 0, solve_comm, ierr)
+
+      Call do_log (1, 'Starting transport calculation...')
+      Call do_log (1, '     IBZ,  kx,      ky,   nr_lm,nr_rm, ikx,iky,        consv ')
+
+
+      t_lr = 0.0d0
+      r_lr = 0.0d0
+      t_rl = 0.0d0
+      r_rl = 0.0d0
+      t_lr_spec = 0.0d0
+      t_rl_spec = 0.0d0
+      l_shc = 0.0d0
+      r_shc = 0.0d0
+      l_polj = 0.0d0
+      r_polj = 0.0d0
+      consv = 0.0d0
+      consw = 0.0d0
+      cons1 = 0.d0
+      Call MPI_Barrier (solve_comm, ierr)
+
+!!$ Workaround of bug in Fortran MPI interface
+      Call mrealloc (msys%c, 1, 1)
+
+!SMP$ DO SERIAL
+      Do loop = 0, nkloops - 1
+
+         iitime = MPI_Wtime ()
+         ik = 1 + loop * (ngrps) + grpid
+         havejob = 0
+         If (ik <= bz%nkgrid) Then
+            k = bz%k (:, ik)
+            havejob = 1
+         End If
+
+         If ((mpi_loc_id /= 0) .And. (solsize > 1)) havejob = 0
+         If (havejob /= 0) Then
+            If (opt%po%kind <= 3) Call make_sk (sk, msc, k, hops-1)
+         End If
+         Call mpi_gather (havejob, 1, mpi_integer, jobs, 1, mpi_integer, root, solve_comm, ierr)
+
+         cons = 0.0d0
+         havelr = 0
+         haverl = 0
+         needsolve = 0
+         If (havejob /= 0) Then
+            If (opt%po%kind <= 3) Then
+!!$ Prepare Ando for left lead
+               lnm = get_sc_ando (1, l_ando, k, lpar, lsc, lscell, opt%po,-1, opt%actl)
+!!$ Prepare Ando for Right lead
+               rnm = get_sc_ando (1, r_ando, k, rpar, rsc, rscell, opt%po, 1, opt%actl)
+            Else If (opt%po%kind == 5) Then
+!!$ Prepare Ando for left lead
+               lnm = get_sc_ando (1, l_ando, k, lpar, lsc, lscell, opt%po,-1, opt%actl, rotm(:, 1:1))
+!!$ Prepare Ando for Right lead
+               rnm = get_sc_ando (1, r_ando, k, rpar, rsc, rscell, opt%po, 1, opt%actl, rotm(:, size(rotm, 2) &
+              & :size(rotm, 2)))
+            End If
+
+            If (my_mpi_id == 0) Then
+               Write (timef, '("   Ando Time = ", f12.4," seconds")') MPI_Wtime () - iitime
+               flush (timef)
+            End If
+            If (l_ando%Nin*opt%needlr > 0) havelr = 1
+            If (r_ando%Nin*opt%needrl > 0) haverl = 1
+            needsolve = havelr + haverl
+            If (needsolve /= 0) Then
+!!$ Prepare P-S or H-HOH system for whole device
+               If (opt%po%kind <= 3) Then
+                  Call prep_system (msys, sk, mpar, opt%po, 0)
+                  Call get_ham_diffs (trgeo, sk, rotm, hdiffs, opt%po, opt%ddw%nmodes)
+               Else If (opt%po%kind == 5) Then
+!!$         calculated the dimension of the Hamiltonian
+                  ngc (1) = opt%po%ngridx
+                  ngc (2) = opt%po%ngridy
+                  ngc (3) = opt%po%ngridz + opt%po%nlz + opt%po%nrz
+                  ngr (1) = ngc (1)
+                  ngr (2) = ngc (2)
+                  ngr (3) = opt%po%ngridz
+                  Call prep_system (msys, opt%po, ngc, ngr, k, rotm)
+!!$Fixme          Call get_ham_diffs
+               End If
+
+               If (my_mpi_id == 0) Then
+                  Write (timef, '("   Prep Time = ", f12.4," seconds")') MPI_Wtime () - iitime
+                  flush (timef)
+               End If
+!!$ Embed boundary conditions and prepare RHS
+               Call embed_boundary (msys%c, rhs, l_ando, r_ando, opt%needlr, opt%needrl)
+               If (my_mpi_id == 0) Then
+                  Write (timef, '("  Embed Time = ", f12.4," seconds")') MPI_Wtime () - iitime
+                  flush (timef)
+               End If
+            End If
+         End If
+         If (opt%lowmem /= 0) Then
+            Call free_ando_emb (l_ando)
+            Call free_ando_emb (r_ando)
+         End If
+         If (opt%writeham == 1) Then
+            Write (cwork, '("ham/",i3.3,".dat")') ik
+            Call dump_matrix (msys%c, trim(cwork))
+         End If
+         If (opt%writerhs == 1) Then
+            Write (cwork, '("rhs/",i3.3,".dat")') ik
+            Call dump_matrix (rhs%bl, trim(cwork))
+         End If
+
+         Call mpi_allgather (needsolve, 1, mpi_integer, nsols, 1, mpi_integer, local_comm, ierr)
+!!$ Solve system
+!SMP$ DO SERIAL
+         Do boss = 0, solsize - 1
+            If (nsols(boss+1) /= 0) Then
+               Call sp_solve_diffs (msys%c, hdiffs, rhs, xdiffs, boss, local_comm, opt%leq)
+!!$            Call sp_solve (msys%c, rhs, boss, local_comm, opt%leq)
+            End If
+         End Do
+         If (opt%writewf == 1 .And. needsolve > 0) Then
+            Write (cwork, '("wf/",i3.3,".dat")') ik
+            Call dump_matrix (rhs%bl, trim(cwork))
+         End If
+!!$ All postprocessing/output, which depends on solution for local K-point comes here
+         If (needsolve > 0) Then
+!!$         Call calc_torque (rhs, trgeo, rotm, tors1, l_ando%Nin*havelr, r_ando%Nin*haverl)
+
+!!$         Call bzsum_torq (tors, tors1, bz%kweight(ik))
+
+!!$         Call calc_zcurrent (rhs, msys%c, trgeo, zcurr1, l_ando%Nin*havelr, r_ando%Nin*haverl)
+!!$         zcurr (:, :, :) = zcurr (:, :, :) + zcurr1 (:, :, :) * bz%kweight(ik)
+
+            dw1%damp = dcmplx (0.d0, 0.d0)
+            dw1%beta = dcmplx (0.d0, 0.d0)
+            dw1 = calc_pump (rhs, xdiffs, l_ando, r_ando, opt%ddw)
+            dw%damp = dw%damp + bz%kweight(ik) * dw1%damp
+            dw%beta = dw%beta + bz%kweight(ik) * dw1%beta
+         End If
+
+!!$ Calculate conductance
+         If (havejob /= 0) Then
+            cons1 = cond_full (tran, rhs, l_ando, r_ando, havelr, haverl)
+            Write (cwork, '(i7,2(1x,f8.4),2(1x,i4),2x,2(1x,i4),3x,g17.8)') ik, k (1), k (2), lnm, rnm, &
+           & bz%ik(1, ik), bz%ik(2, ik), cons1
+
+            cons = cons + cons1
+            If (consw(1) < cons1) consw (1) = cons1
+            Call free (rhs)
+         End If
+         Call MPI_Barrier (solve_comm, ierr)
+         Call log_parallel (solve_comm, root, havejob, jobs, cwork)
+
+         If (havejob /= 0) Then
+            If (opt%writetm /= 0) Then
+               If (opt%needlr /= 0) Call write_trans_matrices ('l', tran(1), ik)
+               If (opt%needrl /= 0) Call write_trans_matrices ('r', tran(2), ik)
+            End If
+
+            consv (1) = consv (1) + 0.5d0 * cons * bz%kweight(ik)
+            t_lr = t_lr + bz%kweight(ik) * tran(1)%T%val
+            r_lr = r_lr + bz%kweight(ik) * tran(1)%R%val
+            t_rl = t_rl + bz%kweight(ik) * tran(2)%T%val
+            r_rl = r_rl + bz%kweight(ik) * tran(2)%R%val
+            l_shc = l_shc + bz%kweight(ik) * l_ando%SNin
+            r_shc = r_shc + bz%kweight(ik) * r_ando%SNin
+            l_polj = l_polj + bz%kweight(ik) * l_ando%ppj * (l_ando%SNin(1)+l_ando%SNin(2))
+            r_polj = r_polj + bz%kweight(ik) * r_ando%ppj * (r_ando%SNin(1)+r_ando%SNin(2))
+
+            t_lr_spec = t_lr_spec + bz%kweight(ik) * tran(1)%T%spec
+            r_lr_spec = r_lr_spec + bz%kweight(ik) * tran(1)%R%spec
+            t_rl_spec = t_rl_spec + bz%kweight(ik) * tran(2)%T%spec
+            r_rl_spec = r_rl_spec + bz%kweight(ik) * tran(2)%R%spec
+         End If
+
+         If (my_mpi_id == 0) Then
+            Write (timef, '(i3.3," x KP Time = ", f12.4," seconds")') ngrps, MPI_Wtime () - iitime
+            flush (timef)
+         End If
+
+      End Do ! End of k-loop
+
+      Call do_log (1, 'Done!')
+
+      Call MPI_summ_res_d (solve_comm, 0, t_lr, 4, mpi_sum)
+      Call MPI_summ_res_d (solve_comm, 0, t_rl, 4, mpi_sum)
+      Call MPI_summ_res_d (solve_comm, 0, r_lr, 4, mpi_sum)
+      Call MPI_summ_res_d (solve_comm, 0, r_rl, 4, mpi_sum)
+
+      Call MPI_summ_res_d (solve_comm, 0, t_lr_spec, 4, mpi_sum)
+      Call MPI_summ_res_d (solve_comm, 0, t_rl_spec, 4, mpi_sum)
+      Call MPI_summ_res_d (solve_comm, 0, r_lr_spec, 4, mpi_sum)
+      Call MPI_summ_res_d (solve_comm, 0, r_rl_spec, 4, mpi_sum)
+
+      Call MPI_summ_res_d (solve_comm, 0, l_shc, 2, mpi_sum)
+      Call MPI_summ_res_d (solve_comm, 0, r_shc, 2, mpi_sum)
+      Call MPI_summ_res_d (solve_comm, 0, consv, 1, mpi_sum)
+      Call MPI_summ_res_d (solve_comm, 0, consw, 1, mpi_max)
+
+      Call MPI_summ_res_z (solve_comm, 0, dw%damp, 4, mpi_sum)
+      Call MPI_summ_res_z (solve_comm, 0, dw%beta, 1, mpi_sum)
+
+
+      If (my_mpi_id == 0) Then
+         Call write_legacy_ando (opt, t_lr, t_rl, t_lr_spec, t_rl_spec, l_shc, r_shc, consv, consw, dw)
+      End If
+
+      Call MPI_Barrier (solve_comm, ierr)
+
+      If (my_mpi_id == 0) write (timef, '(/"  Total Time = ", f12.4," seconds")') MPI_Wtime () - ttime
+
+      Call mpi_finalize (ierr)
+
+
+!!$ End of Program!
+!!$ ---------------------------------------------------------------------------------------
+      Stop
+
+Contains
+
+      Subroutine get_ham_diffs (trgeo, sk, rotm0, hdiffs, po, nmodes)
+         Use sparselib
+         Use hamiltonian
+         Use structure
+         Implicit None
+         Type (zcsrmat), Intent (Inout) :: hdiffs (:)
+         Real (Kind=DEF_DBL_PREC), Intent (In) :: rotm0 (:, :)
+         Type (t_pot_opts), Intent (In) :: po
+         Type (t_mathop), Intent (In) :: sk
+         Type (t_geometry), Intent (In) :: trgeo
+         Integer, Intent (In) :: nmodes
+!!$ Local vars
+         Real (Kind=DEF_DBL_PREC), Allocatable :: rotm (:, :)
+         Real (Kind=DEF_DBL_PREC), Pointer :: rotd (:, :)
+         Integer :: i, ddir, dind, irot
+         Integer :: dir1, dir2
+         Real (Kind=DEF_DBL_PREC) :: cic
+         Type (t_potpar_mats) :: mpar
+         Type (t_mathop) :: ms (2)
+
+         Allocate (rotm(2, trgeo%num))
+
+!!$ Determine different magnetization configurations
+         dir1 = 1
+         dir2 = 2
+         If (nmodes /= 0) Then
+            dir1 = nmodes
+            dir2 = nmodes
+         End If
+         Do ddir = dir1, dir2
+            irot = ddir
+            If (nmodes /= 0) irot = 1
+            rotd => read_rotdm (trgeo%num, trgeo%ltna, trgeo%rtna, irot)
+            Do dind = 1, 2
+               cic = - 1.d0
+               If (dind == 2) cic = 1.d0
+               Do i = 1, trgeo%num
+                  rotm (1:2, i) = rotm0 (1:2, i) + cic * rotd (1:2, i)
+               End Do
+               mpar = make_ppar_full (trgeo, po, rotm)
+               Call prep_system (ms(dind), sk, mpar, po, 0)
+               Call free_ppar_f (mpar)
+            End Do
+            Call free (hdiffs(ddir))
+            hdiffs (ddir) = spmatadd (ms(2)%c, ms(1)%c, sign=-1)
+            Call free_mathop (ms(1))
+            Call free_mathop (ms(2))
+            Deallocate (rotd)
+         End Do
+         Deallocate (rotm)
+      End Subroutine get_ham_diffs
+
+      Function read_rotdm (num, numl, numr, no) Result (rm)
+         Implicit None
+         Integer :: num, numl, numr, no
+         Real (Kind=DEF_DBL_PREC), Pointer :: rm (:, :)
+!!$ Local vars
+         Integer :: fl = 32899, ios
+         Integer :: i, n
+
+         Allocate (rm(2, num))
+         rm = 0.0d0
+         Open (Unit=fl, File='rot_dw', Action='read', IoStat=ios)
+         If (ios /= 0) Then
+            Write (*,*) 'Error opening file "rot_dw".'
+            Stop
+         End If
+         Read (fl,*)
+         Read (fl, '(2g17.10)') (rm(1:2, numl+i), i=1, num-numr-numl)
+         If (no > 1) Then
+            Do n = 1, no - 1
+               Read (fl, '(2g17.10)') (rm(1:2, numl+i), i=1, num-numr-numl)
+            End Do
+         End If
+         Do i = 1, numl
+            rm (1:2, i) = rm (1:2, numl+1)
+         End Do
+         Do i = num, num - numr + 1, - 1
+            rm (1:2, i) = rm (1:2, num-numr)
+         End Do
+         Close (fl)
+         rm (:, :) = rm (:, :) * DEF_M_PI
+      End Function read_rotdm
+
+      Function calc_pump (rhs, xdiffs, l_ando, r_ando, ddw) Result (dw)
+         Use transport
+         Use ando_module
+         Implicit None
+         Type (zdensemat) :: rhs, xdiffs (2)
+         Type (t_ando_sollution) :: l_ando, r_ando
+         Type (t_ddw_opts) :: ddw
+         Type (t_dw_torque) :: dw
+!!$ Local
+         Type (zdensemat) :: smx, sder (2)
+         Integer :: i1, i2, dir1, dir2
+
+         dw%damp = dcmplx (0.d0, 0.d0)
+         dw%beta = dcmplx (0.d0, 0.d0)
+
+         Call cond_Sdiff (smx, rhs, l_ando, r_ando, .False.)
+
+         dir1 = 1
+         dir2 = 2
+         If (ddw%nmodes /= 0) Then
+            dir1 = ddw%nmodes
+            dir2 = ddw%nmodes
+         End If
+         Do i1 = dir1, dir2
+            Call cond_Sdiff (sder(i1), xdiffs(i1), l_ando, r_ando, .True.)
+         End Do
+
+         Do i1 = dir1, dir2
+            Do i2 = dir1, dir2
+               dw%damp (i1, i2) = sum (sder(i1)%bl*conjg(sder(i2)%bl))
+            End Do
+         End Do
+
+         dw%damp (1, 1) = dw%damp(1, 1) / ((ddw%dr)**2*8.d0*DEF_M_PI)
+         dw%damp (2, 2) = dw%damp(2, 2) / ((ddw%dphi)**2*8.d0*DEF_M_PI)
+         dw%damp (1, 2) = dw%damp(1, 2) / (ddw%dphi*(-ddw%dr)*8.d0*DEF_M_PI)
+         dw%damp (2, 1) = dw%damp(2, 1) / (ddw%dphi*(-ddw%dr)*8.d0*DEF_M_PI)
+
+         If (ddw%nmodes /= 2) Then
+            Do i2 = 1, l_ando%Nout + r_ando%Nout
+               Do i1 = 1, l_ando%Nout
+                  dw%beta (1) = dw%beta(1) + sder(1)%bl(i1, i2) * conjg (smx%bl(i1, i2))
+               End Do
+               Do i1 = l_ando%Nout + 1, l_ando%Nout + r_ando%Nout
+                  dw%beta (1) = dw%beta(1) - sder(1)%bl(i1, i2) * conjg (smx%bl(i1, i2))
+               End Do
+            End Do
+            dw%beta (1) = dw%beta(1) / (-ddw%dr*4.d0)
+         End If
+
+         Do i1 = dir1, dir2
+            Call free (sder(i1))
+         End Do
+         Call free (smx)
+      End Function calc_pump
+
+      Subroutine cond_Sdiff (sd, psid, l_ando, r_ando, lds)
+!!$    Calculates derivative of scattering matrix
+!!$    psid - derivatives of wave-functions
+!!$    sd - matrix with the derivative
+         Use ando_module
+         Implicit None
+!!$    Arguments
+         Type (t_ando_sollution) :: l_ando, r_ando
+         Type (zdensemat) :: psid
+         Type (zdensemat) :: sd
+         Logical :: lds
+!!$    Local variables
+         Complex (Kind=DEF_DBL_PREC), Parameter :: z1 = DEF_cmplx_one, z0 = DEF_cmplx_zero
+         Complex (Kind=DEF_DBL_PREC), Parameter :: zm1 = - z1
+         Complex (Kind=DEF_DBL_PREC), Allocatable :: sr (:, :)
+         Integer :: n, l, m, ldr, n1, i1, i, j
+
+         ldr = psid%nrow
+         l = psid%ncol
+         n1 = l_ando%Nout + r_ando%Nout
+         Call alloc (sd, n1, l)
+
+         i1 = 0
+         If (l_ando%Nout > 0) Then
+            n = l_ando%Nout
+            m = l_ando%n
+            Call zgemm ('N', 'N', n, l, m, z1, l_ando%Uout_i, n, psid%bl(1, 1), ldr, z0, sd%bl(1, 1), n1)
+            If ( .Not. lds) Then
+               Allocate (sr(n, n))
+               Call zgemm ('N', 'N', n, n, m, zm1, l_ando%Uout_i, n, l_ando%Uin, m, z0, sr, n)
+               Do j = 1, n
+                  Do i = 1, n
+                     sd%bl (i, j) = sd%bl(i, j) + sr (i, j)
+                  End Do
+               End Do
+               Deallocate (sr)
+            End If
+            i1 = i1 + l_ando%Nout
+         End If
+
+         If (r_ando%Nout > 0) Then
+            n = r_ando%Nout
+            m = r_ando%n
+            Call zgemm ('N', 'N', n, l, m, z1, r_ando%Uout_i, n, psid%bl(ldr-m+1, 1), ldr, z0, sd%bl(i1+1, &
+           & 1), n1)
+            If ( .Not. lds) Then
+               Allocate (sr(n, n))
+               Call zgemm ('N', 'N', n, n, m, zm1, r_ando%Uout_i, n, r_ando%Uin, m, z0, sr, n)
+               Do j = i1 + 1, i1 + n
+                  Do i = i1 + 1, i1 + n
+                     sd%bl (i, j) = sd%bl(i, j) + sr (i-i1, j-i1)
+                  End Do
+               End Do
+               Deallocate (sr)
+            End If
+         End If
+      End Subroutine cond_Sdiff
+
+      Subroutine write_legacy_ando (opt, t_lr, t_rl, t_lr_spec, t_rl_spec, l_shc, r_shc, consv, consw, dw)
+!!$ Write results
+         Implicit None
+         Type (t_options) :: opt
+         Type (t_dw_torque) :: dw
+         Real (Kind=DEF_DBL_PREC) :: t_lr (2, 2), t_lr_spec (2, 2)
+         Real (Kind=DEF_DBL_PREC) :: t_rl (2, 2), t_rl_spec (2, 2)
+         Real (Kind=DEF_DBL_PREC) :: r_shc (2), l_shc (2)
+         Real (Kind=DEF_DBL_PREC) :: consv (1), consw (1)
+!!$Local
+         Integer, Parameter :: fl = 200
+
+!!$ Output results into "andout"
+         Open (Unit=fl, File='andout', Action='write')
+
+         Write (fl,*) ' Conservation: integrated,      worst'
+         Write (fl, '("         ",2(5x,g13.6))') consv (1), consw (1)
+
+         Write (fl,*) ' Left Sharvin conductance :'
+         Write (fl, '("     by spin :",2(3x,f15.10))') l_shc
+         Write (fl, '("     total   :",3x,f15.10)') sum (l_shc)
+         Write (fl,*) ' Right Sharvin conductance :'
+         Write (fl, '("     by spin :",2(3x,f15.10))') r_shc
+         Write (fl, '("     total   :",3x,f15.10)') sum (r_shc)
+         Write (fl,*) '---------------------------------------------'
+         Write (fl,*) ''
+         Write (fl,*) ' Gilbert damping parameter :'
+         Write (fl,*) ' Re part:'
+         Write (fl, '(" Theta  :",2(2x,g17.10))') real (dw%damp(1, :))
+         Write (fl, '("  Phi   :",2(2x,g17.10))') real (dw%damp(2, :))
+         Write (fl,*) ''
+         Write (fl,*) ' Im part:'
+         Write (fl, '(" Theta  :",2(2x,g17.10))') imag (dw%damp(1, :))
+         Write (fl, '("  Phi   :",2(2x,g17.10))') imag (dw%damp(2, :))
+         Write (fl,*) ''
+         Write (fl,*) ' Out-of-plane spin-tranfer torque :'
+         Write (fl, '(" Beta   :",2(2x,g17.10))') real (dw%beta(1)), imag (dw%beta(1))
+         Write (fl,*) ''
+         Write (fl,*) '---------------------------------------------'
+         Write (fl,*) ''
+
+         If (opt%needlr /= 0) Then
+            Write (fl,*) ' L->R Conductance(carefull with decomposition!):'
+            Write (fl,*) '              Up:                Down:'
+            Write (fl, '("   Up   :",2(3x,g17.10))') t_lr (1, :)
+            Write (fl, '("   Down :",2(3x,g17.10))') t_lr (2, :)
+            Write (fl,*) ''
+            Write (fl,*) ' Conductance total:'
+            Write (fl, '("         ",2(3x,g17.10))') sum (t_lr(1, :)), sum (t_lr(2, :))
+            Write (fl, '("  Grand total:                  ",g17.10)') sum (t_lr(:, :))
+            Write (fl,*) ''
+!!$         Write (fl,*) ' Specular:'
+!!$         Write (fl,*) '              Up:                Down:'
+!!$         Write (fl, '("   Up   :",2(3x,g17.10))') t_lr_spec (1, :)
+!!$         Write (fl, '("   Down :",2(3x,g17.10))') t_lr_spec (2, :)
+!!$         Write (fl,*) ''
+         End If
+
+         If (opt%needrl /= 0) Then
+            Write (fl,*) ' R->L Conductance(carefull with decomposition!):'
+            Write (fl,*) '              Up                Down'
+            Write (fl, '("   Up   :",2(3x,g17.10))') t_rl (1, :)
+            Write (fl, '("   Down :",2(3x,g17.10))') t_rl (2, :)
+            Write (fl,*) ''
+            Write (fl,*) ' Conductance total:'
+            Write (fl, '("         ",2(3x,g17.10))') sum (t_rl(1, :)), sum (t_rl(2, :))
+            Write (fl, '("  Grand total:                  ",g17.10)') sum (t_rl(:, :))
+            Write (fl,*) ''
+!!$         Write (fl,*) ' Specular:'
+!!$         Write (fl,*) '              Up:                Down:'
+!!$         Write (fl, '("   Up   :",2(3x,g17.10))') t_rl_spec (1, :)
+!!$         Write (fl, '("   Down :",2(3x,g17.10))') t_rl_spec (2, :)
+!!$         Write (fl,*) ''
+         End If
+         Close (fl)
+      End Subroutine write_legacy_ando
+
+End Program trans

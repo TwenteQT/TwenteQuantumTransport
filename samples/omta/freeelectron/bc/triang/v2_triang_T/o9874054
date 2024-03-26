@@ -1,0 +1,123 @@
+Began at: 19:36:01
+Finished at: 19:37:46
+Began at: 19:37:46
+Finished at: 19:39:24
+Began at: 19:39:24
+Finished at: 19:41:11
+Began at: 19:41:11
+Finished at: 19:42:53
+Began at: 19:42:53
+Finished at: 19:46:14
+Began at: 19:46:14
+Finished at: 19:48:01
+Began at: 19:48:01
+Finished at: 19:50:13
+Began at: 19:50:14
+Finished at: 19:52:22
+Began at: 19:52:22
+Finished at: 19:53:48
+Began at: 19:53:48
+Finished at: 19:55:14
+Began at: 19:55:14
+Finished at: 19:57:09
+Began at: 19:57:10
+Finished at: 19:59:35
+Began at: 19:59:35
+Finished at: 20:02:42
+Began at: 20:02:42
+Finished at: 20:05:41
+Began at: 20:05:41
+Finished at: 20:07:06
+Began at: 20:07:06
+Finished at: 20:11:12
+Began at: 20:11:12
+Finished at: 20:12:38
+Began at: 20:12:38
+Finished at: 20:15:07
+Began at: 20:15:07
+Finished at: 20:16:55
+Began at: 20:16:55
+Finished at: 20:18:31
+Began at: 20:18:32
+Finished at: 20:20:01
+Began at: 20:20:01
+Finished at: 20:24:15
+Began at: 20:24:15
+Finished at: 20:26:12
+Began at: 20:26:12
+Finished at: 20:28:18
+Began at: 20:28:18
+Finished at: 20:29:46
+Began at: 20:29:46
+Finished at: 20:31:43
+Began at: 20:31:43
+Finished at: 20:33:46
+Began at: 20:33:46
+Finished at: 20:35:42
+Began at: 20:35:42
+Finished at: 20:37:51
+Began at: 20:37:51
+Finished at: 20:39:57
+Began at: 20:39:57
+Finished at: 20:41:47
+Began at: 20:41:48
+Finished at: 20:43:16
+Began at: 20:43:16
+Finished at: 20:44:52
+Began at: 20:44:52
+Finished at: 20:47:57
+Began at: 20:47:57
+Finished at: 20:53:04
+Began at: 20:53:04
+Finished at: 20:57:26
+Began at: 20:57:26
+Finished at: 21:00:07
+Began at: 21:00:07
+Finished at: 21:01:37
+Began at: 21:01:37
+Finished at: 21:04:12
+Began at: 21:04:12
+Finished at: 21:05:43
+Began at: 21:05:44
+Finished at: 21:07:10
+Began at: 21:07:10
+Finished at: 21:08:39
+Began at: 21:08:39
+Finished at: 21:12:49
+Began at: 21:12:49
+Finished at: 21:14:46
+Began at: 21:14:46
+Finished at: 21:16:18
+Began at: 21:16:18
+Finished at: 21:17:46
+Began at: 21:17:46
+Finished at: 21:22:13
+Began at: 21:22:13
+Finished at: 21:23:41
+Began at: 21:23:42
+Finished at: 21:25:41
+Began at: 21:25:41
+Finished at: 21:28:52
+Began at: 21:28:53
+Finished at: 21:30:27
+Began at: 21:30:27
+Finished at: 21:32:25
+Began at: 21:32:25
+Finished at: 21:33:53
+Began at: 21:33:53
+Finished at: 21:35:25
+Began at: 21:35:25
+
+JOB STATISTICS
+==============
+Job ID: 9874054
+Cluster: sara
+User/Group: mrang/mrang
+State: TIMEOUT (exit code 0)
+Nodes: 1
+Cores per node: 32
+CPU Utilized: 2-13:59:56
+CPU Efficiency: 96.740f 2-16:05:20 core-walltime
+Job Wall-clock time: 02:00:10
+Memory Utilized: 53.10 GB
+Memory Efficiency: 21.330f 248.99 GB

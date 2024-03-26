@@ -1,0 +1,138 @@
+10
+
+dir
+2022
+https://cmsdir.tnw.utwente.nl/svn/codes/trans/trunk/samples/transport
+https://cmsdir.tnw.utwente.nl/svn/codes
+
+
+
+2013-09-09T19:02:27.664105Z
+1976
+antst
+has-props
+
+
+
+
+
+
+
+
+
+
+
+
+
+8fced723-7810-0410-b3be-a1d3192da0de
+
+CuCo111_SOC
+dir
+
+mult
+dir
+
+CuCo111-nm
+dir
+
+Ni111
+dir
+
+prepare-input
+dir
+
+CuCo001-SOC
+dir
+
+Co001-AMR
+dir
+
+Ni001-AMR
+dir
+
+.gitignore
+file
+
+
+
+
+2017-04-20T09:33:41.523540Z
+350c983f5d4be34834c3a7f826f82218
+2013-03-07T11:29:54.692042Z
+1860
+antst
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+5
+
+3x2CuCo111-Co
+dir
+
+CuCo111-rotation
+dir
+
+CuCo001-SOC-AMR
+dir
+
+3x2CuCo111
+dir
+
+Cu001-SOC
+dir
+
+README.txt
+file
+
+
+
+
+2017-04-20T09:33:41.528264Z
+d510ff07d2a266bc5afc035f16ea8ada
+2008-05-05T13:50:43.859196Z
+915
+antst
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+202
+
+CuCo111
+dir
+

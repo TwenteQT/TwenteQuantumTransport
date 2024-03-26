@@ -1,0 +1,139 @@
+Began at: 07:43:03
+Finished at: 07:45:01
+Began at: 07:45:01
+Finished at: 07:46:53
+Began at: 07:46:54
+Finished at: 07:48:46
+Began at: 07:48:46
+Finished at: 07:50:43
+Began at: 07:50:43
+Finished at: 07:52:35
+Began at: 07:52:35
+Finished at: 07:54:40
+Began at: 07:54:40
+Finished at: 07:56:38
+Began at: 07:56:38
+Finished at: 07:58:31
+Began at: 07:58:31
+Finished at: 08:00:40
+Began at: 08:00:40
+Finished at: 08:02:36
+Began at: 08:02:36
+Finished at: 08:04:29
+Began at: 08:04:29
+Finished at: 08:06:21
+Began at: 08:06:21
+Finished at: 08:08:17
+Began at: 08:08:17
+ Underflow problem in r16tomsqz
+Finished at: 08:08:42
+Began at: 08:08:42
+Finished at: 08:12:07
+Began at: 08:12:07
+Finished at: 08:14:11
+Began at: 08:14:11
+Finished at: 08:16:27
+Began at: 08:16:27
+Finished at: 08:18:19
+Began at: 08:18:19
+Finished at: 08:20:11
+Began at: 08:20:11
+Finished at: 08:22:13
+Began at: 08:22:13
+Finished at: 08:24:05
+Began at: 08:24:05
+Finished at: 08:25:58
+Began at: 08:25:58
+Finished at: 08:28:05
+Began at: 08:28:05
+Finished at: 08:29:58
+Began at: 08:29:58
+Finished at: 08:31:50
+Began at: 08:31:50
+Finished at: 08:34:01
+Began at: 08:34:01
+Finished at: 08:35:52
+Began at: 08:35:52
+Finished at: 08:37:55
+Began at: 08:37:55
+Finished at: 08:39:47
+Began at: 08:39:47
+Finished at: 08:41:56
+Began at: 08:41:56
+Finished at: 08:43:50
+Began at: 08:43:50
+ Underflow problem in r16tomsqz
+Finished at: 08:44:16
+Began at: 08:44:16
+Finished at: 08:46:08
+Began at: 08:46:08
+Finished at: 08:48:01
+Began at: 08:48:01
+Finished at: 08:49:54
+Began at: 08:49:54
+Finished at: 08:51:47
+Began at: 08:51:47
+Finished at: 08:53:38
+Began at: 08:53:38
+Finished at: 08:55:37
+Began at: 08:55:37
+Finished at: 08:57:29
+Began at: 08:57:29
+Finished at: 08:59:20
+Began at: 08:59:21
+Finished at: 09:01:14
+Began at: 09:01:14
+Finished at: 09:03:07
+Began at: 09:03:07
+Finished at: 09:05:00
+Began at: 09:05:00
+Finished at: 09:06:58
+Began at: 09:06:58
+Finished at: 09:08:57
+Began at: 09:08:57
+Finished at: 09:10:49
+Began at: 09:10:49
+Finished at: 09:12:42
+Began at: 09:12:42
+Finished at: 09:14:43
+Began at: 09:14:43
+Finished at: 09:16:37
+Began at: 09:16:37
+Finished at: 09:18:30
+Began at: 09:18:30
+Finished at: 09:20:21
+Began at: 09:20:21
+Finished at: 09:22:13
+Began at: 09:22:13
+Finished at: 09:24:28
+Began at: 09:24:28
+Finished at: 09:26:25
+Began at: 09:26:25
+Finished at: 09:28:17
+Began at: 09:28:17
+Finished at: 09:30:21
+Began at: 09:30:21
+Finished at: 09:32:13
+Began at: 09:32:13
+Finished at: 09:34:15
+Began at: 09:34:15
+Finished at: 09:36:20
+Began at: 09:36:20
+Finished at: 09:38:39
+Began at: 09:38:47
+Finished at: 09:40:56
+Began at: 09:40:56
+
+JOB STATISTICS
+==============
+Job ID: 9832335
+Cluster: sara
+User/Group: mrang/mrang
+State: TIMEOUT (exit code 0)
+Nodes: 2
+Cores per node: 32
+CPU Utilized: 5-02:00:49
+CPU Efficiency: 95.150f 5-08:13:52 core-walltime
+Job Wall-clock time: 02:00:13
+Memory Utilized: 81.12 GB (estimated maximum)
+Memory Efficiency: 16.290f 497.98 GB (248.99 GB/node)

@@ -1,0 +1,4 @@
+HEADER    Cu Slater-Koster on-site parameters
+OPTIONS   LMX=2 NSPIN=1 EF=0.5805 EUNIT=Ry
+ONSITE    S=0.57133 P=1.07554 D1=0.37380  D2=0.37395 
+

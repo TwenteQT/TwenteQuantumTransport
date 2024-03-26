@@ -1,0 +1,95 @@
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src
+END
+read_write.F90
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src/read_write.F90
+END
+dens_mod.F90
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src/dens_mod.F90
+END
+green_mod.F90
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src/green_mod.F90
+END
+structure.F90
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src/structure.F90
+END
+matmul_blas.F90
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src/matmul_blas.F90
+END
+pot_mod.F90
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src/pot_mod.F90
+END
+deps.mk
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src/deps.mk
+END
+sgfva_mod.F90
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src/sgfva_mod.F90
+END
+definitions.F90
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src/definitions.F90
+END
+quad3_mod.F90
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src/quad3_mod.F90
+END
+inversion.F90
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src/inversion.F90
+END
+maco_mod.F90
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src/maco_mod.F90
+END
+ies.F90
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src/ies.F90
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src/Makefile
+END
+bzgrid.F90
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1981/trans/trunk/src/nies/src/bzgrid.F90
+END

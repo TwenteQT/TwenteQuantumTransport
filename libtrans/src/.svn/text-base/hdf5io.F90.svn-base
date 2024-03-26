@@ -1,0 +1,3221 @@
+#include "math_def.h"
+
+#define MAX_CHUNK 262144
+#define MIN_UNCOMPRESSED 128
+#define GZ_COMP_LEVEL 1
+#define DO_SHUFFLE 1
+Module hdf5io
+      Use HDF5
+      Use h5lt
+      Implicit None
+
+      Type t_h5_openarray
+         Integer (HID_T) :: dset, dspace, Type
+         Integer (HSIZE_T) :: chunk (2), dims (2)
+      End Type
+
+      Type h5_iterout
+         Integer (HID_T) :: cons
+         Integer (HID_T) :: t_rr, t_ll, t_rl, t_lr, t_ms, t_ds, modesl, modesr
+         Integer (HID_T) :: c_ds, c_ms
+      End Type h5_iterout
+
+
+      Interface hdfwrite
+         Module Procedure hdfwriteimat, hdfwriteivec, hdfwritedmat, hdfwritedvec, hdfwrited, hdfwritei, &
+        & hdfwrite_geo, hdfwrite_bz, hdfwritezmat, hdfwritezvec, hdfwritezcsrmat, hdfwritercsrmat, &
+        & hdfwritestring, hdfwritez, hdfwriteLEQopts, hdfwritePotOpts, hdfwriteTransOpts, hdfwriteAndoOpts, &
+        & hdfwriteBZopts, hdfwriteAtomOpts, hdfwriteLeadDecomp, hdfWriteRdenseMat, hdfWriteZdenseMat, &
+        & hdfWriteRvec, hdfWriteTorque, hdfWriteSpaqu, hdfWriteSpadirqu, hdfwritezmat3, hdfwritezmat4, &
+        & hdfwriteDAMPopts, hdfwriteAndo
+      End Interface
+
+      Interface hdfread_ptr
+         Module Procedure hdfReadDVecPtr, hdfReadIVecPtr, hdfReadIMatPtr, hdfReadDMatPtr, hdfReadZVecPtr
+      End Interface
+
+      Interface hdfread
+         Module Procedure hdfreadzdensemat, hdfreadzcsrmat, hdfreadrdensemat, hdfreadi, hdfreadd, &
+        & hdfReadDVec, hdfReadDVecAlloc, hdfReadIVec, hdfReadIVecAlloc, hdfReadIMatAlloc, hdfReadDMatAlloc, &
+        & hdfReadTorque, hdfReadSpaqu, hdfReadSpadirqu, hdfReadDMat, hdfReadZMat, hdfReadZMat4Alloc, &
+        & hdfReadZMat3, hdfread_iatcu
+      End Interface !hdfread
+
+      Interface h5dwrite_f_complex
+         Module Procedure h5dwrite_complex_4, h5dwrite_complex_3, h5dwrite_complex_2, h5dwrite_complex_1, &
+        & h5dwrite_complex_0
+      End Interface ! h5dwrite_f_complex
+
+      Interface h5ltread_dataset_f_complex
+         Module Procedure h5ltread_dataset_f_complex1, h5ltread_dataset_f_complex2, &
+        & h5ltread_dataset_f_complex4
+      End Interface ! h5ltread_dataset_f_complex
+
+      Interface hdfwrtset_par
+         Module Procedure hdfset_write_dmat_parallel, hdfset_write_zmat_parallel, hdfset_write_imat_parallel, &
+        & hdfset_write_dvec_parallel, hdfset_write_ivec_parallel, hdfset_write_zvec_parallel, &
+        & hdfset_write_zcsr_parallel, hdfset_write_rcsr_parallel, hdfset_write_ldecomp_parallel, &
+        & hdfset_write_torque_parallel
+      End Interface
+Contains
+      
+      Subroutine hdf_get_coords(hid, coords, z)
+         Use sparselib
+         Use qofzlib
+         Implicit None
+         Integer (HID_T), intent(in) :: hid
+         type(spatialquant), intent(out) :: coords
+         type(spatialquant), intent(out), Optional :: z
+
+         integer :: natm, natl, natr, nat
+         type(rdensemat) :: allcoords
+
+         call hdfread(hid, 'geom/trgeo/l_transnum', natl)
+         call hdfread(hid, 'geom/trgeo/r_transnum', natr)
+         call hdfread(hid, 'geom/trgeo/num', nat)
+         natm = nat-natl-natr
+         call hdfread(hid, '/geom/trgeo/aucoord',allcoords)
+
+         Call alloc_spaqu(coords,natm,natl,natr,3)
+         coords%l(:, :) = allcoords%bl(:, 1:natl)
+         coords%r(:, :) = allcoords%bl(:, natl+natm+1:nat)
+         coords%m(:, :) = allcoords%bl(:, natl+1:natl+natm)
+         If (present(z)) Then
+         Call alloc_spaqu(z,natm,natl,natr,1)
+            z%l(1, :) = allcoords%bl(3, 1:natl)
+            z%r(1, :) = allcoords%bl(3, natl+natm+1:nat)
+            z%m(1, :) = allcoords%bl(3, natl+1:natl+natm)
+         End If
+      End Subroutine hdf_get_coords
+      
+      Function hdfwriterversion () Result (vers)
+         Implicit None
+         Integer :: vers
+!!$ Local
+!!$          Character (Len=20) :: SVN_VERSION
+!!$          Integer :: cl
+!!$          SVN_VERSION = '$Rev$'
+!!$          cl = len (SVN_VERSION)
+!!$          Read (SVN_VERSION(6:cl-1),*) vers
+         vers = 2
+      End Function hdfwriterversion
+
+      Subroutine hdfsetversion (tgt)
+         Integer (HID_T), Intent (In) :: tgt
+!!$           Local vars
+         Integer :: vers
+         Integer (HID_T) :: space_id, attr
+         Integer (HSIZE_T) :: dims (2)
+         Integer :: error
+         vers = hdfwriterversion ()
+         dims (1) = 1
+         Call h5screate_simple_f (1, dims, space_id, error)
+         Call h5acreate_by_name_f (tgt, '.', 'HDF5IO_Version', H5T_NATIVE_INTEGER, space_id, attr, error)
+         Call H5Awrite_f (attr, H5T_NATIVE_INTEGER, vers, dims, error)
+      End Subroutine hdfsetversion
+
+      Subroutine hdf5lib_init ()
+         Implicit None
+
+         Integer :: hdferr
+         Logical :: avail
+         Integer :: filter_info_both
+         Integer :: filter_info
+
+         Call h5open_f (hdferr)
+
+!!$  Check if gzip compression is available and can be used for both
+!!$  compression and decompression.  Normally we do not perform error
+!!$  checking in these examples for the sake of clarity, but in this
+!!$  case we will make an exception because this filter is an
+!!$  optional part of the hdf5 library.
+
+         Call h5zfilter_avail_f (H5Z_FILTER_DEFLATE_F, avail, hdferr)
+
+         If ( .Not. avail) Then
+            Write (*, '("gzip filter not available.",/)')
+            Stop
+         End If
+         Call h5zget_filter_info_f (H5Z_FILTER_DEFLATE_F, filter_info, hdferr)
+
+         filter_info_both = IOR (H5Z_FILTER_ENCODE_ENABLED_F, H5Z_FILTER_DECODE_ENABLED_F)
+         If (filter_info .Ne. filter_info_both) Then
+            Write (*, '("gzip filter not available for encoding and decoding.",/)')
+            Stop
+         End If
+      End Subroutine hdf5lib_init
+
+      Subroutine hdfwriteBZopts (tgt, path, opt)
+         Use readcfg
+         Implicit None
+         Type (t_bz_opts) :: opt
+         Integer (HID_T) :: tgt
+         Character (Len=*) :: path
+!!$ Local
+         Integer (HID_T) :: gid
+         Integer :: error
+         Call h5gcreate_f (tgt, path, gid, error)
+         Call hdfwrite (gid, 'BZpart', opt%BZpart)
+         Call hdfwrite (gid, 'bzone', opt%bzone)
+         Call hdfwrite (gid, 'kpoint', opt%kpoint)
+         Call hdfwrite (gid, 'iftr', opt%iftr)
+         Call hdfwrite (gid, 'inve', opt%inve)
+         Call hdfwrite (gid, 'nk', opt%nk)
+         Call hdfwrite (gid, 'nsym', opt%nsym)
+      End Subroutine hdfwriteBZopts
+
+      Subroutine hdfwriteAndoOpts (tgt, path, opt)
+         Use readcfg
+         Implicit None
+         Type (t_ando_ctl) :: opt
+         Integer (HID_T) :: tgt
+         Character (Len=*) :: path
+!!$ Local
+         Integer (HID_T) :: gid
+         Integer :: error
+         Call h5gcreate_f (tgt, path, gid, error)
+
+         Call hdfwrite (gid, 'specpart', opt%specpart)
+         Call hdfwrite (gid, 'gensol', opt%gensol)
+         Call hdfwrite (gid, 'refine', opt%refine)
+         Call hdfwrite (gid, 'writedecomp', opt%writedecomp)
+         Call hdfwrite (gid, 'extlead', opt%extlead)
+
+      End Subroutine hdfwriteAndoOpts
+
+
+      Subroutine hdfwriteAtomOpts (tgt, path, opt)
+         Use readcfg
+         Implicit None
+         Type (t_potparp_options) :: opt
+         Integer (HID_T) :: tgt
+         Character (Len=*) :: path
+!!$ Local
+         Integer (HID_T) :: gid
+         Integer :: error
+         Call h5gcreate_f (tgt, path, gid, error)
+
+         Call hdfwrite (gid, 'irel', opt%irel)
+         Call hdfwrite (gid, 'nsirk', opt%nsirk)
+         Call hdfwrite (gid, 'dE', opt%dE)
+
+      End Subroutine hdfwriteAtomOpts
+
+
+
+!!$       Subroutine hdfwrite_opts (tgt, path, opt)
+!!$          Use readcfg
+!!$          Implicit None
+!!$          Type (t_bz_opts) :: opt
+!!$          Integer (HID_T) :: tgt
+!!$          Character (Len=*) :: path
+!!$ !!$ Local
+!!$          Integer (HID_T) :: gid
+!!$          Integer :: error
+!!$       End Subroutine hdfwrite_opts
+
+      Subroutine hdfwriteTransOpts (tgt, path, opt)
+         Use readcfg
+         Implicit None
+         Type (t_options) :: opt
+         Integer (HID_T) :: tgt
+         Character (Len=*) :: path
+!!$ Local
+         Integer (HID_T) :: gid
+         Integer :: error
+
+         Call h5gcreate_f (tgt, path, gid, error)
+
+         Call hdfwrite (gid, 'bz', opt%bzo)
+         Call hdfwrite (gid, 'ando', opt%actl)
+         Call hdfwrite (gid, 'potopts', opt%po)
+         Call hdfwrite (gid, 'leqopts', opt%leq)
+         Call hdfwrite (gid, 'damopts', opt%damp)
+
+         Call hdfwrite (gid, 'Eoffset', opt%Eoffset)
+         Call hdfwrite (gid, 'drshift', opt%drshift)
+         Call hdfwrite (gid, 'spop_angle', opt%spop_angle)
+         Call hdfwrite (gid, 'par_nprock', opt%par_nprock)
+         Call hdfwrite (gid, 'onlyspin', opt%onlyspin)
+         Call hdfwrite (gid, 'lowmem', opt%lowmem)
+         Call hdfwrite (gid, 'loglvl', opt%loglvl)
+         Call hdfwrite (gid, 'sdcdir', opt%sdcdir)
+         Call hdfwrite (gid, 'signat', opt%signat)
+         Call hdfwrite (gid, 'write_tr', opt%write_tr)
+         Call hdfwrite (gid, 'icont', opt%icont)
+         Call hdfwrite (gid, 'needlr', opt%needlr)
+         Call hdfwrite (gid, 'needrl', opt%needrl)
+         Call hdfwrite (gid, 'writewf', opt%writewf)
+         Call hdfwrite (gid, 'writeham', opt%writeham)
+         Call hdfwrite (gid, 'writetm', opt%writetm)
+         Call hdfwrite (gid, 'writerhs', opt%writerhs)
+         Call hdfwrite (gid, 'writedens', opt%writedens)
+         Call hdfwrite (gid, 'writetorque', opt%writetorque)
+         Call hdfwrite (gid, 'writeveloc', opt%writeveloc)
+         Call hdfwrite (gid, 'do_oldcurr', opt%do_oldcurr)
+         Call hdfwrite (gid, 'do_iatcu', opt%do_iatcu)
+
+         Call h5gclose_f (gid, error)
+      End Subroutine hdfwriteTransOpts
+
+
+      Subroutine hdfwriteLEQopts (tgt, path, opt)
+         Use sparse_solvers
+         Implicit None
+         Type (t_leq_param) :: opt
+         Integer (HID_T) :: tgt
+         Character (Len=*) :: path
+!!$ Local
+         Integer (HID_T) :: gid
+         Integer :: error
+
+         Call h5gcreate_f (tgt, path, gid, error)
+
+         Call hdfwrite (gid, 'workhost', opt%workhost)
+         Call hdfwrite (gid, 'debug', opt%debug)
+         Call hdfwrite (gid, 'maxit', opt%maxit)
+         Call hdfwrite (gid, 'memover', opt%memover)
+         Call hdfwrite (gid, 'solver', opt%solver)
+         Call hdfwrite (gid, 'redistmtx', opt%redistmtx)
+         Call hdfwrite (gid, 'partitioner', opt%partitioner)
+         Call hdfwrite (gid, 'permscale', opt%permscale)
+         Call hdfwrite (gid, 'tol', opt%tol)
+         Call h5gclose_f (gid, error)
+
+      End Subroutine hdfwriteLEQopts
+
+      Subroutine hdfwriteDAMPopts (tgt, path, opt)
+         Use readcfg
+         Implicit None
+         Type (t_damp_opts) :: opt
+         Integer (HID_T) :: tgt
+         Character (Len=*) :: path
+!!$ Local
+         Integer (HID_T) :: gid
+         Integer :: error
+
+         Call h5gcreate_f (tgt, path, gid, error)
+
+         Call hdfwrite (gid, 'dstep', opt%dstep)
+         Call hdfwrite (gid, 'axesdir', opt%axesdir)
+         Call h5gclose_f (gid, error)
+
+      End Subroutine hdfwriteDAMPopts
+
+      Subroutine hdfwritePotOpts (tgt, path, opt)
+         Use potpars
+         Implicit None
+         Type (t_pot_opts) :: opt
+         Integer (HID_T) :: tgt
+         Character (Len=*) :: path
+!!$ Local
+         Integer (HID_T) :: gid
+         Integer :: error
+
+         Call h5gcreate_f (tgt, path, gid, error)
+
+         Call hdfwrite (gid, 'so', opt%so)
+         Call hdfwrite (gid, 'Kind', opt%Kind)
+         Call hdfwrite (gid, 'full', opt%full)
+         Call hdfwrite (gid, 'nhops', opt%nhops)
+         Call hdfwrite (gid, 'rot_mask', opt%rot_mask)
+         If (opt%rot_mask == 1) Then
+            Call hdfwrite (gid, 'rm_angles', opt%rm_angles)
+         Else
+            Call hdfwrite (gid, 'rot_angle', opt%rot_angle)
+         End If
+         Call hdfwrite (gid, 'need_current_pol', opt%need_current_pol)
+         Call hdfwrite (gid, 'rotcf', opt%rotcf)
+         Call hdfwrite (gid, 'so_scale', opt%so_scale)
+         Call hdfwrite (gid, 'energy', opt%energy)
+         Call hdfwrite (gid, 'rnegl', opt%rnegl)
+         Call hdfwrite (gid, 'ei', opt%ei)
+         Call hdfwrite (gid, 'periodic', opt%periodic)
+         Call hdfwrite (gid, 'ngrid', opt%ngrid)
+         Call hdfwrite (gid, 'ngridx', opt%ngridx)
+         Call hdfwrite (gid, 'ngridy', opt%ngridy)
+         Call hdfwrite (gid, 'ngridz', opt%ngridz)
+         Call hdfwrite (gid, 'nlx', opt%nlx)
+         Call hdfwrite (gid, 'nly', opt%nly)
+         Call hdfwrite (gid, 'nlz', opt%nlz)
+         Call hdfwrite (gid, 'nrx', opt%nrx)
+         Call hdfwrite (gid, 'nry', opt%nry)
+         Call hdfwrite (gid, 'nrz', opt%nrz)
+         Call hdfwrite (gid, 'gamma1', opt%gamma1)
+         Call hdfwrite (gid, 'gamma2', opt%gamma2)
+         Call hdfwrite (gid, 'h0', opt%h0)
+         Call hdfwrite (gid, 'v0', opt%v0)
+         Call hdfwrite (gid, 'dx', opt%dx)
+         Call hdfwrite (gid, 'dy', opt%dy)
+         Call hdfwrite (gid, 'dz', opt%dz)
+
+         Call h5gclose_f (gid, error)
+      End Subroutine hdfwritePotOpts
+
+      Subroutine init_iterout (tgt, h5o, nk)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Type (h5_iterout), Intent (Inout) :: h5o
+         Integer, Intent (In) :: nk
+!!$          Local vars
+         Integer :: error
+         Integer (HID_T) :: plist, gid
+         Integer (HSIZE_T) :: chunk (2), dims (2)
+         dims (1) = 4
+         dims (2) = nk
+         chunk (1) = 4
+         chunk (2) = Min (nk, MAX_CHUNK/4/8)
+
+         Call h5pcreate_f (H5P_DATASET_CREATE_F, plist, error)
+         Call h5pset_chunk_f (plist, 2, chunk, error)
+#if defined(DO_SHUFFLE)
+         Call h5pset_shuffle_f (plist, error)
+#endif
+         Call h5pset_deflate_f (plist, GZ_COMP_LEVEL, error)
+
+         Call h5screate_simple_f (2, dims, h5o%t_ds, error)
+
+
+         Call h5gcreate_f (tgt, "trans", gid, error)
+
+         Call hdfcheckds (gid, "lr", H5T_NATIVE_DOUBLE, h5o%t_ds, h5o%t_lr, error, plist)
+         Call hdfcheckds (gid, "ll", H5T_NATIVE_DOUBLE, h5o%t_ds, h5o%t_ll, error, plist)
+         Call hdfcheckds (gid, "rr", H5T_NATIVE_DOUBLE, h5o%t_ds, h5o%t_rr, error, plist)
+         Call hdfcheckds (gid, "rl", H5T_NATIVE_DOUBLE, h5o%t_ds, h5o%t_rl, error, plist)
+         Call hdfcheckds (gid, "nmodesl", H5T_NATIVE_INTEGER, h5o%t_ds, h5o%modesl, error, plist)
+         Call hdfcheckds (gid, "nmodesr", H5T_NATIVE_INTEGER, h5o%t_ds, h5o%modesr, error, plist)
+
+         dims (2) = 1
+         Call h5screate_simple_f (2, dims, h5o%t_ms, error)
+
+
+         dims (1) = nk
+         chunk (1) = Min (nk, MAX_CHUNK/8)
+         Call h5screate_simple_f (1, dims, h5o%c_ds, error)
+         Call h5pset_chunk_f (plist, 1, chunk, error)
+         Call hdfcheckds (gid, "cons", H5T_NATIVE_DOUBLE, h5o%c_ds, h5o%cons, error, plist)
+
+         dims (1) = 1
+         Call h5screate_simple_f (1, dims, h5o%c_ms, error)
+
+
+      End Subroutine init_iterout
+
+
+      Subroutine hdf_mkopen2 (tgt, path, h5o, n1, nk, dtype)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt, dtype
+         Type (t_h5_openarray), Intent (Inout) :: h5o
+         Integer, Intent (In) :: nk, n1
+         Character (Len=*) :: path
+!!$          Local vars
+         Integer :: error
+         Integer (HID_T) :: plist
+         h5o%dims (1) = n1
+         h5o%dims (2) = nk
+         h5o%chunk (1) = n1
+         h5o%chunk (2) = Min (nk, MAX_CHUNK/2/8)
+
+         Call h5pcreate_f (H5P_DATASET_CREATE_F, plist, error)
+         Call h5pset_chunk_f (plist, 2, h5o%chunk, error)
+#if defined(DO_SHUFFLE)
+         Call h5pset_shuffle_f (plist, error)
+#endif
+         Call h5pset_deflate_f (plist, GZ_COMP_LEVEL, error)
+
+         Call h5screate_simple_f (2, h5o%dims, h5o%dspace, error)
+
+         Call hdfcheckds (tgt, path, dtype, h5o%dspace, h5o%dset, error, plist)
+         h5o%type = dtype
+      End Subroutine hdf_mkopen2
+
+      Subroutine hdf_wrtslab2z_par (comm, root, flag, h5o, dat, pos, cnti)
+         Implicit None
+         Include 'mpif.h'
+         Type (t_h5_openarray), Intent (Inout) :: h5o
+         Complex (Kind=DEF_DBL_PREC), Intent (In), Target :: dat (:, :)
+         Integer, Intent (In) :: pos (2), flag
+         Integer, Intent (In), Optional :: cnti (2)
+         Integer, Intent (In) :: comm, root
+!!$ Local
+         Integer, Allocatable :: jobs (:)
+         Integer :: error, mpi_sz, my_mpi_id, cbase (8), procnum, cnt (2)
+         Integer, Allocatable :: cnt1 (:, :), pos1 (:, :)
+         Integer :: status (MPI_STATUS_SIZE)
+         Complex (Kind=DEF_DBL_PREC), Allocatable, Target :: buf (:, :)
+         Complex (Kind=DEF_DBL_PREC), Pointer :: tptr (:, :)
+
+         Call mpi_comm_rank (comm, my_mpi_id, error)
+         Call mpi_comm_size (comm, mpi_sz, error)
+
+         If (my_mpi_id == root) Then
+            Allocate (jobs(mpi_sz))
+            Allocate (cnt1(2, mpi_sz))
+            Allocate (pos1(2, mpi_sz))
+         Else
+            Allocate (jobs(1))
+            Allocate (cnt1(2, 1))
+            Allocate (pos1(2, 1))
+         End If
+
+         If ( .Not. present(cnti)) Then
+            cnt = (/ size (dat, 1), size (dat, 2) /)
+         Else
+            cnt = cnti
+         End If
+
+         Call rand_vec_int (cbase)
+         Call mpi_bcast (cbase, 8, mpi_integer, root, comm, error)
+         Call mpi_gather (flag, 1, mpi_integer, jobs, 1, mpi_integer, root, comm, error)
+         Call mpi_gather (cnt, 2, mpi_integer, cnt1, 2, mpi_integer, root, comm, error)
+         Call mpi_gather (pos, 2, mpi_integer, pos1, 2, mpi_integer, root, comm, error)
+
+         If (my_mpi_id /= root) Then
+            If (flag /= 0) Then
+               Call MPI_Send (dat, cnt(1)*cnt(2), MPI_DOUBLE_COMPLEX, root, cbase(1)+my_mpi_id+1, comm, &
+              & error)
+            End If
+         Else
+            Allocate (buf(maxval(cnt1(1, :))*maxval(cnt1(1, :)), 1))
+            Do procnum = 1, mpi_sz
+               If (jobs(procnum) > 0) Then
+                  If ((procnum-1) /= root) Then
+                     Call MPI_Recv (buf, cnt1(1, procnum)*cnt1(2, procnum), MPI_DOUBLE_COMPLEX, procnum-1, &
+                    & procnum+cbase(1), comm, status, error)
+                     tptr => buf
+                  Else
+                     tptr => dat
+                  End If
+                  Call hdf_wrtslab2z (h5o, tptr, pos1(:, procnum), cnt1(:, procnum))
+               End If
+            End Do
+            Deallocate (buf)
+         End If
+         Deallocate (jobs, cnt1, pos1)
+
+      End Subroutine hdf_wrtslab2z_par
+
+
+      Subroutine hdf_wrtslab2z (h5o, dat, pos, sz)
+         Implicit None
+         Type (t_h5_openarray), Intent (Inout) :: h5o
+         Complex (Kind=DEF_DBL_PREC), Intent (In) :: dat (:, :)
+         Integer, Intent (In) :: pos (2)
+         Integer, Intent (In), Optional :: sz (2)
+!!$ Local
+         Integer (HSIZE_T) :: ofs (2), cnt (2)
+         Integer (HID_T) :: t_ms
+         Integer :: error
+
+         If ( .Not. present(sz)) Then
+            cnt = (/ size (dat, 1), size (dat, 2) /)
+         Else
+            cnt = sz
+         End If
+         ofs = pos - 1
+
+         Call h5screate_simple_f (2, cnt, t_ms, error)
+
+         Call h5sselect_hyperslab_f (h5o%dspace, H5S_SELECT_SET_F, ofs, cnt, error)
+         Call h5dwrite_f_complex (h5o%dset, hdf_complex_t(H5T_NATIVE_DOUBLE), dat, cnt, error, t_ms, &
+        & h5o%dspace)
+         Call h5sclose_f (t_ms, error)
+      End Subroutine hdf_wrtslab2z
+
+      Subroutine close_iterout (h5o)
+         Implicit None
+         Type (h5_iterout), Intent (Inout) :: h5o
+!!$          Local vars
+         Integer :: error
+
+         Call h5dclose_f (h5o%t_lr, error)
+         Call h5dclose_f (h5o%t_ll, error)
+         Call h5dclose_f (h5o%t_rl, error)
+         Call h5dclose_f (h5o%t_rr, error)
+         Call h5dclose_f (h5o%modesl, error)
+         Call h5dclose_f (h5o%modesr, error)
+         Call h5dclose_f (h5o%cons, error)
+      End Subroutine close_iterout
+
+      Subroutine hdfwrite_geo (tgt, path, geo)
+         Use geometry_module
+         Implicit None
+         Type (t_geometry) :: geo
+         Integer (HID_T) :: tgt
+         Character (Len=*) :: path
+!!$   Local vars
+         Integer :: i
+         Real (Kind=DEF_DBL_PREC), Allocatable :: coord (:, :)
+         Real (Kind=DEF_DBL_PREC) :: anm
+         Allocate (coord(3, geo%num))
+         Do i = 1, geo%num
+            coord (:, i) = geo%atoms(i)%coord(:)
+         End Do
+
+         Call hdfwrite (tgt, path//'/coord', coord)
+         anm=1.0d0
+         If (geo%scale > 1e-15) Then
+            coord (:, :) = coord (:, :) / geo%scale
+            anm=1.0d0/geo%scale*5.2917720859D-2
+         End if
+         Call hdfwrite (tgt, path//'/aucoord', coord)
+         Call hdfwrite (tgt, path//'/rawsr', geo%rawsr)
+         Call hdfwrite (tgt, path//'/dawsr', geo%dawsr)
+         Call hdfwrite (tgt, path//'/scale', geo%scale)
+         Call hdfwrite (tgt, path//'/anm', anm)
+         Call hdfwrite (tgt, path//'/norbit', geo%norbit)
+         Call hdfwrite (tgt, path//'/nlmax', geo%nlmax)
+         Call hdfwrite (tgt, path//'/num', geo%num)
+         Call hdfwrite (tgt, path//'/sc_size', geo%sc_size)
+         Call hdfwrite (tgt, path//'/ntrpar', geo%ntrpar)
+         Call hdfwrite (tgt, path//'/l_ntrperp', geo%l_ntrperp)
+         Call hdfwrite (tgt, path//'/r_ntrperp', geo%r_ntrperp)
+         Call hdfwrite (tgt, path//'/base', geo%base)
+         Call hdfwrite (tgt, path//'/perp_trans', geo%perp_trans)
+         Call hdfwrite (tgt, path//'/cutrat', geo%cutrat)
+         Call hdfwrite (tgt, path//'/l_perp_trans', geo%l_perp_trans)
+         Call hdfwrite (tgt, path//'/r_perp_trans', geo%r_perp_trans)
+         Call hdfwrite (tgt, path//'/l_transnum', geo%l_transnum)
+         Call hdfwrite (tgt, path//'/r_transnum', geo%r_transnum)
+         Call hdfwrite (tgt, path//'/scx', (/ 1.0d0, 1.0d0, 1.0d0 /))
+         Deallocate (coord)
+
+         Allocate (coord(geo%num, 1))
+         Do i = 1, geo%num
+            coord (i, 1) = geo%atoms(i)%ptr%magmom
+         End Do
+         Call hdfwrite (tgt, path//'/magmom', coord(:, 1))
+         Deallocate (coord)
+   End Subroutine hdfwrite_geo
+
+   Subroutine hdfwrite_bz (tgt, path, bz)
+         Use bzgrid
+         Implicit None
+         Integer (HID_T) :: tgt
+         Character (Len=*) :: path
+         Type (bzone), Intent (In) :: bz
+!!$   Local vars
+         Integer (HID_T) :: gid
+         Integer :: error
+         Call h5gcreate_f (tgt, path, gid, error)
+
+         Call hdfwrite (gid, 'k', bz%k)
+         Call hdfwrite (gid, 'kweight', bz%kweight)
+         Call hdfwrite (gid, 'ik', bz%ik)
+         Call hdfwrite (gid, 'nk', bz%nkgrid)
+         Call hdfwrite (gid, 'vbg', bz%vbg)
+         Call hdfwrite (gid, 'gomega', bz%gomega)
+
+         Call h5gclose_f (gid, error)
+   End Subroutine hdfwrite_bz
+
+   Subroutine hdfWriteTorque (tgt, path, ts)
+         Use postprocess
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (torqsigmas), Intent (In) :: ts
+!!$           Local vard
+         Integer (HID_T) :: grp_id
+         Integer :: error
+         Call hdfcheckgrp (tgt, trim(adjustl(path)))
+         Call h5gopen_f (tgt, trim(adjustl(path)), grp_id, error)
+
+!!$ 'm' is middle region, 'ir' is incident plus reflected, 't' is transmitted.
+         Call hdfwrite (grp_id, 'Lm', ts%Lm(:, :))
+         Call hdfwrite (grp_id, 'Rm', ts%Rm(:, :))
+         Call hdfwrite (grp_id, 'Lir', ts%Lir(:, :))
+         Call hdfwrite (grp_id, 'Rir', ts%Rir(:, :))
+         Call hdfwrite (grp_id, 'Lt', ts%Lt(:, :))
+         Call hdfwrite (grp_id, 'Rt', ts%Rt(:, :))
+
+         Call h5gclose_f (grp_id, error)
+   End Subroutine hdfWriteTorque
+
+   Subroutine hdfWriteSpadirqu (tgt, path, sdq)
+         Use qofzlib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (spadirquant), Intent (In) :: sdq
+!!$           Local vard
+         Integer (HID_T) :: grp_id
+         Integer :: error
+         Call hdfcheckgrp (tgt, trim(adjustl(path)))
+         Call h5gopen_f (tgt, trim(adjustl(path)), grp_id, error)
+
+!!$ 'm' is middle region, 'ir' is incident plus reflected, 't' is transmitted.
+         Call hdfwrite (grp_id, 'Lm', sdq%Lm(:, :))
+         Call hdfwrite (grp_id, 'Rm', sdq%Rm(:, :))
+         Call hdfwrite (grp_id, 'Lir', sdq%Lir(:, :))
+         Call hdfwrite (grp_id, 'Rir', sdq%Rir(:, :))
+         Call hdfwrite (grp_id, 'Lt', sdq%Lt(:, :))
+         Call hdfwrite (grp_id, 'Rt', sdq%Rt(:, :))
+
+         Call h5gclose_f (grp_id, error)
+   End Subroutine hdfWriteSpadirqu
+
+   Subroutine hdfWriteSpaqu (tgt, path, sq)
+         Use qofzlib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (spatialquant), Intent (In) :: sq
+!!$           Local vard
+         Integer (HID_T) :: grp_id
+         Integer :: error
+         Call hdfcheckgrp (tgt, trim(adjustl(path)))
+         Call h5gopen_f (tgt, trim(adjustl(path)), grp_id, error)
+
+!!$ 'm' is middle region, 'l' is left lead, 'r' is right lead.
+         Call hdfwrite (grp_id, 'm', sq%m(:, :))
+         Call hdfwrite (grp_id, 'l', sq%l(:, :))
+         Call hdfwrite (grp_id, 'r', sq%r(:, :))
+
+         Call h5gclose_f (grp_id, error)
+   End Subroutine hdfWriteSpaqu
+
+   Subroutine hdfset_write_torque_parallel (tgt, set, idx, name, comm, root, needwrite, dat)
+         Use postprocess
+         Implicit None
+         Include 'mpif.h'
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: set, name
+         Type (torqsigmas), Intent (In), Target :: dat
+         Integer, Intent (In) :: needwrite, comm, root, idx
+!!$ Local vars
+         Integer :: error, mpi_sz, my_mpi_id, cbase (8), procnum
+         Integer, Allocatable :: jobs (:)
+         Integer :: idat (4)
+         Integer :: status (MPI_STATUS_SIZE)
+         Type (torqsigmas), Pointer :: tptr
+         Type (torqsigmas), Target :: tdat
+         Character (Len=8) :: cwork
+
+         Call mpi_comm_rank (comm, my_mpi_id, error)
+         Call mpi_comm_size (comm, mpi_sz, error)
+
+         If (my_mpi_id == root) Then
+            Allocate (jobs(mpi_sz))
+         Else
+            Allocate (jobs(1))
+         End If
+
+         Call rand_vec_int (cbase)
+         Call mpi_bcast (cbase, 8, mpi_integer, root, comm, error)
+         Call mpi_gather (needwrite, 1, mpi_integer, jobs, 1, mpi_integer, root, comm, error)
+
+         If (my_mpi_id /= root) Then
+            If (needwrite /= 0) Then
+               idat (1) = dat%nm
+               idat (2) = dat%nl
+               idat (3) = dat%nr
+               idat (4) = idx
+
+               Call MPI_Send (idat, 4, mpi_integer, root, cbase(1)+my_mpi_id+1, comm, error)
+
+               Call MPI_Send (dat%Lm, idat(1)*7, mpi_double_precision, root, cbase(2)+my_mpi_id+1, comm, &
+              & error)
+               Call MPI_Send (dat%Rm, idat(1)*7, mpi_double_precision, root, cbase(3)+my_mpi_id+1, comm, &
+              & error)
+               Call MPI_Send (dat%Lir, idat(2)*7, mpi_double_precision, root, cbase(4)+my_mpi_id+1, comm, &
+              & error)
+               Call MPI_Send (dat%Lt, idat(2)*7, mpi_double_precision, root, cbase(5)+my_mpi_id+1, comm, &
+              & error)
+               Call MPI_Send (dat%Rir, idat(3)*7, mpi_double_precision, root, cbase(6)+my_mpi_id+1, comm, &
+              & error)
+               Call MPI_Send (dat%Rt, idat(3)*7, mpi_double_precision, root, cbase(7)+my_mpi_id+1, comm, &
+              & error)
+            End If
+         Else
+            Do procnum = 1, mpi_sz
+               If (jobs(procnum) > 0) Then
+                  If ((procnum-1) /= root) Then
+                     Call MPI_Recv (idat, 4, mpi_integer, procnum-1, procnum+cbase(1), comm, status, error)
+
+                     Call alloc_torque (tdat, idat(1), idat(2), idat(3))
+
+                     Call MPI_Recv (tdat%Lm, idat(1)*7, mpi_double_precision, procnum-1, procnum+cbase(2), &
+                    & comm, status, error)
+                     Call MPI_Recv (tdat%Rm, idat(1)*7, mpi_double_precision, procnum-1, procnum+cbase(3), &
+                    & comm, status, error)
+                     Call MPI_Recv (tdat%Lir, idat(2)*7, mpi_double_precision, procnum-1, procnum+cbase(4), &
+                    & comm, status, error)
+                     Call MPI_Recv (tdat%Lt, idat(2)*7, mpi_double_precision, procnum-1, procnum+cbase(5), &
+                    & comm, status, error)
+                     Call MPI_Recv (tdat%Rir, idat(3)*7, mpi_double_precision, procnum-1, procnum+cbase(6), &
+                    & comm, status, error)
+                     Call MPI_Recv (tdat%Rt, idat(3)*7, mpi_double_precision, procnum-1, procnum+cbase(7), &
+                    & comm, status, error)
+                     tptr => tdat
+                  Else
+                     idat (4) = idx
+                     tptr => dat
+                  End If
+                  Write (cwork, '(i8)') idat (4)
+                  Call hdfwrite (tgt, set//'/'//trim(adjustl(cwork))//'/'//name, tptr)
+                  Call free_torque (tdat)
+               End If
+            End Do
+         End If
+         Deallocate (jobs)
+
+   End Subroutine hdfset_write_torque_parallel
+      
+      Subroutine hdfwrite_iatcu (tgt, path, iatcu)
+         Use interatcur
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (t_interat_currents), Intent (In) :: iatcu
+         
+         Integer (HID_T) :: grp_id, grp_id0
+         Integer :: error, i
+         Character (Len=10) :: cwork
+
+         If (iatcu%alloc == 0) Return
+         Call hdfcheckgrp (tgt, trim(adjustl(path)))
+         Call h5gopen_f (tgt, trim(adjustl(path)), grp_id0, error)
+         !Call hdfwriteattr_uchar (grp_id0, '.', 'OCTAVE_NEW_FORMAT', char(1))
+         !Call hdfwrite (grp_id0, 'type', 'sparse complex matrix')
+         Call hdfwrite (grp_id0, 'nat', iatcu%nat)
+         Call hdfwrite (grp_id0, 'ntr', iatcu%ntr)
+         Call hdfwrite (grp_id0, 'trlist', iatcu%trlist)
+         Call hdfwrite (grp_id0, 'direct', iatcu%direct)
+         Call hdfwrite (grp_id0, 'cons', iatcu%cons)
+         Do i = 1, iatcu%ntr
+            Write (cwork, '(i8)') i
+            Call h5gcreate_f (grp_id0, 'tr'//trim(adjustl(cwork)), grp_id, error)
+            Call hdfwrite (grp_id, 'Ldata', transpose(iatcu%curten(i)%a(:, :, 1)))
+            Call hdfwrite (grp_id, 'Rdata', transpose(iatcu%curten(i)%a(:, :, 2)))
+            Call hdfwrite (grp_id, 'ir', iatcu%curten(i)%ir)
+            Call hdfwrite (grp_id, 'jc', iatcu%curten(i)%jc)
+            Call hdfwrite (grp_id, 'nnz', iatcu%curten(i)%nnz)
+            Call h5gclose_f (grp_id, error)
+         End Do
+         Call h5gclose_f (grp_id0, error)
+      End Subroutine hdfwrite_iatcu
+
+
+!!$ Create HDF5  dataset reprezeting real CSR sparse matrix
+!!$ tgt - target in HDF file (file itself or subgroup)
+!!$ path - name of dataset (name of matrix in the file)
+!!$ mat - matrix itself
+
+   Subroutine hdfwritercsrmat (tgt, path, mat)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (rcsrmat), Intent (In) :: mat
+!!$           Local vard
+         Integer (HID_T) :: grp_id, grp_id0
+         Integer :: error
+
+         Call hdfcheckgrp (tgt, trim(adjustl(path)))
+         Call h5gopen_f (tgt, trim(adjustl(path)), grp_id0, error)
+         Call hdfwriteattr_uchar (grp_id0, '.', 'OCTAVE_NEW_FORMAT', char(1))
+         Call hdfwrite (grp_id0, 'type', 'sparse complex matrix')
+
+         Call h5gcreate_f (grp_id0, 'value', grp_id, error)
+         Call hdfwrite (grp_id, 'data', mat%a)
+         Call hdfwrite (grp_id, 'cidx', mat%ir)
+         Call hdfwrite (grp_id, 'ridx', mat%jc)
+         Call hdfwrite (grp_id, 'nz', mat%nnz)
+         Call hdfwrite (grp_id, 'nr', mat%ncol)
+         Call hdfwrite (grp_id, 'nc', mat%nrow)
+         Call h5gclose_f (grp_id, error)
+   End Subroutine hdfwritercsrmat
+
+!!$ Create HDF5  dataset reprezeting complex CSR sparse matrix
+!!$ tgt - target in HDF file (file itself or subgroup)
+!!$ path - name of dataset (name of matrix in the file)
+!!$ mat - matrix itself
+
+   Subroutine hdfwritezcsrmat (tgt, path, mat)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (zcsrmat), Intent (In) :: mat
+!!$           Local vard
+         Integer (HID_T) :: grp_id, grp_id0
+         Integer :: error
+         Integer, Allocatable :: cidx (:), ridx (:)
+
+         Call hdfcheckgrp (tgt, trim(adjustl(path)))
+         Call h5gopen_f (tgt, trim(adjustl(path)), grp_id0, error)
+         Call hdfwriteattr_uchar (grp_id0, '.', 'OCTAVE_NEW_FORMAT', char(1))
+
+         Call hdfwrite (grp_id0, 'type', 'sparse complex matrix')
+
+         Call h5gcreate_f (grp_id0, 'value', grp_id, error)
+
+         Allocate (cidx(mat%nrow+1), ridx(mat%nnz))
+         cidx = mat%ir - 1
+         ridx = mat%jc - 1
+
+         Call hdfwrite (grp_id, 'data', mat%a)
+         Call hdfwrite (grp_id, 'cidx', cidx)
+         Call hdfwrite (grp_id, 'ridx', ridx)
+         Call hdfwrite (grp_id, 'nz', mat%nnz)
+         Call hdfwrite (grp_id, 'nr', mat%ncol)
+         Call hdfwrite (grp_id, 'nc', mat%nrow)
+         Call h5gclose_f (grp_id, error)
+         Call h5gclose_f (grp_id0, error)
+         Deallocate (cidx, ridx)
+   End Subroutine hdfwritezcsrmat
+
+
+   Subroutine hdfwritestring (tgt, path, val)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Character (Len=*), Intent (In) :: val
+!!$           Local vard
+         Integer (HID_T) :: dspace_id, dset_id, dtype
+         Integer :: error
+         Integer (HSIZE_T) :: dims (2)
+         Integer (SIZE_T) :: cl (2)
+         Character (Len=255) :: val1
+
+         dims (1) = 1
+         val1 = val // char (1)
+         cl (1) = len (val) + 1
+
+!! Create dataspace
+         Call h5screate_simple_f (0, dims, dspace_id, error)
+
+         Call h5tcopy_f (H5T_NATIVE_CHARACTER, dtype, error)
+         Call h5tset_size_f (dtype, cl(1), error)
+!!$ Create dataset
+         Call hdfcheckds (tgt, trim(adjustl(path)), dtype, dspace_id, dset_id, error)
+!!$ write data into dataset
+         Call h5dwrite_f (dset_id, dtype, val, dims, error)
+!!$           Call h5dclose_f (dset_id, error)
+         Call h5sclose_f (dspace_id, error)
+   End Subroutine hdfwritestring
+
+   Subroutine hdfwriteattr_uchar (tgt, path, aname, aval)
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path, aname
+         Character :: aval
+!!$           Local vard
+         Integer (HID_T) :: space_id, attr
+         Integer (HSIZE_T) :: dims (2)
+         Integer :: error
+!! Create dataspace
+         dims (1) = 1
+         Call h5screate_simple_f (0, dims, space_id, error)
+         Call h5acreate_by_name_f (tgt, path, aname, H5T_STD_U8LE, space_id, attr, error)
+         Call H5Awrite_f (attr, H5T_STD_U8LE, aval, dims, error)
+   End Subroutine hdfwriteattr_uchar
+
+   Subroutine hdfsetcompression4 (dims, dtype, plist)
+         Integer (HSIZE_T), Intent (In) :: dims (:)
+         Integer (HID_T), Intent (In) :: dtype
+         Integer (HID_T), Intent (Inout) :: plist
+!!$
+         Integer :: i1, error, totsz, ldim, mch, ldim1 (1)
+         Integer (HSIZE_T) :: tsz, chunk (4)
+         Call h5tget_size_f (dtype, tsz, error)
+         totsz = dims (1) * dims (2) * dims (3) * dims (4)
+         chunk (1:4) = dims (1:4)
+
+         If (totsz < MIN_UNCOMPRESSED/tsz) Return
+
+         mch = MAX_CHUNK / tsz
+         If (totsz > mch) Then
+            ldim1 = maxloc (dims)
+            ldim = ldim1 (1)
+            chunk (ldim) = 1
+            i1 = mch / (chunk(1)*chunk(2)*chunk(3)*chunk(4))
+            chunk (ldim) = Max (i1, 1)
+         End If
+         Call h5pset_chunk_f (plist, 4, chunk, error)
+#if defined(DO_SHUFFLE)
+         Call h5pset_shuffle_f (plist, error)
+#endif
+         Call h5pset_deflate_f (plist, GZ_COMP_LEVEL, error)
+   End Subroutine hdfsetcompression4
+
+
+   Subroutine hdfsetcompression3 (dims, dtype, plist)
+         Integer (HSIZE_T), Intent (In) :: dims (:)
+         Integer (HID_T), Intent (In) :: dtype
+         Integer (HID_T), Intent (Inout) :: plist
+!!$
+         Integer :: i1, error, totsz, ldim, mch, ldim1 (1)
+         Integer (HSIZE_T) :: tsz, chunk (3)
+         Call h5tget_size_f (dtype, tsz, error)
+         totsz = dims (1) * dims (2) * dims (3)
+         chunk (1:3) = dims (1:3)
+
+         If (totsz < MIN_UNCOMPRESSED/tsz) Return
+
+         mch = MAX_CHUNK / tsz
+         If (totsz > mch) Then
+            ldim1 = maxloc (dims)
+            ldim = ldim1 (1)
+            chunk (ldim) = 1
+            i1 = mch / (chunk(1)*chunk(2)*chunk(3))
+            chunk (ldim) = Max (i1, 1)
+         End If
+         Call h5pset_chunk_f (plist, 3, chunk, error)
+#if defined(DO_SHUFFLE)
+         Call h5pset_shuffle_f (plist, error)
+#endif
+         Call h5pset_deflate_f (plist, GZ_COMP_LEVEL, error)
+   End Subroutine hdfsetcompression3
+
+
+   Subroutine hdfsetcompression2 (dims, dtype, plist)
+         Integer (HSIZE_T), Intent (In) :: dims (:)
+         Integer (HID_T), Intent (In) :: dtype
+         Integer (HID_T), Intent (Inout) :: plist
+!!$
+         Integer :: i1, error, totsz, ldim, mch
+         Integer (HSIZE_T) :: tsz, chunk (2)
+         Call h5tget_size_f (dtype, tsz, error)
+         totsz = dims (1) * dims (2)
+         chunk (1:2) = dims (1:2)
+
+         If (totsz < MIN_UNCOMPRESSED/tsz) Return
+
+         mch = MAX_CHUNK / tsz
+         If (totsz > mch) Then
+            ldim = 2
+            If (dims(1) > dims(2)) ldim = 1
+            If (dims(3-ldim) > mch) Then
+               i1 = dims (3-ldim)
+               If (Mod(i1, mch) == 0) Then
+                  chunk (3-ldim) = mch
+               Else
+                  i1 = dims (3-ldim) / mch
+                  chunk (3-ldim) = dims (3-ldim) / (i1+1)
+               End If
+            End If
+            i1 = mch / (chunk(3-ldim))
+            chunk (ldim) = Max (i1, 1)
+         End If
+         Call h5pset_chunk_f (plist, 2, chunk, error)
+#if defined(DO_SHUFFLE)
+         Call h5pset_shuffle_f (plist, error)
+#endif
+         Call h5pset_deflate_f (plist, GZ_COMP_LEVEL, error)
+   End Subroutine hdfsetcompression2
+
+   Subroutine hdfsetcompression1 (dims, dtype, plist)
+         Integer (HSIZE_T), Intent (In) :: dims (:)
+         Integer (HID_T), Intent (In) :: dtype
+         Integer (HID_T), Intent (Inout) :: plist
+!!$
+         Integer :: i1, error, totsz, mch
+         Integer (HSIZE_T) :: tsz, chunk (2)
+         Call h5tget_size_f (dtype, tsz, error)
+         chunk (1) = dims (1)
+         If (dims(1) < MIN_UNCOMPRESSED/tsz) Return
+         mch = MAX_CHUNK / tsz
+
+         If (totsz > mch) Then
+            i1 = dims (1)
+            If (Mod(i1, mch) == 0) Then
+               chunk (1) = mch
+            Else
+               i1 = dims (1) / mch
+               chunk (1) = dims (1) / (i1+1)
+            End If
+         End If
+         Call h5pset_chunk_f (plist, 1, chunk, error)
+#if defined(DO_SHUFFLE)
+         Call h5pset_shuffle_f (plist, error)
+#endif
+         Call h5pset_deflate_f (plist, GZ_COMP_LEVEL, error)
+   End Subroutine hdfsetcompression1
+
+!!$ Create HDF5 compressed dataset and write complex matrix to it
+!!$ tgt - target in HDF file (file itself or subgroup)
+!!$ path - name of dataset (name of matrix in the file)
+!!$ mat - matrix itself
+
+   Subroutine hdfwritezmat (tgt, path, mat)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Complex (Kind=DEF_DBL_PREC), Intent (In) :: mat (:, :)
+!!$           Local vard
+         Integer (HID_T) :: plist, dspace_id, dset_id, ztype
+         Integer :: error
+         Integer (HSIZE_T) :: dims (2)
+!!$          Real (Kind=DEF_DBL_PREC),pointer :: qq(:,:)
+         dims (1) = size (mat, 1)
+         dims (2) = size (mat, 2)
+
+         ztype = hdf_complex_t (H5T_NATIVE_DOUBLE)
+!! Create property list
+         Call h5pcreate_f (H5P_DATASET_CREATE_F, plist, error)
+!! Set compression paramteres
+         Call hdfsetcompression2 (dims, ztype, plist)
+!! Create dataspace
+         Call h5screate_simple_f (2, dims, dspace_id, error)
+!!$ Create dataset
+         Call hdfcheckds (tgt, trim(adjustl(path)), ztype, dspace_id, dset_id, error, plist)
+!!$ write data into dataset
+         Call h5dwrite_f_complex (dset_id, ztype, mat, dims, error)
+!!$ close everything
+         Call h5dclose_f (dset_id, error)
+         Call h5sclose_f (dspace_id, error)
+         Call h5pclose_f (plist, error)
+   End Subroutine hdfwritezmat
+
+
+   Subroutine hdfwritezmat4 (tgt, path, mat)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Complex (Kind=DEF_DBL_PREC), Intent (In) :: mat (:, :, :, :)
+!!$           Local vard
+         Integer (HID_T) :: plist, dspace_id, dset_id, ztype
+         Integer :: error
+         Integer (HSIZE_T) :: dims (4)
+!!$          Real (Kind=DEF_DBL_PREC),pointer :: qq(:,:)
+         dims (1) = size (mat, 1)
+         dims (2) = size (mat, 2)
+         dims (3) = size (mat, 3)
+         dims (4) = size (mat, 4)
+
+         ztype = hdf_complex_t (H5T_NATIVE_DOUBLE)
+!! Create property list
+         Call h5pcreate_f (H5P_DATASET_CREATE_F, plist, error)
+!! Set compression paramteres
+         Call hdfsetcompression4 (dims, ztype, plist)
+!! Create dataspace
+         Call h5screate_simple_f (4, dims, dspace_id, error)
+!!$ Create dataset
+         Call hdfcheckds (tgt, trim(adjustl(path)), ztype, dspace_id, dset_id, error, plist)
+!!$ write data into dataset
+         Call h5dwrite_f_complex (dset_id, ztype, mat, dims, error)
+!!$ close everything
+         Call h5dclose_f (dset_id, error)
+         Call h5sclose_f (dspace_id, error)
+         Call h5pclose_f (plist, error)
+   End Subroutine hdfwritezmat4
+
+
+   Subroutine hdfwritezmat3 (tgt, path, mat)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Complex (Kind=DEF_DBL_PREC), Intent (In) :: mat (:, :, :)
+!!$           Local vard
+         Integer (HID_T) :: plist, dspace_id, dset_id, ztype
+         Integer :: error
+         Integer (HSIZE_T) :: dims (3)
+!!$          Real (Kind=DEF_DBL_PREC),pointer :: qq(:,:)
+         dims (1) = size (mat, 1)
+         dims (2) = size (mat, 2)
+         dims (3) = size (mat, 3)
+
+         ztype = hdf_complex_t (H5T_NATIVE_DOUBLE)
+!! Create property list
+         Call h5pcreate_f (H5P_DATASET_CREATE_F, plist, error)
+!! Set compression paramteres
+         Call hdfsetcompression3 (dims, ztype, plist)
+!! Create dataspace
+         Call h5screate_simple_f (3, dims, dspace_id, error)
+!!$ Create dataset
+         Call hdfcheckds (tgt, trim(adjustl(path)), ztype, dspace_id, dset_id, error, plist)
+!!$ write data into dataset
+         Call h5dwrite_f_complex (dset_id, ztype, mat, dims, error)
+!!$ close everything
+         Call h5dclose_f (dset_id, error)
+         Call h5sclose_f (dspace_id, error)
+         Call h5pclose_f (plist, error)
+   End Subroutine hdfwritezmat3
+
+
+!!$ Create HDF5 compressed dataset and write double matrix to it
+!!$ tgt - target in HDF file (file itself or subgroup)
+!!$ path - name of dataset (name of matrix in the file)
+!!$ mat - matrix itself
+
+   Subroutine hdfwritedmat (tgt, path, mat)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Real (Kind=DEF_DBL_PREC), Intent (In) :: mat (:, :)
+!!$           Local vard
+         Integer (HID_T) :: plist, dspace_id, dset_id
+         Integer :: error
+         Integer (HSIZE_T) :: dims (2)
+
+         dims (1) = size (mat, 1)
+         dims (2) = size (mat, 2)
+
+!! Create property list
+         Call h5pcreate_f (H5P_DATASET_CREATE_F, plist, error)
+         Call hdfsetcompression2 (dims, H5T_NATIVE_DOUBLE, plist)
+!! Create dataspace
+         Call h5screate_simple_f (2, dims, dspace_id, error)
+!!$ Create dataset
+         Call hdfcheckds (tgt, trim(adjustl(path)), H5T_NATIVE_DOUBLE, dspace_id, dset_id, error, plist)
+!!$ write data into dataset
+         Call h5dwrite_f (dset_id, H5T_NATIVE_DOUBLE, mat, dims, error)
+!!$ close everything
+         Call h5dclose_f (dset_id, error)
+         Call h5sclose_f (dspace_id, error)
+         Call h5pclose_f (plist, error)
+   End Subroutine hdfwritedmat
+
+   Subroutine hdfWriteRdenseMat (tgt, path, mat)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (rdensemat), Intent (In) :: mat
+!!$           Local vars
+         Call hdfwrite (tgt, path, mat%bl)
+   End Subroutine hdfWriteRdenseMat
+
+   Subroutine hdfWriteZdenseMat (tgt, path, mat)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (zdensemat), Intent (In) :: mat
+!!$           Local vars
+         Call hdfwrite (tgt, path, mat%bl)
+   End Subroutine hdfWriteZdenseMat
+
+   Subroutine hdfWriteRvec (tgt, path, vec)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (rvec), Intent (In) :: vec
+!!$           Local vars
+         Call hdfwrite (tgt, path, vec%vec)
+   End Subroutine hdfWriteRvec
+
+!!$ Create HDF5 compressed dataset and write double vector to it
+!!$ tgt - target in HDF file (file itself or subgroup)
+!!$ path - name of dataset (name of matrix in the file)
+!!$ mat - vector itself
+
+   Subroutine hdfwritedvec (tgt, path, mat)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Real (Kind=DEF_DBL_PREC), Intent (In) :: mat (:)
+!!$           Local vard
+         Integer (HID_T) :: plist, dspace_id, dset_id
+         Integer :: error
+         Integer (HSIZE_T) :: dims (2)
+
+         dims (2) = size (mat)
+         dims (1) = 1
+
+!! Create property list
+         Call h5pcreate_f (H5P_DATASET_CREATE_F, plist, error)
+         Call hdfsetcompression2 (dims, H5T_NATIVE_DOUBLE, plist)
+
+!! Create dataspace
+         Call h5screate_simple_f (2, dims, dspace_id, error)
+!!$ Create dataset
+         Call hdfcheckds (tgt, trim(adjustl(path)), H5T_NATIVE_DOUBLE, dspace_id, dset_id, error, plist)
+!!$ write data into dataset
+         Call h5dwrite_f (dset_id, H5T_NATIVE_DOUBLE, mat, dims, error)
+!!$ close everything
+         Call h5dclose_f (dset_id, error)
+         Call h5sclose_f (dspace_id, error)
+         Call h5pclose_f (plist, error)
+   End Subroutine hdfwritedvec
+
+!!$ Create HDF5 compressed dataset and write double number to it
+!!$ tgt - target in HDF file (file itself or subgroup)
+!!$ path - name of dataset (name of matrix in the file)
+!!$ mat - number itself
+
+   Subroutine hdfwrited (tgt, path, mat)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Real (Kind=DEF_DBL_PREC), Intent (In) :: mat
+!!$           Local vard
+         Integer (HID_T) :: dspace_id, dset_id
+         Integer :: error
+         Integer (HSIZE_T) :: dims (2)
+
+         dims (1) = 1
+!! Create dataspace
+         Call h5screate_simple_f (0, dims, dspace_id, error)
+!!$ Create dataset
+         Call hdfcheckds (tgt, trim(adjustl(path)), H5T_NATIVE_DOUBLE, dspace_id, dset_id, error)
+!!$ write data into dataset
+         Call h5dwrite_f (dset_id, H5T_NATIVE_DOUBLE, mat, dims, error)
+!!$ close everything
+         Call h5dclose_f (dset_id, error)
+         Call h5sclose_f (dspace_id, error)
+   End Subroutine hdfwrited
+
+!!$ Create HDF5 compressed dataset and write integer number to it
+!!$ tgt - target in HDF file (file itself or subgroup)
+!!$ path - name of dataset (name of matrix in the file)
+!!$ mat - number itself
+
+   Subroutine hdfwritei (tgt, path, mat)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Integer, Intent (In) :: mat
+!!$           Local vard
+         Integer (HID_T) :: dspace_id, dset_id
+         Integer :: error
+         Integer (HSIZE_T) :: dims (2)
+
+         dims (1) = 1
+!! Create dataspace
+         Call h5screate_simple_f (0, dims, dspace_id, error)
+!!$ Create dataset
+         Call hdfcheckds (tgt, trim(adjustl(path)), H5T_NATIVE_INTEGER, dspace_id, dset_id, error)
+!!$ write data into dataset
+         Call h5dwrite_f (dset_id, H5T_NATIVE_INTEGER, mat, dims, error)
+!!$ close everything
+         Call h5dclose_f (dset_id, error)
+         Call h5sclose_f (dspace_id, error)
+   End Subroutine hdfwritei
+
+
+!!$ Create HDF5 compressed dataset and write integer matrix to it
+!!$ tgt - target in HDF file (file itself or subgroup)
+!!$ path - name of dataset (name of matrix in the file)
+!!$ mat - matrix itself
+
+   Subroutine hdfwriteimat (tgt, path, mat)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Integer, Intent (In) :: mat (:, :)
+!!$           Local vard
+         Integer (HID_T) :: plist, dspace_id, dset_id
+         Integer :: error
+         Integer (HSIZE_T) :: dims (2)
+
+         dims (1) = size (mat, 1)
+         dims (2) = size (mat, 2)
+!! Create property list
+         Call h5pcreate_f (H5P_DATASET_CREATE_F, plist, error)
+!! Set compression paramteres
+         Call hdfsetcompression2 (dims, H5T_NATIVE_INTEGER, plist)
+!! Create dataspace
+         Call h5screate_simple_f (2, dims, dspace_id, error)
+!!$ Create dataset
+         Call hdfcheckds (tgt, trim(adjustl(path)), H5T_NATIVE_INTEGER, dspace_id, dset_id, error, plist)
+!!$ write data into dataset
+         Call h5dwrite_f (dset_id, H5T_NATIVE_INTEGER, mat, dims, error)
+!!$ close everything
+         Call h5dclose_f (dset_id, error)
+         Call h5sclose_f (dspace_id, error)
+         Call h5pclose_f (plist, error)
+   End Subroutine hdfwriteimat
+
+
+!!$ Create HDF5 compressed dataset and write integer vector to it
+!!$ tgt - target in HDF file (file itself or subgroup)
+!!$ path - name of dataset (name of matrix in the file)
+!!$ mat - vector itself
+
+   Subroutine hdfwriteivec (tgt, path, mat)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Integer, Intent (In) :: mat (:)
+!!$           Local vard
+         Integer (HID_T) :: plist, dspace_id, dset_id
+         Integer :: error
+         Integer (HSIZE_T) :: dims (2)
+
+         dims (1) = 1
+         dims (2) = size (mat)
+!! Create property list
+         Call h5pcreate_f (H5P_DATASET_CREATE_F, plist, error)
+!! Set compression paramteres
+         Call hdfsetcompression2 (dims, H5T_NATIVE_INTEGER, plist)
+!! Create dataspace
+         Call h5screate_simple_f (2, dims, dspace_id, error)
+!!$ Create dataset
+         Call hdfcheckds (tgt, trim(adjustl(path)), H5T_NATIVE_INTEGER, dspace_id, dset_id, error, plist)
+!!$ write data into dataset
+         Call h5dwrite_f (dset_id, H5T_NATIVE_INTEGER, mat, dims, error)
+!!$ close everything
+         Call h5dclose_f (dset_id, error)
+         Call h5sclose_f (dspace_id, error)
+         Call h5pclose_f (plist, error)
+   End Subroutine hdfwriteivec
+
+
+!!$ Create HDF5 compressed dataset and write double number to it
+!!$ tgt - target in HDF file (file itself or subgroup)
+!!$ path - name of dataset (name of matrix in the file)
+!!$ mat - number itself
+
+   Subroutine hdfwritez (tgt, path, mat)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Complex (Kind=DEF_DBL_PREC), Intent (In) :: mat
+!!$           Local vard
+         Integer (HID_T) :: dspace_id, dset_id, ztype
+         Integer :: error
+         Integer (HSIZE_T) :: dims (2)
+
+         ztype = hdf_complex_t (H5T_NATIVE_DOUBLE)
+         dims (1) = 1
+!! Create dataspace
+         Call h5screate_simple_f (0, dims, dspace_id, error)
+!!$ Create dataset
+         Call hdfcheckds (tgt, trim(adjustl(path)), ztype, dspace_id, dset_id, error)
+!!$ write data into dataset
+         Call h5dwrite_f_complex (dset_id, ztype, mat, dims, error)
+!!$ close everything
+         Call h5dclose_f (dset_id, error)
+         Call h5sclose_f (dspace_id, error)
+   End Subroutine hdfwritez
+
+!!$ Create HDF5 compressed dataset and write complex vector to it
+!!$ tgt - target in HDF file (file itself or subgroup)
+!!$ path - name of dataset (name of matrix in the file)
+!!$ mat - matrix itself
+
+   Subroutine hdfwritezvec (tgt, path, mat)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Complex (Kind=DEF_DBL_PREC), Intent (In) :: mat (:)
+!!$           Local vard
+         Integer (HID_T) :: plist, dspace_id, dset_id, ztype
+         Integer :: error
+         Integer (HSIZE_T) :: dims (2)
+!!$          Real (Kind=DEF_DBL_PREC),pointer :: qq(:,:)
+
+         dims (2) = size (mat)
+         dims (1) = 1
+
+         ztype = hdf_complex_t (H5T_NATIVE_DOUBLE)
+!! Create property list
+         Call h5pcreate_f (H5P_DATASET_CREATE_F, plist, error)
+!! Set compression paramteres
+         Call hdfsetcompression2 (dims, ztype, plist)
+!! Create dataspace
+         Call h5screate_simple_f (2, dims, dspace_id, error)
+!!$ Create dataset
+         Call hdfcheckds (tgt, trim(adjustl(path)), ztype, dspace_id, dset_id, error, plist)
+!!$ write data into dataset
+         Call h5dwrite_f_complex (dset_id, ztype, mat, dims, error)
+!!$ close everything
+         Call h5dclose_f (dset_id, error)
+         Call h5sclose_f (dspace_id, error)
+         Call h5pclose_f (plist, error)
+   End Subroutine hdfwritezvec
+
+
+   Subroutine hdfset_write_ivec_parallel (tgt, set, idx, name, comm, root, needwrite, mat)
+         Implicit None
+         Include 'mpif.h'
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: set, name
+         Integer, Intent (In), Target :: mat (:)
+         Integer, Intent (In) :: needwrite, comm, root, idx
+!!$ Local vars
+         Integer :: error, mpi_sz, my_mpi_id, cbase (4), procnum
+         Integer, Allocatable :: jobs (:)
+         Integer :: idat (2)
+         Integer :: status (MPI_STATUS_SIZE)
+         Integer, Pointer :: tptr (:)
+         Integer, Allocatable, Target :: tmat (:)
+         Character (Len=8) :: cwork
+
+         Call mpi_comm_rank (comm, my_mpi_id, error)
+         Call mpi_comm_size (comm, mpi_sz, error)
+
+         If (my_mpi_id == root) Then
+            Allocate (jobs(mpi_sz))
+         Else
+            Allocate (jobs(1))
+         End If
+
+         Call rand_vec_int (cbase)
+         Call mpi_bcast (cbase, 2, mpi_integer, root, comm, error)
+         Call mpi_gather (needwrite, 1, mpi_integer, jobs, 1, mpi_integer, root, comm, error)
+
+         If (my_mpi_id /= root) Then
+            If (needwrite /= 0) Then
+               idat (1) = size (mat)
+               idat (2) = idx
+               Call MPI_Send (idat, 2, mpi_integer, root, cbase(1)+my_mpi_id+1, comm, error)
+               Call MPI_Send (mat, idat(1), mpi_integer, root, cbase(2)+my_mpi_id+1, comm, error)
+            End If
+         Else
+            Do procnum = 1, mpi_sz
+               If (jobs(procnum) > 0) Then
+                  If ((procnum-1) /= root) Then
+                     Call MPI_Recv (idat, 2, mpi_integer, procnum-1, procnum+cbase(1), comm, status, error)
+                     Allocate (tmat(idat(1)))
+                     Call MPI_Recv (tmat, idat(1), mpi_integer, procnum-1, procnum+cbase(2), comm, status, &
+                    & error)
+                     tptr => tmat
+                  Else
+                     idat (2) = idx
+                     tptr => mat
+                  End If
+                  Write (cwork, '(i8)') idat (2)
+                  Call hdfwrite (tgt, set//'/'//trim(adjustl(cwork))//'/'//name, tptr)
+                  If (allocated(tmat)) deallocate (tmat)
+               End If
+            End Do
+         End If
+         Deallocate (jobs)
+   End Subroutine hdfset_write_ivec_parallel
+
+
+   Subroutine hdfset_write_dvec_parallel (tgt, set, idx, name, comm, root, needwrite, mat)
+         Implicit None
+         Include 'mpif.h'
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: set, name
+         Real (Kind=DEF_DBL_PREC), Intent (In), Target :: mat (:)
+         Integer, Intent (In) :: needwrite, comm, root, idx
+!!$ Local vars
+         Integer :: error, mpi_sz, my_mpi_id, cbase (4), procnum
+         Integer, Allocatable :: jobs (:)
+         Integer :: idat (2)
+         Integer :: status (MPI_STATUS_SIZE)
+         Real (Kind=DEF_DBL_PREC), Pointer :: tptr (:)
+         Real (Kind=DEF_DBL_PREC), Allocatable, Target :: tmat (:)
+         Character (Len=8) :: cwork
+
+         Call mpi_comm_rank (comm, my_mpi_id, error)
+         Call mpi_comm_size (comm, mpi_sz, error)
+
+         If (my_mpi_id == root) Then
+            Allocate (jobs(mpi_sz))
+         Else
+            Allocate (jobs(1))
+         End If
+
+         Call rand_vec_int (cbase)
+         Call mpi_bcast (cbase, 2, mpi_integer, root, comm, error)
+         Call mpi_gather (needwrite, 1, mpi_integer, jobs, 1, mpi_integer, root, comm, error)
+
+         If (my_mpi_id /= root) Then
+            If (needwrite /= 0) Then
+               idat (1) = size (mat)
+               idat (2) = idx
+               Call MPI_Send (idat, 2, mpi_integer, root, cbase(1)+my_mpi_id+1, comm, error)
+               Call MPI_Send (mat, idat(1), mpi_double_precision, root, cbase(2)+my_mpi_id+1, comm, error)
+            End If
+         Else
+            Do procnum = 1, mpi_sz
+               If (jobs(procnum) > 0) Then
+                  If ((procnum-1) /= root) Then
+                     Call MPI_Recv (idat, 2, mpi_integer, procnum-1, procnum+cbase(1), comm, status, error)
+                     Allocate (tmat(idat(1)))
+                     Call MPI_Recv (tmat, idat(1), mpi_double_precision, procnum-1, procnum+cbase(2), comm, &
+                    & status, error)
+                     tptr => tmat
+                  Else
+                     idat (2) = idx
+                     tptr => mat
+                  End If
+                  Write (cwork, '(i8)') idat (2)
+                  Call hdfwrite (tgt, set//'/'//trim(adjustl(cwork))//'/'//name, tptr)
+                  If (allocated(tmat)) deallocate (tmat)
+               End If
+            End Do
+         End If
+         Deallocate (jobs)
+   End Subroutine hdfset_write_dvec_parallel
+
+   Subroutine hdfset_write_zvec_parallel (tgt, set, idx, name, comm, root, needwrite, mat)
+         Implicit None
+         Include 'mpif.h'
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: set, name
+         Complex (Kind=DEF_DBL_PREC), Intent (In), Target :: mat (:)
+         Integer, Intent (In) :: needwrite, comm, root, idx
+!!$ Local vars
+         Integer :: error, mpi_sz, my_mpi_id, cbase (4), procnum
+         Integer, Allocatable :: jobs (:)
+         Integer :: idat (2)
+         Integer :: status (MPI_STATUS_SIZE)
+         Complex (Kind=DEF_DBL_PREC), Pointer :: tptr (:)
+         Complex (Kind=DEF_DBL_PREC), Allocatable, Target :: tmat (:)
+         Character (Len=8) :: cwork
+
+         Call mpi_comm_rank (comm, my_mpi_id, error)
+         Call mpi_comm_size (comm, mpi_sz, error)
+
+         If (my_mpi_id == root) Then
+            Allocate (jobs(mpi_sz))
+         Else
+            Allocate (jobs(1))
+         End If
+
+         Call rand_vec_int (cbase)
+         Call mpi_bcast (cbase, 2, mpi_integer, root, comm, error)
+         Call mpi_gather (needwrite, 1, mpi_integer, jobs, 1, mpi_integer, root, comm, error)
+
+         If (my_mpi_id /= root) Then
+            If (needwrite /= 0) Then
+               idat (1) = size (mat)
+               idat (2) = idx
+               Call MPI_Send (idat, 2, mpi_integer, root, cbase(1)+my_mpi_id+1, comm, error)
+               Call MPI_Send (mat, idat(1)*2, mpi_double_precision, root, cbase(2)+my_mpi_id+1, comm, error)
+            End If
+         Else
+            Do procnum = 1, mpi_sz
+               If (jobs(procnum) > 0) Then
+                  If ((procnum-1) /= root) Then
+                     Call MPI_Recv (idat, 2, mpi_integer, procnum-1, procnum+cbase(1), comm, status, error)
+                     Allocate (tmat(idat(1)))
+                     Call MPI_Recv (tmat, idat(1)*2, mpi_double_precision, procnum-1, procnum+cbase(2), comm, &
+                    & status, error)
+                     tptr => tmat
+                  Else
+                     idat (2) = idx
+                     tptr => mat
+                  End If
+                  Write (cwork, '(i8)') idat (2)
+                  Call hdfwrite (tgt, set//'/'//trim(adjustl(cwork))//'/'//name, tptr)
+                  If (allocated(tmat)) deallocate (tmat)
+               End If
+            End Do
+         End If
+         Deallocate (jobs)
+   End Subroutine hdfset_write_zvec_parallel
+
+
+   Subroutine hdfset_write_imat_parallel (tgt, set, idx, name, comm, root, needwrite, mat)
+         Implicit None
+         Include 'mpif.h'
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: set, name
+         Integer, Intent (In), Target :: mat (:, :)
+         Integer, Intent (In) :: needwrite, comm, root, idx
+!!$ Local vars
+         Integer :: error, mpi_sz, my_mpi_id, cbase (4), procnum
+         Integer, Allocatable :: jobs (:)
+         Integer :: idat (3)
+         Integer :: status (MPI_STATUS_SIZE)
+         Integer, Pointer :: tptr (:, :)
+         Integer, Allocatable, Target :: tmat (:, :)
+         Character (Len=8) :: cwork
+
+         Call mpi_comm_rank (comm, my_mpi_id, error)
+         Call mpi_comm_size (comm, mpi_sz, error)
+
+         If (my_mpi_id == root) Then
+            Allocate (jobs(mpi_sz))
+         Else
+            Allocate (jobs(1))
+         End If
+
+         Call rand_vec_int (cbase)
+         Call mpi_bcast (cbase, 2, mpi_integer, root, comm, error)
+         Call mpi_gather (needwrite, 1, mpi_integer, jobs, 1, mpi_integer, root, comm, error)
+
+         If (my_mpi_id /= root) Then
+            If (needwrite /= 0) Then
+               idat (1) = size (mat, 1)
+               idat (2) = size (mat, 2)
+               idat (3) = idx
+               Call MPI_Send (idat, 3, mpi_integer, root, cbase(1)+my_mpi_id+1, comm, error)
+               Call MPI_Send (mat, idat(1)*idat(2), mpi_integer, root, cbase(2)+my_mpi_id+1, comm, error)
+            End If
+         Else
+            Do procnum = 1, mpi_sz
+               If (jobs(procnum) > 0) Then
+                  If ((procnum-1) /= root) Then
+                     Call MPI_Recv (idat, 3, mpi_integer, procnum-1, procnum+cbase(1), comm, status, error)
+                     Allocate (tmat(idat(1), idat(2)))
+                     Call MPI_Recv (tmat, idat(1)*idat(2), mpi_integer, procnum-1, procnum+cbase(2), comm, &
+                    & status, error)
+                     tptr => tmat
+                  Else
+                     idat (3) = idx
+                     tptr => mat
+                  End If
+                  Write (cwork, '(i8)') idat (3)
+                  Call hdfwrite (tgt, set//'/'//trim(adjustl(cwork))//'/'//name, tptr)
+                  If (allocated(tmat)) deallocate (tmat)
+               End If
+            End Do
+         End If
+         Deallocate (jobs)
+   End Subroutine hdfset_write_imat_parallel
+
+
+   Subroutine hdfset_write_dmat_parallel (tgt, set, idx, name, comm, root, needwrite, mat)
+         Implicit None
+         Include 'mpif.h'
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: set, name
+         Real (Kind=DEF_DBL_PREC), Intent (In), Target :: mat (:, :)
+         Integer, Intent (In) :: needwrite, comm, root, idx
+!!$ Local vars
+         Integer :: error, mpi_sz, my_mpi_id, cbase (4), procnum
+         Integer, Allocatable :: jobs (:)
+         Integer :: idat (3)
+         Integer :: status (MPI_STATUS_SIZE)
+         Real (Kind=DEF_DBL_PREC), Pointer :: tptr (:, :)
+         Real (Kind=DEF_DBL_PREC), Allocatable, Target :: tmat (:, :)
+         Character (Len=8) :: cwork
+
+         Call mpi_comm_rank (comm, my_mpi_id, error)
+         Call mpi_comm_size (comm, mpi_sz, error)
+
+         If (my_mpi_id == root) Then
+            Allocate (jobs(mpi_sz))
+         Else
+            Allocate (jobs(1))
+         End If
+
+         Call rand_vec_int (cbase)
+         Call mpi_bcast (cbase, 2, mpi_integer, root, comm, error)
+         Call mpi_gather (needwrite, 1, mpi_integer, jobs, 1, mpi_integer, root, comm, error)
+
+         If (my_mpi_id /= root) Then
+            If (needwrite /= 0) Then
+               idat (1) = size (mat, 1)
+               idat (2) = size (mat, 2)
+               idat (3) = idx
+               Call MPI_Send (idat, 3, mpi_integer, root, cbase(1)+my_mpi_id+1, comm, error)
+               Call MPI_Send (mat, idat(1)*idat(2), mpi_double_precision, root, cbase(2)+my_mpi_id+1, comm, &
+              & error)
+            End If
+         Else
+            Do procnum = 1, mpi_sz
+               If (jobs(procnum) > 0) Then
+                  If ((procnum-1) /= root) Then
+                     Call MPI_Recv (idat, 3, mpi_integer, procnum-1, procnum+cbase(1), comm, status, error)
+                     Allocate (tmat(idat(1), idat(2)))
+                     Call MPI_Recv (tmat, idat(1)*idat(2), mpi_double_precision, procnum-1, procnum+cbase(2), &
+                    & comm, status, error)
+                     tptr => tmat
+                  Else
+                     idat (3) = idx
+                     tptr => mat
+                  End If
+                  Write (cwork, '(i8)') idat (3)
+                  Call hdfwrite (tgt, set//'/'//trim(adjustl(cwork))//'/'//name, tptr)
+                  If (allocated(tmat)) deallocate (tmat)
+               End If
+            End Do
+         End If
+         Deallocate (jobs)
+   End Subroutine hdfset_write_dmat_parallel
+
+
+   Subroutine hdfwriteAndo (tgt, path, ando)
+         Use ando_module
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (t_ando_sollution), Intent (In) :: ando
+!!$           Local vard
+         Integer (HID_T) :: grp_id
+         Integer :: error
+
+         If (ando%alloc == 0) Return
+
+         Call hdfcheckgrp (tgt, trim(adjustl(path)))
+         Call h5gopen_f (tgt, trim(adjustl(path)), grp_id, error)
+
+         Call hdfwrite (grp_id, 'lin', ando%lin)
+         Call hdfwrite (grp_id, 'lout', ando%lout)
+         Call hdfwrite (grp_id, 'Vin', ando%Vin)
+         Call hdfwrite (grp_id, 'Vout', ando%Vout)
+         Call hdfwrite (grp_id, 'Uout_i', ando%Uout_i)
+         Call hdfwrite (grp_id, 'Uin', ando%Uin)
+
+         If (ando%haveAllFU /= 0) Then
+            Call hdfwrite (grp_id, 'Uout', ando%Uout)
+            Call hdfwrite (grp_id, 'Uin_i', ando%Uin_i)
+         End If
+
+         If (ando%haveF /= 0) Then
+            Call hdfwrite (grp_id, 'Fout_i', ando%Fout_i)
+            Call hdfwrite (grp_id, 'Fin', ando%Fin)
+            If (ando%haveAllFU /= 0) Then
+               Call hdfwrite (grp_id, 'Fin_i', ando%Fin_i)
+               Call hdfwrite (grp_id, 'Fout', ando%Fout)
+            End If
+         End If
+
+         If (ando%haveEmb /= 0) Call hdfwrite (grp_id, 'emb', ando%emb)
+         If (ando%haveBound /= 0) Call hdfwrite (grp_id, 'bound', ando%bound)
+
+
+         If (ando%have_split /= 0) Then
+            Call hdfwrite (grp_id, 'mask_in', ando%mask_in)
+            Call hdfwrite (grp_id, 'mask_out', ando%mask_out)
+         End If
+
+         Call hdfwrite (grp_id, 'Nin', ando%Nin)
+         Call hdfwrite (grp_id, 'Nout', ando%Nout)
+         Call hdfwrite (grp_id, 'n', ando%n)
+         Call hdfwrite (grp_id, 'haveF', ando%haveF)
+         Call hdfwrite (grp_id, 'haveEmb', ando%haveEmb)
+         Call hdfwrite (grp_id, 'haveBound', ando%haveBound)
+         Call hdfwrite (grp_id, 'haveAllFU', ando%haveAllFU)
+         Call hdfwrite (grp_id, 'haveEvanecent', ando%haveEvanecent)
+         Call hdfwrite (grp_id, 'SNin', ando%SNin)
+         Call hdfwrite (grp_id, 'SNout', ando%SNout)
+         Call h5gclose_f (grp_id, error)
+   End Subroutine hdfwriteAndo
+
+
+   Subroutine hdfwriteLeadDecomp (tgt, path, dat)
+         Use sparselib
+         Use supercell
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (t_decomp_data), Intent (In) :: dat
+!!$           Local vard
+         Integer (HID_T) :: grp_id
+         Integer :: error
+
+         Call hdfcheckgrp (tgt, trim(adjustl(path)))
+         Call h5gopen_f (tgt, trim(adjustl(path)), grp_id, error)
+
+         Call hdfwrite (grp_id, 'csz', dat%csz)
+         Call hdfwrite (grp_id, 'num', dat%num)
+         Call hdfwrite (grp_id, 'ldwf', dat%ldwf)
+         Call hdfwrite (grp_id, 'nin', dat%Nin)
+         If (dat%num > 0) Then
+            Call hdfwrite (grp_id, 'wf', dat%wf)
+            Call hdfwrite (grp_id, 'kp', dat%kp)
+            Call hdfwrite (grp_id, 'vel', dat%vel)
+         End If
+         Call h5gclose_f (grp_id, error)
+   End Subroutine hdfwriteLeadDecomp
+
+   Subroutine hdfset_write_ldecomp_parallel (tgt, set, idx, name, comm, root, needwrite, dat)
+         Use sparselib
+         Use supercell
+         Implicit None
+         Include 'mpif.h'
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: set, name
+         Type (t_decomp_data), Intent (In), Target :: dat
+         Integer, Intent (In) :: needwrite, comm, root, idx
+!!$ Local vars
+         Integer :: error, mpi_sz, my_mpi_id, cbase (8), procnum
+         Integer, Allocatable :: jobs (:)
+         Integer :: idat (4)
+         Integer :: status (MPI_STATUS_SIZE)
+         Type (t_decomp_data), Pointer :: tptr
+         Type (t_decomp_data), Target :: tdat
+         Character (Len=8) :: cwork
+
+         Call mpi_comm_rank (comm, my_mpi_id, error)
+         Call mpi_comm_size (comm, mpi_sz, error)
+
+         If (my_mpi_id == root) Then
+            Allocate (jobs(mpi_sz))
+         Else
+            Allocate (jobs(1))
+         End If
+
+         Call rand_vec_int (cbase)
+         Call mpi_bcast (cbase, 8, mpi_integer, root, comm, error)
+         Call mpi_gather (needwrite, 1, mpi_integer, jobs, 1, mpi_integer, root, comm, error)
+
+         If (my_mpi_id /= root) Then
+            If (needwrite /= 0) Then
+               idat (1) = dat%csz
+               idat (2) = dat%num
+               idat (3) = dat%ldwf
+               idat (4) = idx
+
+               Call MPI_Send (idat, 4, mpi_integer, root, cbase(1)+my_mpi_id+1, comm, error)
+               Call MPI_Send (dat%Nin, idat(1), mpi_integer, root, cbase(2)+my_mpi_id+1, comm, error)
+
+               If (dat%num > 0) Then
+                  Call MPI_Send (dat%vel, idat(2), mpi_double_precision, root, cbase(3)+my_mpi_id+1, comm, &
+                 & error)
+                  Call MPI_Send (dat%kp, idat(2)*2, mpi_double_precision, root, cbase(4)+my_mpi_id+1, comm, &
+                 & error)
+                  Call MPI_Send (dat%wf, idat(2)*idat(3)*2, mpi_double_precision, root, cbase(5)+my_mpi_id+1, &
+                 & comm, error)
+               End If
+            End If
+         Else
+            Do procnum = 1, mpi_sz
+               If (jobs(procnum) > 0) Then
+                  If ((procnum-1) /= root) Then
+                     Call MPI_Recv (idat, 4, mpi_integer, procnum-1, procnum+cbase(1), comm, status, error)
+
+                     Call decomp_realloc (idat(1), idat(2), tdat, idat(3))
+                     Call MPI_Recv (tdat%Nin, idat(1), mpi_integer, procnum-1, procnum+cbase(2), comm, &
+                    & status, error)
+                     If (idat(2) > 0) Then
+                        Call MPI_Recv (tdat%vel, idat(2), mpi_double_precision, procnum-1, procnum+cbase(3), &
+                       & comm, status, error)
+                        Call MPI_Recv (tdat%kp, idat(2)*2, mpi_double_precision, procnum-1, procnum+cbase(4), &
+                       & comm, status, error)
+                        Call MPI_Recv (tdat%wf, idat(2)*idat(3)*2, mpi_double_precision, procnum-1, &
+                       & procnum+cbase(5), comm, status, error)
+                     End If
+                     tptr => tdat
+                  Else
+                     idat (4) = idx
+                     tptr => dat
+                  End If
+                  Write (cwork, '(i8)') idat (4)
+                  Call hdfwrite (tgt, set//'/'//trim(adjustl(cwork))//'/'//name, tptr)
+                  Call decomp_free (tdat)
+               End If
+            End Do
+         End If
+         Deallocate (jobs)
+   End Subroutine hdfset_write_ldecomp_parallel
+
+
+
+   Subroutine hdfset_write_zcsr_parallel (tgt, set, idx, name, comm, root, needwrite, mat)
+         Use sparselib
+         Implicit None
+         Include 'mpif.h'
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: set, name
+         Type (zcsrmat), Intent (In), Target :: mat
+         Integer, Intent (In) :: needwrite, comm, root, idx
+!!$ Local vars
+         Integer :: error, mpi_sz, my_mpi_id, cbase (8), procnum
+         Integer, Allocatable :: jobs (:)
+         Integer :: idat (4)
+         Integer :: status (MPI_STATUS_SIZE)
+         Type (zcsrmat), Pointer :: tptr
+         Type (zcsrmat), Target :: tmat
+         Character (Len=8) :: cwork
+
+         Call mpi_comm_rank (comm, my_mpi_id, error)
+         Call mpi_comm_size (comm, mpi_sz, error)
+
+         If (my_mpi_id == root) Then
+            Allocate (jobs(mpi_sz))
+         Else
+            Allocate (jobs(1))
+         End If
+
+         Call rand_vec_int (cbase)
+         Call mpi_bcast (cbase, 4, mpi_integer, root, comm, error)
+         Call mpi_gather (needwrite, 1, mpi_integer, jobs, 1, mpi_integer, root, comm, error)
+
+         If (my_mpi_id /= root) Then
+            If (needwrite /= 0) Then
+               idat (1) = mat%nrow
+               idat (2) = mat%ncol
+               idat (3) = mat%nnz
+               idat (4) = idx
+               Call MPI_Send (idat, 4, mpi_integer, root, cbase(1)+my_mpi_id+1, comm, error)
+               Call MPI_Send (mat%a, idat(3)*2, mpi_double_precision, root, cbase(2)+my_mpi_id+1, comm, &
+              & error)
+               Call MPI_Send (mat%ir, idat(1)+1, mpi_integer, root, cbase(3)+my_mpi_id+1, comm, error)
+               Call MPI_Send (mat%jc, idat(3), mpi_integer, root, cbase(4)+my_mpi_id+1, comm, error)
+            End If
+         Else
+            Do procnum = 1, mpi_sz
+               If (jobs(procnum) > 0) Then
+                  If ((procnum-1) /= root) Then
+                     Call MPI_Recv (idat, 4, mpi_integer, procnum-1, procnum+cbase(1), comm, status, error)
+                     Call mrealloc (tmat, idat(3), idat(1), idat(2))
+                     Call MPI_Recv (tmat%a, idat(3)*2, mpi_double_precision, procnum-1, procnum+cbase(2), &
+                    & comm, status, error)
+                     Call MPI_Recv (tmat%ir, idat(1)+1, mpi_integer, procnum-1, procnum+cbase(3), comm, &
+                    & status, error)
+                     Call MPI_Recv (tmat%jc, idat(3), mpi_integer, procnum-1, procnum+cbase(4), comm, status, &
+                    & error)
+                     tmat%nnz = idat (3)
+                     tptr => tmat
+                  Else
+                     idat (4) = idx
+                     tptr => mat
+                  End If
+                  Write (cwork, '(i8)') idat (4)
+                  Call hdfwrite (tgt, set//'/'//trim(adjustl(cwork))//'/'//name, tptr)
+                  Call free (tmat)
+               End If
+            End Do
+         End If
+         Deallocate (jobs)
+   End Subroutine hdfset_write_zcsr_parallel
+
+   Subroutine hdfset_write_rcsr_parallel (tgt, set, idx, name, comm, root, needwrite, mat)
+         Use sparselib
+         Implicit None
+         Include 'mpif.h'
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: set, name
+         Type (rcsrmat), Intent (In), Target :: mat
+         Integer, Intent (In) :: needwrite, comm, root, idx
+!!$ Local vars
+         Integer :: error, mpi_sz, my_mpi_id, cbase (8), procnum
+         Integer, Allocatable :: jobs (:)
+         Integer :: idat (4)
+         Integer :: status (MPI_STATUS_SIZE)
+         Type (rcsrmat), Pointer :: tptr
+         Type (rcsrmat), Target :: tmat
+         Character (Len=8) :: cwork
+
+         Call mpi_comm_rank (comm, my_mpi_id, error)
+         Call mpi_comm_size (comm, mpi_sz, error)
+
+         If (my_mpi_id == root) Then
+            Allocate (jobs(mpi_sz))
+         Else
+            Allocate (jobs(1))
+         End If
+
+         Call rand_vec_int (cbase)
+         Call mpi_bcast (cbase, 4, mpi_integer, root, comm, error)
+         Call mpi_gather (needwrite, 1, mpi_integer, jobs, 1, mpi_integer, root, comm, error)
+
+         If (my_mpi_id /= root) Then
+            If (needwrite /= 0) Then
+               idat (1) = mat%nrow
+               idat (2) = mat%ncol
+               idat (3) = mat%nnz
+               idat (4) = idx
+               Call MPI_Send (idat, 4, mpi_integer, root, cbase(1)+my_mpi_id+1, comm, error)
+               Call MPI_Send (mat%a, idat(3), mpi_double_precision, root, cbase(2)+my_mpi_id+1, comm, error)
+               Call MPI_Send (mat%ir, idat(1)+1, mpi_integer, root, cbase(3)+my_mpi_id+1, comm, error)
+               Call MPI_Send (mat%jc, idat(3), mpi_integer, root, cbase(4)+my_mpi_id+1, comm, error)
+            End If
+         Else
+            Do procnum = 1, mpi_sz
+               If (jobs(procnum) > 0) Then
+                  If ((procnum-1) /= root) Then
+                     Call MPI_Recv (idat, 4, mpi_integer, procnum-1, procnum+cbase(1), comm, status, error)
+                     Call mrealloc (tmat, idat(3), idat(1), idat(2))
+                     Call MPI_Recv (tmat%a, idat(3), mpi_double_precision, procnum-1, procnum+cbase(2), comm, &
+                    & status, error)
+                     Call MPI_Recv (tmat%ir, idat(1)+1, mpi_integer, procnum-1, procnum+cbase(3), comm, &
+                    & status, error)
+                     Call MPI_Recv (tmat%jc, idat(3), mpi_integer, procnum-1, procnum+cbase(4), comm, status, &
+                    & error)
+                     tmat%nnz = idat (3)
+                     tptr => tmat
+                  Else
+                     idat (4) = idx
+                     tptr => mat
+                  End If
+                  Write (cwork, '(i8)') idat (4)
+                  Call hdfwrite (tgt, set//'/'//trim(adjustl(cwork))//'/'//name, tptr)
+                  Call free (tmat)
+               End If
+            End Do
+         End If
+         Deallocate (jobs)
+   End Subroutine hdfset_write_rcsr_parallel
+
+
+
+   Subroutine hdfset_write_zmat_parallel (tgt, set, idx, name, comm, root, needwrite, mat)
+         Implicit None
+         Include 'mpif.h'
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: set, name
+         Complex (Kind=DEF_DBL_PREC), Intent (In), Target :: mat (:, :)
+         Integer, Intent (In) :: needwrite, comm, root, idx
+!!$ Local vars
+         Integer :: error, mpi_sz, my_mpi_id, cbase (4), procnum
+         Integer, Allocatable :: jobs (:)
+         Integer :: idat (3)
+         Integer :: status (MPI_STATUS_SIZE)
+         Complex (Kind=DEF_DBL_PREC), Pointer :: tptr (:, :)
+         Complex (Kind=DEF_DBL_PREC), Allocatable, Target :: tmat (:, :)
+         Character (Len=8) :: cwork
+
+         Call mpi_comm_rank (comm, my_mpi_id, error)
+         Call mpi_comm_size (comm, mpi_sz, error)
+
+         If (my_mpi_id == root) Then
+            Allocate (jobs(mpi_sz))
+         Else
+            Allocate (jobs(1))
+         End If
+
+         Call rand_vec_int (cbase)
+         Call mpi_bcast (cbase, 2, mpi_integer, root, comm, error)
+         Call mpi_gather (needwrite, 1, mpi_integer, jobs, 1, mpi_integer, root, comm, error)
+
+         If (my_mpi_id /= root) Then
+            If (needwrite /= 0) Then
+               idat (1) = size (mat, 1)
+               idat (2) = size (mat, 2)
+               idat (3) = idx
+               Call MPI_Send (idat, 3, mpi_integer, root, cbase(1)+my_mpi_id+1, comm, error)
+               Call MPI_Send (mat, idat(1)*idat(2)*2, mpi_double_precision, root, cbase(2)+my_mpi_id+1, comm, &
+              & error)
+            End If
+         Else
+            Do procnum = 1, mpi_sz
+               If (jobs(procnum) > 0) Then
+                  If ((procnum-1) /= root) Then
+                     Call MPI_Recv (idat, 3, mpi_integer, procnum-1, procnum+cbase(1), comm, status, error)
+                     Allocate (tmat(idat(1), idat(2)))
+                     Call MPI_Recv (tmat, idat(1)*idat(2)*2, mpi_double_precision, procnum-1, &
+                    & procnum+cbase(2), comm, status, error)
+                     tptr => tmat
+                  Else
+                     idat (3) = idx
+                     tptr => mat
+                  End If
+                  Write (cwork, '(i8)') idat (3)
+                  Call hdfwrite (tgt, set//'/'//trim(adjustl(cwork))//'/'//name, tptr)
+                  If (allocated(tmat)) deallocate (tmat)
+               End If
+            End Do
+         End If
+         Deallocate (jobs)
+   End Subroutine hdfset_write_zmat_parallel
+
+   Subroutine hdfcheckds (tgt, path, ds_type, dspace_id, dset_id, error, plist_in)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Integer (HID_T), Intent (In) :: ds_type, dspace_id
+         Integer (HID_T), Intent (Out) :: dset_id
+         Integer (HID_T), Intent (In), Optional :: plist_in
+         Integer, Intent (Out) :: error
+!!$ Local
+         Integer (HID_T) :: plist, dt1, ds1
+         Integer :: err1, i1
+         Integer (HSIZE_T) :: dm1 (7), dm2 (7), dmb1 (7), dmb2 (7)
+         Integer :: rank, rank1
+
+         If (present(plist_in)) Then
+            plist = plist_in
+         Else
+            Call h5pcreate_f (H5P_DATASET_CREATE_F, plist, error)
+         End If
+         Call H5Eset_auto_f (0, err1)
+         Call h5dopen_f (tgt, path, dset_id, error)
+         Call H5Eset_auto_f (1, err1)
+         If (error /= 0) Then
+            i1 = index (path, '/', .True.)
+            If (i1 > 1) Then
+               Do while (path(i1:i1) == "/")
+                  i1 = i1 - 1
+               End Do
+               If (i1 > 0) Then
+                  Call hdfcheckgrp (tgt, path(1:i1))
+               End If
+            End If
+            Call h5dcreate_f (tgt, path, ds_type, dspace_id, dset_id, error, plist)
+            Return
+         End If
+
+         Call h5dget_type_f (dset_id, dt1, error)
+         Call h5dget_space_f (dset_id, ds1, error)
+         Call h5sget_simple_extent_ndims_f (dspace_id, rank, error)
+         Call h5sget_simple_extent_ndims_f (ds1, rank1, error)
+         Call h5sget_simple_extent_dims_f (ds1, dm1, dm2, error)
+         Call h5sget_simple_extent_dims_f (dspace_id, dmb1, dmb2, error)
+!!$ Make sure that comparison of dimensions works correctly!!!
+         If ((dt1 == ds_type) .And. (rank == rank1) .And. all(dmb1(1:rank) == dm1(1:rank))) Return
+!!$ What if datatype is different???
+         Call H5Eset_auto_f (0, err1)
+         Call h5dset_extent_f (dset_id, dmb1, error)
+         Call H5Eset_auto_f (1, err1)
+         If (error /= 0) Then
+            Call h5ldelete_f (tgt, path, error)
+            Call h5dcreate_f (tgt, path, ds_type, dspace_id, dset_id, error, plist)
+         End If
+   End Subroutine hdfcheckds
+
+   Recursive Subroutine hdfcheckgrp (tgt, path)
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+!!$ Local vars
+         Integer :: error, i1
+         Integer (HID_T) :: grp_id
+!!$          character(len=1024) :: path1
+
+         Call H5Eset_auto_f (0, error)
+         Call h5gopen_f (tgt, path, grp_id, error)
+         If (error /= 0) Then
+            i1 = index (path, '/', .True.)
+            If (i1 > 1) Then
+               Do while (path(i1:i1) == "/")
+                  i1 = i1 - 1
+               End Do
+               If (i1 > 0) Then
+                  Call hdfcheckgrp (tgt, path(1:i1))
+               End If
+            End If
+            Call h5gcreate_f (tgt, path, grp_id, error)
+            If (error /= 0) Then
+               Write (*,*) 'Failed to create group: "', path, '" in HDF file! Exiting'
+               Stop
+            End If
+         End If
+         Call h5gclose_f (grp_id, error)
+         Call H5Eset_auto_f (1, error)
+   End Subroutine hdfcheckgrp
+
+
+   Subroutine rand_vec_int (x)
+         Implicit None
+         Integer, Intent (Out) :: x (:)
+!!$ Local
+         Real (Kind=DEF_DBL_PREC) :: r (size(x, 1))
+
+         Call random_number (r)
+         x = r * 1e8
+   End Subroutine rand_vec_int
+
+!!$       Subroutine writetextattr (tgt, path, aname, txt)
+!!$          Integer (HID_T), Intent (In) :: tgt
+!!$          Character (Len=*), Intent (In) :: path, aname, txt
+!!$ !!$           Local vard
+!!$          Integer (HID_T) :: space_id, attr
+!!$          Integer (HSIZE_T) :: dims (2)
+!!$          Integer :: error
+!!$ !! Create dataspace
+!!$          dims (1) = len (txt)
+!!$          Call h5screate_simple_f (1, dims, space_id, error)
+!!$          Call h5acreate_by_name_f (tgt, path, aname, H5T_FORTRAN_S1, space_id, attr, error)
+!!$          Call H5Awrite_f (attr, H5T_FORTRAN_S1, txt, dims, error)
+!!$       End Subroutine writetextattr
+
+   Subroutine h5dwrite_complex_2 (dset_id, mem_type_id, buf, dims, hdferr, mem_space_id, file_space_id, &
+  & xfer_prp)
+         Implicit None
+         Integer (HID_T), Intent (In) :: dset_id ! Dataset identifier
+         Integer (HID_T), Intent (In) :: mem_type_id ! Memory datatype identifier
+         Integer (HSIZE_T), Intent (In), Dimension (*) :: dims
+         Complex (Kind=DEF_DBL_PREC), Intent (In), Dimension (dims(1), dims(2)) :: buf
+         Integer, Intent (Out) :: hdferr ! Error code
+         Integer (HID_T), Optional, Intent (In) :: mem_space_id ! Memory dataspace identfier
+         Integer (HID_T), Optional, Intent (In) :: file_space_id ! File dataspace identfier
+         Integer (HID_T), Optional, Intent (In) :: xfer_prp ! Transfer property list identifier
+
+         Integer (HID_T) :: xfer_prp_default
+         Integer (HID_T) :: mem_space_id_default
+         Integer (HID_T) :: file_space_id_default
+
+         Interface
+            Integer Function h5dwrite_c (dset_id, mem_type_id, mem_space_id_default, file_space_id_default, &
+           & xfer_prp_default, buf, dims)
+               Use H5GLOBAL
+               Integer (HID_T), Intent (In) :: dset_id
+               Integer (HID_T), Intent (In) :: mem_type_id
+               Integer (HID_T) :: mem_space_id_default
+               Integer (HID_T) :: file_space_id_default
+               Integer (HID_T) :: xfer_prp_default
+               Integer (HSIZE_T), Intent (In), Dimension (*) :: dims
+               Complex (Kind=DEF_DBL_PREC), Intent (In), Dimension (dims(1), dims(2)) :: buf
+            End Function h5dwrite_c
+         End Interface
+
+         xfer_prp_default = H5P_DEFAULT_F
+         mem_space_id_default = H5S_ALL_F
+         file_space_id_default = H5S_ALL_F
+
+         If (present(xfer_prp)) xfer_prp_default = xfer_prp
+         If (present(mem_space_id)) mem_space_id_default = mem_space_id
+         If (present(file_space_id)) file_space_id_default = file_space_id
+
+         hdferr = h5dwrite_c (dset_id, mem_type_id, mem_space_id_default, file_space_id_default, &
+        & xfer_prp_default, buf, dims)
+
+   End Subroutine h5dwrite_complex_2
+
+   Subroutine h5dwrite_complex_1 (dset_id, mem_type_id, buf, dims, hdferr, mem_space_id, file_space_id, &
+  & xfer_prp)
+         Implicit None
+         Integer (HID_T), Intent (In) :: dset_id ! Dataset identifier
+         Integer (HID_T), Intent (In) :: mem_type_id ! Memory datatype identifier
+         Integer (HSIZE_T), Intent (In), Dimension (*) :: dims
+         Complex (Kind=DEF_DBL_PREC), Intent (In), Dimension (dims(1)) :: buf
+         Integer, Intent (Out) :: hdferr ! Error code
+         Integer (HID_T), Optional, Intent (In) :: mem_space_id ! Memory dataspace identfier
+         Integer (HID_T), Optional, Intent (In) :: file_space_id ! File dataspace identfier
+         Integer (HID_T), Optional, Intent (In) :: xfer_prp ! Transfer property list identifier
+
+         Integer (HID_T) :: xfer_prp_default
+         Integer (HID_T) :: mem_space_id_default
+         Integer (HID_T) :: file_space_id_default
+
+         Interface
+            Integer Function h5dwrite_c (dset_id, mem_type_id, mem_space_id_default, file_space_id_default, &
+           & xfer_prp_default, buf, dims)
+               Use H5GLOBAL
+               Integer (HID_T), Intent (In) :: dset_id
+               Integer (HID_T), Intent (In) :: mem_type_id
+               Integer (HID_T) :: mem_space_id_default
+               Integer (HID_T) :: file_space_id_default
+               Integer (HID_T) :: xfer_prp_default
+               Integer (HSIZE_T), Intent (In), Dimension (*) :: dims
+               Complex (Kind=DEF_DBL_PREC), Intent (In), Dimension (dims(1)) :: buf
+            End Function h5dwrite_c
+         End Interface
+         xfer_prp_default = H5P_DEFAULT_F
+         mem_space_id_default = H5S_ALL_F
+         file_space_id_default = H5S_ALL_F
+
+         If (present(xfer_prp)) xfer_prp_default = xfer_prp
+         If (present(mem_space_id)) mem_space_id_default = mem_space_id
+         If (present(file_space_id)) file_space_id_default = file_space_id
+
+         hdferr = h5dwrite_c (dset_id, mem_type_id, mem_space_id_default, file_space_id_default, &
+        & xfer_prp_default, buf, dims)
+
+   End Subroutine h5dwrite_complex_1
+
+   Subroutine h5dwrite_complex_0 (dset_id, mem_type_id, buf, dims, hdferr, mem_space_id, file_space_id, &
+  & xfer_prp)
+         Implicit None
+         Integer (HID_T), Intent (In) :: dset_id ! Dataset identifier
+         Integer (HID_T), Intent (In) :: mem_type_id ! Memory datatype identifier
+         Integer (HSIZE_T), Intent (In), Dimension (*) :: dims
+         Complex (Kind=DEF_DBL_PREC), Intent (In) :: buf
+         Integer, Intent (Out) :: hdferr ! Error code
+         Integer (HID_T), Optional, Intent (In) :: mem_space_id ! Memory dataspace identfier
+         Integer (HID_T), Optional, Intent (In) :: file_space_id ! File dataspace identfier
+         Integer (HID_T), Optional, Intent (In) :: xfer_prp ! Transfer property list identifier
+
+         Integer (HID_T) :: xfer_prp_default
+         Integer (HID_T) :: mem_space_id_default
+         Integer (HID_T) :: file_space_id_default
+
+         Interface
+            Integer Function h5dwrite_c (dset_id, mem_type_id, mem_space_id_default, file_space_id_default, &
+           & xfer_prp_default, buf, dims)
+               Use H5GLOBAL
+               Integer (HID_T), Intent (In) :: dset_id
+               Integer (HID_T), Intent (In) :: mem_type_id
+               Integer (HID_T) :: mem_space_id_default
+               Integer (HID_T) :: file_space_id_default
+               Integer (HID_T) :: xfer_prp_default
+               Integer (HSIZE_T), Intent (In), Dimension (*) :: dims
+               Complex (Kind=DEF_DBL_PREC), Intent (In) :: buf
+            End Function h5dwrite_c
+         End Interface
+         xfer_prp_default = H5P_DEFAULT_F
+         mem_space_id_default = H5S_ALL_F
+         file_space_id_default = H5S_ALL_F
+
+         If (present(xfer_prp)) xfer_prp_default = xfer_prp
+         If (present(mem_space_id)) mem_space_id_default = mem_space_id
+         If (present(file_space_id)) file_space_id_default = file_space_id
+
+         hdferr = h5dwrite_c (dset_id, mem_type_id, mem_space_id_default, file_space_id_default, &
+        & xfer_prp_default, buf, dims)
+
+   End Subroutine h5dwrite_complex_0
+
+   Subroutine h5dwrite_complex_3 (dset_id, mem_type_id, buf, dims, hdferr, mem_space_id, file_space_id, &
+  & xfer_prp)
+         Implicit None
+         Integer (HID_T), Intent (In) :: dset_id ! Dataset identifier
+         Integer (HID_T), Intent (In) :: mem_type_id ! Memory datatype identifier
+         Integer (HSIZE_T), Intent (In), Dimension (*) :: dims
+         Complex (Kind=DEF_DBL_PREC), Intent (In), Dimension (dims(1), dims(2), dims(3)) :: buf
+         Integer, Intent (Out) :: hdferr ! Error code
+         Integer (HID_T), Optional, Intent (In) :: mem_space_id ! Memory dataspace identfier
+         Integer (HID_T), Optional, Intent (In) :: file_space_id ! File dataspace identfier
+         Integer (HID_T), Optional, Intent (In) :: xfer_prp ! Transfer property list identifier
+
+         Integer (HID_T) :: xfer_prp_default
+         Integer (HID_T) :: mem_space_id_default
+         Integer (HID_T) :: file_space_id_default
+
+         Interface
+            Integer Function h5dwrite_c (dset_id, mem_type_id, mem_space_id_default, file_space_id_default, &
+           & xfer_prp_default, buf, dims)
+               Use H5GLOBAL
+               Integer (HID_T), Intent (In) :: dset_id
+               Integer (HID_T), Intent (In) :: mem_type_id
+               Integer (HID_T) :: mem_space_id_default
+               Integer (HID_T) :: file_space_id_default
+               Integer (HID_T) :: xfer_prp_default
+               Integer (HSIZE_T), Intent (In), Dimension (*) :: dims
+               Complex (Kind=DEF_DBL_PREC), Intent (In), Dimension (dims(1), dims(2), dims(3)) :: buf
+            End Function h5dwrite_c
+         End Interface
+
+         xfer_prp_default = H5P_DEFAULT_F
+         mem_space_id_default = H5S_ALL_F
+         file_space_id_default = H5S_ALL_F
+
+         If (present(xfer_prp)) xfer_prp_default = xfer_prp
+         If (present(mem_space_id)) mem_space_id_default = mem_space_id
+         If (present(file_space_id)) file_space_id_default = file_space_id
+
+         hdferr = h5dwrite_c (dset_id, mem_type_id, mem_space_id_default, file_space_id_default, &
+        & xfer_prp_default, buf, dims)
+
+   End Subroutine h5dwrite_complex_3
+
+   Subroutine h5dwrite_complex_4 (dset_id, mem_type_id, buf, dims, hdferr, mem_space_id, file_space_id, &
+  & xfer_prp)
+         Implicit None
+         Integer (HID_T), Intent (In) :: dset_id ! Dataset identifier
+         Integer (HID_T), Intent (In) :: mem_type_id ! Memory datatype identifier
+         Integer (HSIZE_T), Intent (In), Dimension (*) :: dims
+         Complex (Kind=DEF_DBL_PREC), Intent (In), Dimension (dims(1), dims(2), dims(3), dims(4)) :: buf
+         Integer, Intent (Out) :: hdferr ! Error code
+         Integer (HID_T), Optional, Intent (In) :: mem_space_id ! Memory dataspace identfier
+         Integer (HID_T), Optional, Intent (In) :: file_space_id ! File dataspace identfier
+         Integer (HID_T), Optional, Intent (In) :: xfer_prp ! Transfer property list identifier
+
+         Integer (HID_T) :: xfer_prp_default
+         Integer (HID_T) :: mem_space_id_default
+         Integer (HID_T) :: file_space_id_default
+
+         Interface
+            Integer Function h5dwrite_c (dset_id, mem_type_id, mem_space_id_default, file_space_id_default, &
+           & xfer_prp_default, buf, dims)
+               Use H5GLOBAL
+               Integer (HID_T), Intent (In) :: dset_id
+               Integer (HID_T), Intent (In) :: mem_type_id
+               Integer (HID_T) :: mem_space_id_default
+               Integer (HID_T) :: file_space_id_default
+               Integer (HID_T) :: xfer_prp_default
+               Integer (HSIZE_T), Intent (In), Dimension (*) :: dims
+               Complex (Kind=DEF_DBL_PREC), Intent (In), Dimension (dims(1), dims(2), dims(3), dims(4)) :: &
+              & buf
+            End Function h5dwrite_c
+         End Interface
+
+         xfer_prp_default = H5P_DEFAULT_F
+         mem_space_id_default = H5S_ALL_F
+         file_space_id_default = H5S_ALL_F
+
+         If (present(xfer_prp)) xfer_prp_default = xfer_prp
+         If (present(mem_space_id)) mem_space_id_default = mem_space_id
+         If (present(file_space_id)) file_space_id_default = file_space_id
+
+         hdferr = h5dwrite_c (dset_id, mem_type_id, mem_space_id_default, file_space_id_default, &
+        & xfer_prp_default, buf, dims)
+
+   End Subroutine h5dwrite_complex_4
+
+   Function hdf_complex_t (base) Result (ztype)
+         Implicit None
+         Integer (HID_T), Intent (In) :: base
+         Integer (HID_T) :: ztype
+!!$ Local vars
+         Integer (HSIZE_T) :: d_size, zero
+         Integer :: error
+         zero = 0
+         Call h5tget_size_f (base, d_size, error)
+         Call h5tcreate_f (H5T_COMPOUND_F, d_size*2, ztype, error)
+         Call h5tinsert_f (ztype, "real", zero, base, error)
+         Call h5tinsert_f (ztype, "imag", d_size, base, error)
+         Return
+   End Function hdf_complex_t
+
+   Subroutine h5ltread_dataset_f_complex2 (loc_id, dset_name, type_id, buf, dims, errcode)
+         Implicit None
+         Integer (HID_T), Intent (In) :: loc_id ! file or group identifier
+         Character (Len=*), Intent (In) :: dset_name ! name of the dataset
+         Integer (HID_T), Intent (In) :: type_id ! datatype identifier
+         Integer (HSIZE_T), Dimension (*), Intent (In) :: dims ! size of the bufffer buf
+!!$          Complex (Kind=DEF_DBL_PREC), Intent (Inout), Dimension (*) :: buf(:,:) ! data buffer
+         Complex (Kind=DEF_DBL_PREC), Intent (Inout) :: buf (:, :)! data buffer
+         Integer :: errcode ! error code
+         Integer :: namelen ! name length
+         Interface
+            Integer Function h5ltread_dataset_dl2_c (loc_id, namelen, dset_name, type_id, buf, dims)
+               Use H5GLOBAL
+!DEC$ATTRIBUTES reference :: dset_name
+               Integer (HID_T), Intent (In) :: loc_id ! file or group identifier
+               Integer (HID_T), Intent (In) :: type_id ! datatype identifier
+               Integer :: namelen ! lenght of name buffer
+               Character (Len=*), Intent (In) :: dset_name ! name of the dataset
+               Integer (HSIZE_T), Dimension (*), Intent (In) :: dims ! size of the bufffer buf
+               Complex (Kind=DEF_DBL_PREC), Intent (In), Dimension (*) :: buf ! data buffer
+            End Function h5ltread_dataset_dl2_c
+         End Interface
+
+         namelen = len (dset_name)
+         errcode = h5ltread_dataset_dl2_c (loc_id, namelen, dset_name, type_id, buf, dims)
+   End Subroutine h5ltread_dataset_f_complex2
+
+   Subroutine h5ltread_dataset_f_complex3 (loc_id, dset_name, type_id, buf, dims, errcode)
+         Implicit None
+         Integer (HID_T), Intent (In) :: loc_id ! file or group identifier
+         Character (Len=*), Intent (In) :: dset_name ! name of the dataset
+         Integer (HID_T), Intent (In) :: type_id ! datatype identifier
+         Integer (HSIZE_T), Dimension (*), Intent (In) :: dims ! size of the bufffer buf
+!!$          Complex (Kind=DEF_DBL_PREC), Intent (Inout), Dimension (*) :: buf(:,:) ! data buffer
+         Complex (Kind=DEF_DBL_PREC), Intent (Inout) :: buf (:, :, :)! data buffer
+         Integer :: errcode ! error code
+         Integer :: namelen ! name length
+         Interface
+            Integer Function h5ltread_dataset_dl3_c (loc_id, namelen, dset_name, type_id, buf, dims)
+               Use H5GLOBAL
+!DEC$ATTRIBUTES reference :: dset_name
+               Integer (HID_T), Intent (In) :: loc_id ! file or group identifier
+               Integer (HID_T), Intent (In) :: type_id ! datatype identifier
+               Integer :: namelen ! lenght of name buffer
+               Character (Len=*), Intent (In) :: dset_name ! name of the dataset
+               Integer (HSIZE_T), Dimension (*), Intent (In) :: dims ! size of the bufffer buf
+               Complex (Kind=DEF_DBL_PREC), Intent (In), Dimension (*) :: buf ! data buffer
+            End Function h5ltread_dataset_dl3_c
+         End Interface
+
+         namelen = len (dset_name)
+         errcode = h5ltread_dataset_dl3_c (loc_id, namelen, dset_name, type_id, buf, dims)
+   End Subroutine h5ltread_dataset_f_complex3
+
+
+   Subroutine h5ltread_dataset_f_complex4 (loc_id, dset_name, type_id, buf, dims, errcode)
+         Implicit None
+         Integer (HID_T), Intent (In) :: loc_id ! file or group identifier
+         Character (Len=*), Intent (In) :: dset_name ! name of the dataset
+         Integer (HID_T), Intent (In) :: type_id ! datatype identifier
+         Integer (HSIZE_T), Dimension (*), Intent (In) :: dims ! size of the bufffer buf
+!!$          Complex (Kind=DEF_DBL_PREC), Intent (Inout), Dimension (*) :: buf(:,:) ! data buffer
+         Complex (Kind=DEF_DBL_PREC), Intent (Inout) :: buf (:, :, :, :)! data buffer
+         Integer :: errcode ! error code
+         Integer :: namelen ! name length
+         Interface
+            Integer Function h5ltread_dataset_dl3_c (loc_id, namelen, dset_name, type_id, buf, dims)
+               Use H5GLOBAL
+!DEC$ATTRIBUTES reference :: dset_name
+               Integer (HID_T), Intent (In) :: loc_id ! file or group identifier
+               Integer (HID_T), Intent (In) :: type_id ! datatype identifier
+               Integer :: namelen ! lenght of name buffer
+               Character (Len=*), Intent (In) :: dset_name ! name of the dataset
+               Integer (HSIZE_T), Dimension (*), Intent (In) :: dims ! size of the bufffer buf
+               Complex (Kind=DEF_DBL_PREC), Intent (In), Dimension (*) :: buf ! data buffer
+            End Function h5ltread_dataset_dl3_c
+         End Interface
+
+         namelen = len (dset_name)
+         errcode = h5ltread_dataset_dl3_c (loc_id, namelen, dset_name, type_id, buf, dims)
+   End Subroutine h5ltread_dataset_f_complex4
+
+   Subroutine h5ltread_dataset_f_complex1 (loc_id, dset_name, type_id, buf, dims, errcode)
+         Implicit None
+         Integer (HID_T), Intent (In) :: loc_id ! file or group identifier
+         Character (Len=*), Intent (In) :: dset_name ! name of the dataset
+         Integer (HID_T), Intent (In) :: type_id ! datatype identifier
+         Integer (HSIZE_T), Dimension (*), Intent (In) :: dims ! size of the bufffer buf
+         Complex (Kind=DEF_DBL_PREC), Intent (Inout), Dimension (*) :: buf ! data buffer
+         Integer :: errcode ! error code
+         Integer :: namelen ! name length
+         Interface
+            Integer Function h5ltread_dataset_dl1_c (loc_id, namelen, dset_name, type_id, buf, dims)
+               Use H5GLOBAL
+!DEC$ATTRIBUTES reference :: dset_name
+               Integer (HID_T), Intent (In) :: loc_id ! file or group identifier
+               Integer (HID_T), Intent (In) :: type_id ! datatype identifier
+               Integer :: namelen ! lenght of name buffer
+               Character (Len=*), Intent (In) :: dset_name ! name of the dataset
+               Integer (HSIZE_T), Dimension (*), Intent (In) :: dims ! size of the bufffer buf
+               Complex (Kind=DEF_DBL_PREC), Intent (In), Dimension (*) :: buf ! data buffer
+            End Function h5ltread_dataset_dl1_c
+         End Interface
+
+         namelen = len (dset_name)
+         errcode = h5ltread_dataset_dl1_c (loc_id, namelen, dset_name, type_id, buf, dims)
+   End Subroutine h5ltread_dataset_f_complex1
+
+   Subroutine hdfreadzcsrmat (tgt, path, mat)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (zcsrmat), Intent (Inout) :: mat
+!!$           Local vard
+         Integer (HID_T) :: grp_id
+         Integer :: error, buf (1), nc, nr, nnz
+         Integer (HSIZE_T) :: dims (2)
+
+         Call h5gopen_f (tgt, path//'/value', grp_id, error)
+
+         dims (1) = 1
+         dims (2) = 0
+         Call h5ltread_dataset_f (grp_id, 'nc', H5T_NATIVE_INTEGER, buf, dims, error)
+         nr = buf (1)
+         Call h5ltread_dataset_f (grp_id, 'nr', H5T_NATIVE_INTEGER, buf, dims, error)
+         nc = buf (1)
+         Call h5ltread_dataset_f (grp_id, 'nz', H5T_NATIVE_INTEGER, buf, dims, error)
+         nnz = buf (1)
+         Call mrealloc (mat, nnz, nr, nc)
+         dims (2) = nr + 1
+         Call h5ltread_dataset_f (grp_id, 'cidx', H5T_NATIVE_INTEGER, mat%ir, dims, error)
+         mat%ir = mat%ir + 1
+         dims (1) = nnz
+         Call h5ltread_dataset_f (grp_id, 'ridx', H5T_NATIVE_INTEGER, mat%jc, dims, error)
+         mat%jc = mat%jc + 1
+         Call h5ltread_dataset_f_complex1 (grp_id, 'data', hdf_complex_t(H5T_NATIVE_DOUBLE), mat%a, dims, &
+        & error)
+         mat%nnz = nnz
+         Call h5gclose_f (grp_id, error)
+   End Subroutine hdfreadzcsrmat
+
+   Subroutine hdfreadi (tgt, path, val)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Integer, Intent (Inout) :: val
+
+         Integer (HSIZE_T) :: dims (4)
+         Integer :: error, buf (1)
+
+         dims (1) = 1
+         dims (2) = 0
+         Call h5ltread_dataset_f (tgt, path, H5T_NATIVE_INTEGER, buf, dims, error)
+         val = buf (1)
+   End Subroutine hdfreadi
+
+   Subroutine hdfreadd (tgt, path, val)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Real (Kind=DEF_DBL_PREC), Intent (Inout) :: val
+
+         Integer (HSIZE_T) :: dims (4)
+         Integer :: error
+         Real (Kind=DEF_DBL_PREC) :: buf (1)
+
+         dims (1) = 1
+         dims (2) = 0
+         Call h5ltread_dataset_f (tgt, path, H5T_NATIVE_DOUBLE, buf, dims, error)
+         val = buf (1)
+   End Subroutine hdfreadd
+
+
+   Subroutine hdfreadzdensemat (tgt, path, mat)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (zdensemat), Intent (Inout) :: mat
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         Call alloc (mat, nr, nc)
+         Call h5ltread_dataset_f_complex1 (tgt, path, hdf_complex_t(H5T_NATIVE_DOUBLE), mat%bl, dims, error)
+   End Subroutine hdfreadzdensemat
+
+   Subroutine hdfreadrdensemat (tgt, path, mat)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (rdensemat), Intent (Inout) :: mat
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         Call alloc (mat, nr, nc)
+         Call h5ltread_dataset_f (tgt, path, H5T_NATIVE_DOUBLE, mat%bl, dims, error)
+   End Subroutine hdfreadrdensemat
+
+   Subroutine hdfReadZVecPtr (tgt, path, vec)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Complex (Kind=DEF_DBL_PREC), Pointer, Intent (Out) :: vec (:)
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         Allocate (vec(nr*nc))
+
+         Call h5ltread_dataset_f_complex1 (tgt, path, hdf_complex_t(H5T_NATIVE_DOUBLE), vec, dims, error)
+   End Subroutine hdfReadZVecPtr
+
+   Subroutine hdfReadDVecPtr (tgt, path, vec)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Real (Kind=DEF_DBL_PREC), Pointer, Intent (Out) :: vec (:)
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         Allocate (vec(nr*nc))
+
+         Call h5ltread_dataset_f (tgt, path, H5T_NATIVE_DOUBLE, vec, dims, error)
+   End Subroutine hdfReadDVecPtr
+
+   Subroutine hdfReadDVecAlloc (tgt, path, vec)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Real (Kind=DEF_DBL_PREC), Allocatable, Intent (Inout) :: vec (:)
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         Allocate (vec(nr*nc))
+
+         Call h5ltread_dataset_f (tgt, path, H5T_NATIVE_DOUBLE, vec, dims, error)
+   End Subroutine hdfReadDVecAlloc
+
+   Subroutine hdfReadDVec (tgt, path, vec, sz)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Real (Kind=DEF_DBL_PREC), Intent (Inout) :: vec (:)
+         Integer, Intent (In) :: sz
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         If (nr*nc > sz) Then
+            Write (*,*) 'Vector is too small'
+            Stop
+         End If
+         Call h5ltread_dataset_f (tgt, path, H5T_NATIVE_DOUBLE, vec, dims, error)
+   End Subroutine hdfReadDVec
+
+   Subroutine hdfReadIVecPtr (tgt, path, vec)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Integer, Pointer, Intent (Out) :: vec (:)
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         Allocate (vec(nr*nc))
+
+         Call h5ltread_dataset_f (tgt, path, H5T_NATIVE_INTEGER, vec, dims, error)
+   End Subroutine hdfReadIVecPtr
+
+   Subroutine hdfReadIVecAlloc (tgt, path, vec)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Integer, Allocatable, Intent (Inout) :: vec (:)
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         Allocate (vec(nr*nc))
+
+         Call h5ltread_dataset_f (tgt, path, H5T_NATIVE_INTEGER, vec, dims, error)
+   End Subroutine hdfReadIVecAlloc
+
+   Subroutine hdfReadIVec (tgt, path, vec, sz)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Integer, Intent (Inout) :: vec (:)
+         Integer, Intent (In) :: sz
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         If (nr*nc > sz) Then
+            Write (*,*) 'Vector is too small'
+            Stop
+         End If
+         Call h5ltread_dataset_f (tgt, path, H5T_NATIVE_INTEGER, vec, dims, error)
+   End Subroutine hdfReadIVec
+
+   Subroutine hdfReadIMatPtr (tgt, path, mat)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Integer, Pointer, Intent (Out) :: mat (:, :)
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         Allocate (mat(nr, nc))
+
+         Call h5ltread_dataset_f (tgt, path, H5T_NATIVE_INTEGER, mat, dims, error)
+   End Subroutine hdfReadIMatPtr
+
+   Subroutine hdfReadIMatAlloc (tgt, path, mat)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Integer, Allocatable, Intent (Inout) :: mat (:, :)
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         If (allocated(mat)) deallocate (mat)
+         Allocate (mat(nr, nc))
+
+         Call h5ltread_dataset_f (tgt, path, H5T_NATIVE_INTEGER, mat, dims, error)
+   End Subroutine hdfReadIMatAlloc
+
+   Subroutine hdfReadDMatPtr (tgt, path, mat)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Real (Kind=DEF_DBL_PREC), Pointer, Intent (Inout) :: mat (:, :)
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         Allocate (mat(nr, nc))
+
+         Call h5ltread_dataset_f (tgt, path, H5T_NATIVE_DOUBLE, mat, dims, error)
+   End Subroutine hdfReadDMatPtr
+
+   Subroutine hdfReadDMatAlloc (tgt, path, mat)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Real (Kind=DEF_DBL_PREC), Allocatable, Intent (Inout) :: mat (:, :)
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         If (allocated(mat)) deallocate (mat)
+         Allocate (mat(nr, nc))
+
+         Call h5ltread_dataset_f (tgt, path, H5T_NATIVE_DOUBLE, mat, dims, error)
+   End Subroutine hdfReadDMatAlloc
+
+
+   Subroutine hdfReadDMat (tgt, path, mat, n1, n2)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Integer :: n1, n2
+         Real (Kind=DEF_DBL_PREC), Intent (Inout) :: mat (:, :)
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         If (nr /= n1 .Or. nc /= n2) Then
+            Write (*,*) 'wrong matrix size in hdfReadDMat'
+         End If
+
+         Call h5ltread_dataset_f (tgt, path, H5T_NATIVE_DOUBLE, mat, dims, error)
+   End Subroutine hdfReadDMat
+
+   Subroutine hdfReadZMat4Alloc (tgt, path, mat)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Complex (Kind=DEF_DBL_PREC), Allocatable, Intent (Inout) :: mat (:, :, :, :)
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc, nz1, nz2
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         nz1 = dims (3)
+         nz2 = dims (4)
+         If (allocated(mat)) deallocate (mat)
+         Allocate (mat(nr, nc, nz1, nz2))
+
+         Call h5ltread_dataset_f_complex4 (tgt, path, hdf_complex_t(H5T_NATIVE_DOUBLE), mat, dims, error)
+   End Subroutine hdfReadZMat4Alloc
+
+
+   Subroutine hdfReadZMat (tgt, path, mat, n1, n2)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Integer :: n1, n2
+         Complex (Kind=DEF_DBL_PREC), Intent (Inout) :: mat (:, :)
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         If (nr /= n1 .Or. nc /= n2) Then
+            Write (*,*) 'wrong matrix size in hdfReadZMat'
+         End If
+
+         Call h5ltread_dataset_f_complex2 (tgt, path, hdf_complex_t(H5T_NATIVE_DOUBLE), mat, dims, error)
+   End Subroutine hdfReadZMat
+
+   Subroutine hdfReadZMat3 (tgt, path, mat, n1, n2, n3)
+         Use sparselib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Integer :: n1, n2, n3
+         Complex (Kind=DEF_DBL_PREC), Intent (Inout) :: mat (:, :, :)
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer :: error, type_class, nr, nc, nc1
+
+         Call h5ltget_dataset_info_f (tgt, path, dims, type_class, type_size, error)
+         nr = dims (1)
+         nc = dims (2)
+         nc1 = dims (3)
+         If (nr /= n1 .Or. nc /= n2 .Or. nc1 /= n3) Then
+            Write (*,*) 'wrong matrix size in hdfReadZMat'
+         End If
+
+         Call h5ltread_dataset_f_complex3 (tgt, path, hdf_complex_t(H5T_NATIVE_DOUBLE), mat, dims, error)
+   End Subroutine hdfReadZMat3
+
+
+
+   Subroutine hdfReadTorque (tgt, path, ts)
+         Use sparselib
+         Use postprocess
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (torqsigmas), Intent (Inout) :: ts
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer (HID_T) :: grp_id
+         Integer :: error, type_class, mna, rna, lna
+
+         Call h5gopen_f (tgt, trim(adjustl(path)), grp_id, error)
+
+         Call h5ltget_dataset_info_f (grp_id, 'Lm', dims, type_class, type_size, error)
+         mna = dims (2)
+         Call h5ltget_dataset_info_f (grp_id, 'Lir', dims, type_class, type_size, error)
+         lna = dims (2)
+         Call h5ltget_dataset_info_f (grp_id, 'Lt', dims, type_class, type_size, error)
+         rna = dims (2)
+         Call alloc_torque (ts, mna, lna, rna)
+         Call h5ltread_dataset_f (grp_id, 'Lt', H5T_NATIVE_DOUBLE, ts%Lt, dims, error)
+         Call h5ltread_dataset_f (grp_id, 'Rir', H5T_NATIVE_DOUBLE, ts%Rir, dims, error)
+         dims (2) = lna
+         Call h5ltread_dataset_f (grp_id, 'Lir', H5T_NATIVE_DOUBLE, ts%Lir, dims, error)
+         Call h5ltread_dataset_f (grp_id, 'Rt', H5T_NATIVE_DOUBLE, ts%Rt, dims, error)
+         dims (2) = mna
+         Call h5ltread_dataset_f (grp_id, 'Lm', H5T_NATIVE_DOUBLE, ts%Lm, dims, error)
+         Call h5ltread_dataset_f (grp_id, 'Rm', H5T_NATIVE_DOUBLE, ts%Rm, dims, error)
+         Call h5gclose_f (grp_id, error)
+   End Subroutine hdfReadTorque
+
+   Subroutine hdfReadSpadirqu (tgt, path, sdq)
+         Use qofzlib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (spadirquant), Intent (Inout) :: sdq
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer (HID_T) :: grp_id
+         Integer :: error, type_class, mna, rna, lna, ld
+
+         Call h5gopen_f (tgt, trim(adjustl(path)), grp_id, error)
+
+         Call h5ltget_dataset_info_f (grp_id, 'Lm', dims, type_class, type_size, error)
+         ld = dims (1)
+         mna = dims (2)
+         Call h5ltget_dataset_info_f (grp_id, 'Lir', dims, type_class, type_size, error)
+         lna = dims (2)
+         Call h5ltget_dataset_info_f (grp_id, 'Lt', dims, type_class, type_size, error)
+         rna = dims (2)
+         Call alloc_spadirqu (sdq, mna, lna, rna, ld)
+         Call h5ltread_dataset_f (grp_id, 'Lt', H5T_NATIVE_DOUBLE, sdq%Lt, dims, error)
+         Call h5ltread_dataset_f (grp_id, 'Rir', H5T_NATIVE_DOUBLE, sdq%Rir, dims, error)
+         dims (2) = lna
+         Call h5ltread_dataset_f (grp_id, 'Lir', H5T_NATIVE_DOUBLE, sdq%Lir, dims, error)
+         Call h5ltread_dataset_f (grp_id, 'Rt', H5T_NATIVE_DOUBLE, sdq%Rt, dims, error)
+         dims (2) = mna
+         Call h5ltread_dataset_f (grp_id, 'Lm', H5T_NATIVE_DOUBLE, sdq%Lm, dims, error)
+         Call h5ltread_dataset_f (grp_id, 'Rm', H5T_NATIVE_DOUBLE, sdq%Rm, dims, error)
+         Call h5gclose_f (grp_id, error)
+   End Subroutine hdfReadSpadirqu
+
+   Subroutine hdfReadSpaqu (tgt, path, sq)
+         Use qofzlib
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (spatialquant), Intent (Inout) :: sq
+
+         Integer (HSIZE_T) :: dims (4), type_size
+         Integer (HID_T) :: grp_id
+         Integer :: error, type_class, mna, rna, lna, ld
+
+         Call h5gopen_f (tgt, trim(adjustl(path)), grp_id, error)
+
+         Call h5ltget_dataset_info_f (grp_id, 'm', dims, type_class, type_size, error)
+         ld = dims (1)
+         mna = dims (2)
+         Call h5ltget_dataset_info_f (grp_id, 'l', dims, type_class, type_size, error)
+         lna = dims (2)
+         Call h5ltget_dataset_info_f (grp_id, 'r', dims, type_class, type_size, error)
+         rna = dims (2)
+         Call alloc_spaqu (sq, mna, lna, rna, ld)
+         Call h5ltread_dataset_f (grp_id, 'r', H5T_NATIVE_DOUBLE, sq%r, dims, error)
+         dims (2) = lna
+         Call h5ltread_dataset_f (grp_id, 'l', H5T_NATIVE_DOUBLE, sq%l, dims, error)
+         dims (2) = mna
+         Call h5ltread_dataset_f (grp_id, 'm', H5T_NATIVE_DOUBLE, sq%m, dims, error)
+         Call h5gclose_f (grp_id, error)
+   End Subroutine hdfReadSpaqu
+      
+      Subroutine hdfread_iatcu (tgt, path, iatcu)
+         Use interatcur
+         Integer (HID_T), Intent (In) :: tgt
+         Character (Len=*), Intent (In) :: path
+         Type (t_interat_currents), Intent (Out) :: iatcu
+         
+         Type (t_curtensor), Pointer :: ctp
+         Integer (HID_T) :: grp_id0, grp_id
+         Integer :: error, buf (1), nat, ntr, nnz, itr
+         Integer (HSIZE_T) :: dims (2)
+         Character (Len=10) :: cwork
+         Real (Kind=DEF_DBL_PREC), Allocatable :: dummy(:, :)
+         
+         Call h5gopen_f (tgt, path, grp_id0, error)
+
+         dims (1) = 1
+         dims (2) = 0
+         Call h5ltread_dataset_f (grp_id0, 'nat', H5T_NATIVE_INTEGER, buf, dims, error)
+         nat = buf (1)
+         Call h5ltread_dataset_f (grp_id0, 'ntr', H5T_NATIVE_INTEGER, buf, dims, error)
+         ntr = buf (1)
+         Call alloc_iatcu(iatcu, ntr, nat)
+         
+         dims = (/1, ntr/)
+         Call h5ltread_dataset_f (grp_id0, 'direct', H5T_NATIVE_INTEGER, iatcu%direct, dims, error)
+         dims = (/2, ntr/)
+         Call h5ltread_dataset_f (grp_id0, 'trlist', H5T_NATIVE_INTEGER, iatcu%trlist, dims, error)
+         dims = (/2, nat/)
+         Call h5ltread_dataset_f (grp_id0, 'cons', H5T_NATIVE_DOUBLE, iatcu%cons, dims, error)
+         
+         Do itr = 1, ntr
+            ctp => iatcu%curten(itr)
+            Write (cwork, '(i8)') itr
+            Call h5gopen_f (grp_id0, 'tr'//trim(adjustl(cwork)), grp_id, error)
+            dims(1) = 1
+            dims(2) = 0
+            Call h5ltread_dataset_f (grp_id, 'nnz', H5T_NATIVE_INTEGER, buf, dims, error)
+            nnz = buf (1)
+            Call alloc_curten(ctp, nnz, nat)
+            dims(2) = nat+1
+            Call h5ltread_dataset_f (grp_id, 'ir', H5T_NATIVE_INTEGER, ctp%ir, dims, error)
+            dims(2) = nnz
+            Call h5ltread_dataset_f (grp_id, 'jc', H5T_NATIVE_INTEGER, ctp%jc, dims, error)
+            dims(1) = 4
+            Allocate(dummy(4, nnz))
+            Call h5ltread_dataset_f (grp_id, 'Ldata', H5T_NATIVE_DOUBLE, dummy, dims, error)
+            ctp%a(:, :, 1) = transpose(dummy)
+            Call h5ltread_dataset_f (grp_id, 'Rdata', H5T_NATIVE_DOUBLE, dummy, dims, error)
+            ctp%a(:, :, 2) = transpose(dummy)
+            Deallocate(dummy)
+            Call h5gclose_f (grp_id, error)
+         End Do
+         Call h5gclose_f (grp_id0, error)
+      End Subroutine hdfread_iatcu
+
+   Subroutine hdf_write_conds (tgt, t_lr, t_rl, t_ll, t_rr, t_lr_spec, t_rl_spec, t_ll_spec, t_rr_spec, gmix, &
+  & tmix, l_shc, r_shc, consr)
+!!$ Write results
+         Implicit None
+         Integer (HID_T), Intent (In) :: tgt
+         Real (Kind=DEF_DBL_PREC), Intent (In) :: t_ll (2, 2), t_rr (2, 2)
+         Real (Kind=DEF_DBL_PREC), Intent (In) :: t_ll_spec (2, 2), t_rr_spec (2, 2)
+         Real (Kind=DEF_DBL_PREC), Intent (In) :: t_lr (2, 2), t_lr_spec (2, 2)
+         Real (Kind=DEF_DBL_PREC), Intent (In) :: t_rl (2, 2), t_rl_spec (2, 2)
+         Real (Kind=DEF_DBL_PREC), Intent (In) :: r_shc (2), l_shc (2)
+         Complex (Kind=DEF_DBL_PREC), Intent (In) :: gmix (2), tmix (2)
+         Real (Kind=DEF_DBL_PREC), Intent (In) :: consr (2)
+         Call hdfwrite (tgt, '/cond/lr', t_lr)
+         Call hdfwrite (tgt, '/cond/rl', t_rl)
+         Call hdfwrite (tgt, '/cond/ll', t_ll)
+         Call hdfwrite (tgt, '/cond/rr', t_rr)
+
+         Call hdfwrite (tgt, '/cond/totlr', sum(t_lr))
+         Call hdfwrite (tgt, '/cond/totrl', sum(t_rl))
+         Call hdfwrite (tgt, '/cond/totll', sum(t_ll))
+         Call hdfwrite (tgt, '/cond/totrr', sum(t_rr))
+
+
+         Call hdfwrite (tgt, '/cond/lr_spec', t_lr_spec)
+         Call hdfwrite (tgt, '/cond/rl_spec', t_rl_spec)
+         Call hdfwrite (tgt, '/cond/ll_spec', t_ll_spec)
+         Call hdfwrite (tgt, '/cond/rr_spec', t_rr_spec)
+
+         Call hdfwrite (tgt, '/cond/gmix', gmix)
+         Call hdfwrite (tgt, '/cond/tmix', tmix)
+
+         Call hdfwrite (tgt, '/cond/l_shc', l_shc)
+         Call hdfwrite (tgt, '/cond/r_shc', r_shc)
+
+         Call hdfwrite (tgt, '/cond/consint', consr(1))
+         Call hdfwrite (tgt, '/cond/conspeak', consr(2))
+   End Subroutine hdf_write_conds
+
+   Subroutine write_trans_parallel (h5o, opt, comm, root, jobs, bz, ki, tm, cons, nmodl, nmodr)
+         Use readcfg
+         Use transport
+         Use bzgrid
+         Implicit None
+         Include 'mpif.h'
+         Type (t_options) :: opt
+         Type (h5_iterout) :: h5o
+         Type (t_tranrefl) :: tm (2)
+         Integer :: comm, root, nmodl (4), nmodr (4)
+         Integer :: jobs (:), ki
+         Type (bzone) :: bz
+         Real (Kind=DEF_DBL_PREC) :: cons
+!!$ Local
+         Integer :: ierr, i, mpi_sz, my_id
+         Integer, Allocatable :: kis (:)
+         Integer :: error
+         Integer (HSIZE_T) :: dims (2), ofs (2), cnt (2), hone (2)
+         Real (Kind=DEF_DBL_PREC), Allocatable :: tbuf (:, :), Rbuf (:, :), cns (:)
+         Real (Kind=DEF_DBL_PREC) :: tval (2, 2)
+         Integer, Allocatable :: modesl (:, :), modesr (:, :)
+
+         Call mpi_comm_rank (comm, my_id, ierr)
+         Call mpi_comm_size (comm, mpi_sz, ierr)
+
+         If (my_id == root) Then
+            Allocate (tbuf(4, mpi_sz), Rbuf(4, mpi_sz), kis(mpi_sz), modesl(4, mpi_sz), modesr(4, mpi_sz), &
+           & cns(mpi_sz))
+         Else
+            Allocate (tbuf(1, 1), Rbuf(1, 1), kis(1), modesl(1, 1), modesr(1, 1), cns(1))
+         End If
+
+         Call mpi_gather (ki, 1, mpi_integer, kis, 1, mpi_integer, root, comm, ierr)
+         Call mpi_gather (nmodl, 4, mpi_integer, modesl, 4, mpi_integer, root, comm, ierr)
+         Call mpi_gather (nmodr, 4, mpi_integer, modesr, 4, mpi_integer, root, comm, ierr)
+         Call mpi_gather (cons, 1, mpi_double_precision, cns, 1, mpi_double_precision, root, comm, ierr)
+
+         dims (1) = 4
+         dims (2) = 1
+         ofs (1) = 0
+         cnt (1) = 4
+         cnt (2) = 1
+         hone = 1
+         If (my_id == root) Then
+            Do i = 1, mpi_sz
+               If (jobs(i) /= 0) Then
+                  ofs (2) = kis (i) - 1
+                  Call h5sselect_hyperslab_f (h5o%t_ds, H5S_SELECT_SET_F, ofs, cnt, error)
+                  Call h5dwrite_f (h5o%modesl, H5T_NATIVE_INTEGER, modesl(:, i), dims, error, h5o%t_ms, &
+                 & h5o%t_ds)
+                  Call h5dwrite_f (h5o%modesr, H5T_NATIVE_INTEGER, modesr(:, i), dims, error, h5o%t_ms, &
+                 & h5o%t_ds)
+
+                  Call h5sselect_hyperslab_f (h5o%c_ds, H5S_SELECT_SET_F, ofs(2), hone, error)
+                  Call h5dwrite_f (h5o%cons, H5T_NATIVE_DOUBLE, cns(i), hone, error, h5o%c_ms, h5o%c_ds)
+               End If
+            End Do
+         End If
+
+
+         If (opt%needlr /= 0) Then
+            Call prept (tm(1)%T, tval)
+            Call mpi_gather (tval, 4, mpi_double_precision, tbuf, 4, mpi_double_precision, root, comm, ierr)
+            Call prept (tm(1)%r, tval)
+            Call mpi_gather (tval, 4, mpi_double_precision, Rbuf, 4, mpi_double_precision, root, comm, ierr)
+
+            If (my_id == root) Then
+               Do i = 1, mpi_sz
+                  If (jobs(i) /= 0) Then
+                     ofs (2) = kis (i) - 1
+                     Call h5sselect_hyperslab_f (h5o%t_ds, H5S_SELECT_SET_F, ofs, cnt, error)
+                     Call h5dwrite_f (h5o%t_lr, H5T_NATIVE_DOUBLE, tbuf(:, i), dims, error, h5o%t_ms, &
+                    & h5o%t_ds)
+                     Call h5dwrite_f (h5o%t_ll, H5T_NATIVE_DOUBLE, Rbuf(:, i), dims, error, h5o%t_ms, &
+                    & h5o%t_ds)
+                  End If
+               End Do
+            End If
+         End If
+
+
+         If (opt%needrl /= 0) Then
+            Call prept (tm(2)%T, tval)
+            Call mpi_gather (tval, 4, mpi_double_precision, tbuf, 4, mpi_double_precision, root, comm, ierr)
+            Call prept (tm(2)%r, tval)
+            Call mpi_gather (tval, 4, mpi_double_precision, Rbuf, 4, mpi_double_precision, root, comm, ierr)
+
+            If (my_id == root) Then
+               Do i = 1, mpi_sz
+                  If (jobs(i) /= 0) Then
+                     ofs (2) = kis (i) - 1
+                     Call h5sselect_hyperslab_f (h5o%t_ds, H5S_SELECT_SET_F, ofs, cnt, error)
+                     Call h5dwrite_f (h5o%t_rl, H5T_NATIVE_DOUBLE, tbuf(:, i), dims, error, h5o%t_ms, &
+                    & h5o%t_ds)
+                     Call h5dwrite_f (h5o%t_rr, H5T_NATIVE_DOUBLE, Rbuf(:, i), dims, error, h5o%t_ms, &
+                    & h5o%t_ds)
+                  End If
+               End Do
+            End If
+         End If
+
+
+         Deallocate (tbuf, Rbuf, kis, modesl, modesr, cns)
+   End Subroutine write_trans_parallel
+
+End Module hdf5io

@@ -1,0 +1,23 @@
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/codes/!svn/ver/1981/trans/trunk/src/trans_sk
+END
+deps.mk
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/codes/!svn/ver/1981/trans/trunk/src/trans_sk/deps.mk
+END
+trans_sk.F90
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/codes/!svn/ver/1981/trans/trunk/src/trans_sk/trans_sk.F90
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/codes/!svn/ver/1981/trans/trunk/src/trans_sk/Makefile
+END

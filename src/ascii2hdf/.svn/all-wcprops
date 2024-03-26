@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 50
+/svn/codes/!svn/ver/1983/trans/trunk/src/ascii2hdf
+END
+anmfix.F90
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/codes/!svn/ver/1981/trans/trunk/src/ascii2hdf/anmfix.F90
+END
+deps.mk
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/codes/!svn/ver/1981/trans/trunk/src/ascii2hdf/deps.mk
+END
+hdfaddmoms.F90
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svn/codes/!svn/ver/1983/trans/trunk/src/ascii2hdf/hdfaddmoms.F90
+END
+ascii2hdf.F90
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/codes/!svn/ver/1983/trans/trunk/src/ascii2hdf/ascii2hdf.F90
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svn/codes/!svn/ver/1981/trans/trunk/src/ascii2hdf/Makefile
+END

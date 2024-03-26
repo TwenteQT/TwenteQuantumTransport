@@ -1,0 +1,57 @@
+
+#include "../src/math_def.h"
+
+@test
+Subroutine test_invert_cmatrix()
+  Use funit
+  Use omta_df
+  Implicit None
+  Integer :: i, j
+  Real (Kind=DEF_DBL_PREC) :: re, im
+  Complex (Kind=DEF_DBL_PREC) :: A(8,8), inv_A(8,8), inv_A_cmpt(8,8)
+  
+
+  open(unit=131, file='omta_df/mat_A')
+   do i=1,8
+    do j=1,8
+     read(131,*) re,im
+     A(i,j) = cmplx(re,im)  
+    enddo
+   enddo
+  close(131)
+  
+  inv_A = invert_cmatrix (8, A, 8)
+
+  open(unit=132, file='omta_df/mat_A_inv')
+   do i=1,8
+    do j=1,8
+     read(132,*) re,im
+     inv_A_cmpt(i,j) = cmplx(re,im)  
+    enddo
+   enddo
+  close(132)
+  
+  @assertEqual(real(inv_A),real(inv_A_cmpt),message='inv_A, real',tolerance=1d-5)
+
+End Subroutine test_invert_cmatrix
+
+@test 
+Subroutine test_ActuallyDownfold()
+  Use funit
+  Use omta_df
+  Implicit None
+End Subroutine
+
+@test
+Subroutine test_Reorder()
+  Use funit
+  Use omta_df
+  Implicit None
+End Subroutine
+
+@test
+Subroutine test_Downfold_matrix()
+  Use funit
+  Use omta_df
+  Implicit None
+End Subroutine

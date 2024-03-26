@@ -1,0 +1,65 @@
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/CuCo111-rotation
+END
+rot_mask
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/CuCo111-rotation/rot_mask
+END
+job.ll
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/CuCo111-rotation/job.ll
+END
+test.par
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/CuCo111-rotation/test.par
+END
+geom_l
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/CuCo111-rotation/geom_l
+END
+geom_m
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/CuCo111-rotation/geom_m
+END
+test.seq
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/CuCo111-rotation/test.seq
+END
+geom_r
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/CuCo111-rotation/geom_r
+END
+README.txt
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/CuCo111-rotation/README.txt
+END
+trans.conf
+K 25
+svn:wc:ra_dav:version-url
+V 82
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/CuCo111-rotation/trans.conf
+END
+atomlist
+K 25
+svn:wc:ra_dav:version-url
+V 80
+/svn/codes/!svn/ver/1981/trans/trunk/samples/transport/CuCo111-rotation/atomlist
+END

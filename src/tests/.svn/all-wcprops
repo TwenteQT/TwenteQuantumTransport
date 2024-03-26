@@ -1,0 +1,77 @@
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/codes/!svn/ver/1981/trans/trunk/src/tests
+END
+c_ftn_defs.h
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svn/codes/!svn/ver/1981/trans/trunk/src/tests/c_ftn_defs.h
+END
+eig_test.F90
+K 25
+svn:wc:ra_dav:version-url
+V 59
+/svn/codes/!svn/ver/1981/trans/trunk/src/tests/eig_test.F90
+END
+deps.mk
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/svn/codes/!svn/ver/1981/trans/trunk/src/tests/deps.mk
+END
+ftest.F90
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/svn/codes/!svn/ver/1981/trans/trunk/src/tests/ftest.F90
+END
+rnd.c
+K 25
+svn:wc:ra_dav:version-url
+V 52
+/svn/codes/!svn/ver/1981/trans/trunk/src/tests/rnd.c
+END
+.gitignore
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/codes/!svn/ver/1981/trans/trunk/src/tests/.gitignore
+END
+t1.c
+K 25
+svn:wc:ra_dav:version-url
+V 51
+/svn/codes/!svn/ver/1981/trans/trunk/src/tests/t1.c
+END
+ltest.F90
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/svn/codes/!svn/ver/1981/trans/trunk/src/tests/ltest.F90
+END
+c_fileio.c
+K 25
+svn:wc:ra_dav:version-url
+V 57
+/svn/codes/!svn/ver/1981/trans/trunk/src/tests/c_fileio.c
+END
+ptest.F90
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/svn/codes/!svn/ver/1981/trans/trunk/src/tests/ptest.F90
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/svn/codes/!svn/ver/1981/trans/trunk/src/tests/Makefile
+END
+qq.F90
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svn/codes/!svn/ver/1981/trans/trunk/src/tests/qq.F90
+END

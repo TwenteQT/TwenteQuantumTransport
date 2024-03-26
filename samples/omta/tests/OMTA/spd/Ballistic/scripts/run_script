@@ -1,0 +1,39 @@
+#!
+#PBS -N test 
+#PBS -q test  
+#PBS -V
+#PBS -e job.err
+#PBS -o job.out
+#PBS -l walltime=72:00:00
+#PBS -l nodes=4
+#PBS -l mem=10gb
+
+cd $PBS_O_WORKDIR
+
+#for i in 4 8 16 32 40 48 56 64 72 80 96 108 120 150 180 210 240 270 300 330 360;
+for i in 390 420 450;
+do 
+cat >trans.conf<<!
+
+LOGLEVEL =      1
+
+LEFT_POL =      1 
+RIGHT_POL =      1
+
+DO_ONLY_SPIN = 1
+                                                                                 
+EIGVAL_SOLVER =     15   # default value                                         
+                                                                                 
+BZ_NUM_KPOINTS = $i
+BZ_SYM =      1   
+BZ_INVE =      2  
+                                                                                 
+DO_LEFT_TO_RIGHT =      1   # default value                                      
+DO_RIGHT_TO_LEFT =      0
+                                                                                 
+!
+
+mpirun -np  4 ~/work/work1/Trans/omtatrans/bin/transomta_par.x
+mv andout andout_Cu_$i
+done
+

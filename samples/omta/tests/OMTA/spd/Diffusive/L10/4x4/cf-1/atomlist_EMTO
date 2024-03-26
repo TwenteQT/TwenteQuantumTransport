@@ -1,0 +1,10 @@
+#Format: (the first line) label, atomic number, W-S radius, lmaxi
+#Format: (the second line) need downfold any basis? (1-calculate, 2-downfold)
+1
+Pt_B 78 2      #name, atomic number, lmax (2 for spd and 3 for spdf)
+1 1 1 1 
+0.7 0.7 0.7 0.7
+2
+0.7822898967   #Fermi energy
+0.271473661 0.271473661    #VMTZ
+

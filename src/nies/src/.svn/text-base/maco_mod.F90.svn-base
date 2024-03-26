@@ -1,0 +1,517 @@
+!   $Id: definitions.f,v 1.39 2003/11/03 19:04:43 maciej Exp $
+module maco_mod
+  use definitions
+  implicit none
+
+contains
+
+!*******************
+!XXX    MACO    ****
+!*******************
+  subroutine maco(opt,system,madcon)
+!***************************************************
+!   SURFACE MADELUNG CONSTANTS
+!***************************************************
+   implicit none
+   real(kind=prec),parameter:: rcz=0.0d0,rch=0.5d0
+   type(params):: opt
+   type(atoms_set):: system
+   type(madelung):: madcon
+   real(kind=prec)::POW(3,system%nums),X(2),BREF(system%nums),BREFD(system%nums),VREF(system%nums),VREFD(system%nums)
+   real(kind=prec)::rnb,xz,p,pd,pdd,fv,fb,ABWS2,ABWS3,BWST2,BWST3 
+   integer::i,ig,jg,ip,ib
+
+!     allocation of arrays needed by maco
+      allocate(madcon%mmm(system%nums,system%nums))
+      allocate(madcon%mmd(system%nums,system%nums))
+      allocate(madcon%mdm(system%nums,system%nums))
+      allocate(madcon%mdd(system%nums,system%nums))
+      allocate(madcon%mdb(system%nums))
+      allocate(madcon%ddb(system%nums))
+!     end of allocation
+
+
+   RNB=real(system%nb)
+
+   IG=0
+   do IP=1,system%np
+     do ib=1,system%NB
+        IG=IG+1
+        do i=1,3
+           POW(i,IG)=system%POS(i,ib,IP)
+        enddo
+      enddo
+   enddo
+
+!------------------------------ AUXILIARY QUANTITIES
+   do IG = 1,system%nums
+     BREF(IG)  = rcz
+     BREFD(IG) = rcz
+     VREF(IG)  = rcz
+     VREFD(IG) = rcz
+   enddo
+
+   do IG = 1,system%nums
+     do ib = 1,system%nb
+       do i = 1,2
+         X(i) = system%bpos(i,ib) - POW(i,IG)
+       enddo
+       XZ = system%bpos(3,ib) - POW(3,IG)
+
+       call SEW(X,XZ,P,PD,PDD,opt,system)
+
+       BREF(IG) = BREF(IG) + P
+       BREFD(IG) = BREFD(IG) + PD
+       do i=1,2
+        X(i) = system%vpos(i,ib)-POW(i,IG)
+       enddo
+       XZ = system%vpos(3,ib)-POW(3,IG)
+  
+       call SEW(X,XZ,P,PD,PDD,opt,system)
+
+       VREF(IG) = VREF(IG) + P
+       VREFD(IG) = VREFD(IG) + PD
+     enddo
+   enddo
+     
+
+   do IG=1,system%nums
+     BREF(IG)  = BREF(IG) / RNB
+     BREFD(IG) = BREFD(IG) / RNB
+     VREF(IG)  = VREF(IG) / RNB
+     VREFD(IG) = VREFD(IG) / RNB
+   enddo
+
+   FV=rch*real(opt%ivac)
+   FB=rch*real(2.0d0-opt%ivac)
+
+!------------------------------ MADELUNG CONSTANTS
+   do JG = 1,system%nums
+     do IG = 1,system%nums
+       do i = 1,2
+         X(i) = POW(i,IG) - POW(i,JG)
+       enddo
+       XZ = POW(3,IG) - POW(3,JG)
+
+       CALL SEW(X,XZ,P,PD,PDD,opt,system)
+
+       madcon%mmm(IG,JG) = P - FB*BREF(JG) - FV*VREF(JG)
+       madcon%mmd(IG,JG) = FB * BREFD(JG) + FV*VREFD(JG) - PD
+       madcon%mdm(IG,JG) = PD
+       madcon%mdd(IG,JG) = -PDD
+     enddo
+   enddo 
+
+!---------------------------- CONSTANTS FOR DIPOLE BARRIER
+   do IG = 1,system%nums
+      madcon%mdb(IG) = VREF(IG) - BREF(IG)
+      madcon%ddb(IG) = BREFD(IG) - VREFD(IG)
+   enddo 
+!-------------- SCALING OF CONSTANTS BY THE DIMENSIONLESS BULK WS-RADIUS
+
+   ABWS2 = system%ABWS**2
+   ABWS3 = system%ABWS * ABWS2
+   do JG=1,system%nums
+     do IG=1,system%nums
+      madcon%mmm(IG,JG)= system%ABWS*madcon%mmm(IG,JG)
+      madcon%mmd(IG,JG)=ABWS2*madcon%mmd(IG,JG)
+      madcon%mdm(IG,JG)=ABWS2*madcon%mdm(IG,JG)
+      madcon%mdd(IG,JG)=ABWS3*madcon%mdd(IG,JG)
+     enddo
+   enddo 
+   do IG=1,system%nums
+      madcon%mdb(IG) = system%ABWS*madcon%mdb(IG)
+      madcon%ddb(IG) = ABWS2*madcon%ddb(IG)
+   enddo
+
+      write(IW6,121)
+121   format(//2X,' **********  DIMENSIONLESS MADELUNG ', 'CONSTANTS  ********** '//'   IG,  JG,',&
+     & '     M-M,           M-D,','          D-M,           D-D:')
+
+   do IG=1,system%nums
+    do JG=1,system%nums
+      write(IW6,123) IG,JG,madcon%mmm(IG,JG),madcon%mmd(IG,JG),madcon%mdm(IG,JG),madcon%mdd(IG,JG)
+    enddo
+   enddo
+ 
+
+123   format(1X,I4,1X,I4,1X,4G15.7)
+
+      write(IW6,125)
+125   format(/1X,' ******  DIMENSIONLESS CONSTANTS', ' FOR DIPOLE BARRIER  ******'/&
+     & /'       IG,     MONOPOLE,      DIPOLE: ')
+    do IG=1,system%nums
+      write(IW6,127) IG,madcon%mdb(IG),madcon%ddb(IG)
+    enddo
+
+127   format(4X,I5,2X,2G15.7)
+
+!---------------------- SCALING OF CONSTANTS BY THE  ACTUAL BULK WS-RADIUS
+    BWST2 = system%bwst**2
+    BWST3 = system%bwst * BWST2
+    do JG = 1,system%nums
+      do IG = 1,system%nums
+        madcon%mmm(IG,JG) = madcon%mmm(IG,JG) / system%bwst
+        madcon%mmd(IG,JG) = madcon%mmd(IG,JG) / BWST2
+        madcon%mdm(IG,JG) = madcon%mdm(IG,JG) / BWST2
+        madcon%mdd(IG,JG) = madcon%mdd(IG,JG) / BWST3
+      enddo
+    enddo
+
+    do IG=1,system%nums
+      madcon%mdb(IG) = madcon%mdb(IG) / system%bwst
+      madcon%ddb(IG) = madcon%ddb(IG) / BWST2
+    enddo
+
+   return
+ end subroutine maco
+
+!*******************
+!XXX    SEW     ****
+!*******************
+subroutine sew(x,xz,pot,potd,potdd,opt,system)
+!-----------------------------------------------------------
+!   ELECTROSTATIC POTENTIAL GENERATED BY A 2D-LATTICE
+!   OF UNIT MONOPOLES. THE 2D-LATTICE LIES IN THE XY-PLANE.
+!   THE POTENTIAL is EVALUATED:
+!   AT A POINT WELL OUTSIDE THE XY-PLANE USING SUBR. SEWOF,
+!   AT A POINT NEAR THE XY-PLANE USING SUBR. SEWON.
+!-----------------------------------------------------------
+!   INPUT:
+!     X(1),X(2),XZ - COORDINATES OF THE POINT:
+!        X(1),X(2) - THE PROJECTION ONTO THE XY-PLANE
+!               XZ - COORDINATE ALONG Z-AXIS
+!   OUTPUT:
+!      POT - THE ELECTROSTATIC POTENTIAL
+!      POTD - 1ST DERIVATIVE OF POT ACCORDING TO XZ
+!      POTDD - 2ND DERIVATIVE OF POT ACCORDING TO XZ
+!----------------------------------------------------------
+!  REMARK: COMMON/SUV/ MUST BE SET BEFORE !!!
+!----------------------------------------------------------
+    implicit none
+    real(kind=prec),parameter:: rc1=1.0D0,rc2=2.0D0,rc4=4.0D0
+    real(kind=prec):: X(2),XR(2),C(2),pi,pi2,XZ,POT,POTD,POTDD,COOR
+    integer:: i,j
+    type(params):: opt
+    type(atoms_set):: system
+
+!                                      REDUCED X||
+      pi=rc4*ATAN(rc1)
+      PI2=rc2*pi
+      do J=1,2
+        COOR=(X(1)*system%vbg(1,J)+X(2)*system%vbg(2,J))/PI2
+        C(J)= MOD(COOR,rc1)
+      enddo
+
+      do i=1,2
+        XR(i)=C(1)*system%VBR(i,1)+C(2)*system%VBR(i,2)
+      enddo
+
+      if (XZ**2.GE.system%romega) then
+        call SEWOF(XR,XZ,POT,POTD,POTDD,opt,system)
+      else
+        call SEWON(XR,XZ,POT,POTD,POTDD,opt,system)
+      endif
+
+    return
+ end subroutine sew
+
+!*******************
+!XXX   SEWOF    ****
+!*******************
+  subroutine sewof(x,xz,pot,potd,potdd,opt,system)
+!-----------------------------------------------------------
+!   ELECTROSTATIC POTENTIAL GENERATED BY A 2D-LATTICE
+!   OF UNIT MONOPOLES:
+!   FOR A POINT WELL OUTSIDE THE PLANE OF THE 2D-LATTICE
+!-----------------------------------------------------------
+    implicit none
+    real(kind=prec),parameter :: rcz=0.0d0,rc1=1.0D0,rc2=2.0d0,rc4=4.0d0,ARGMAX=50.0d0
+    real(kind=prec)::X(2),G(2),absz,gmax,maxg1,dum,maxg2,sum,sumd,sumdd,alfa,arg,factor
+    real(kind=prec)::pi,pot,potd,potdd,XZ,gg,prod
+    integer:: ig1,ig2,j
+    type(params):: opt
+    type(atoms_set):: system
+
+    pi=rc4*ATAN(rc1)
+    ABSZ=dABS(XZ)
+    GMAX=ARGMAX/ABSZ
+    DUM=GMAX*dSQRT(system%vbg(1,2)**2+system%vbg(2,2)**2)/system%gomega
+    MAXG1=1+INT(DUM)
+    DUM=GMAX*SQRT(system%vbg(1,1)**2+system%vbg(2,1)**2)/system%gomega
+    MAXG2=1+INT(DUM)
+    SUM=rcz
+    SUMD=rcz
+    SUMDD=rcz
+
+    do IG1=-MAXG1,MAXG1
+      do IG2=0,MAXG2
+        if (IG1.LE.0.AND.IG2==0) cycle
+        do J=1,2
+          G(J) = IG1*system%vbg(J,1) + IG2*system%vbg(J,2)
+        enddo
+        GG=SQRT(G(1)**2+G(2)**2)
+        if (GG.GT.GMAX) cycle
+        ALFA=G(1)*X(1)+G(2)*X(2)
+        ARG=GG*ABSZ
+        PROD=EXP(-ARG)*COS(ALFA)
+        SUM   = SUM    + PROD/GG
+        SUMD  = SUMD   + PROD
+        SUMDD = SUMDD  + PROD*GG
+      enddo
+    enddo
+   SUM   = rc2*SUM
+   SUMD  = rc2*SUMD
+   SUMDD = rc2*SUMDD
+
+   FACTOR = rc4*pi/system%romega
+   POT    = FACTOR * (-ABSZ + SUM)
+   POTD   = FACTOR * (rc1 + SUMD)
+   if (XZ.GT.rcz) POTD=-POTD
+   POTDD = FACTOR * SUMDD
+   return
+
+  end subroutine sewof
+
+!*******************
+!XXX   SEWON    ****
+!*******************
+  subroutine sewon(x,xz,pot,potd,potdd,opt,system)
+!-----------------------------------------------------------
+!   ELECTROSTATIC POTENTIAL GENERATED BY A 2D-LATTICE
+!   OF UNIT MONOPOLES:
+!   FOR A POINT NEAR OR IN THE PLANE OF THE 2D-LATTICE
+!-----------------------------------------------------------
+  IMPLICIT none
+  real(kind=prec),parameter::ARGMAX=7.0D0,CMUL=0.282D0,TINY=1.0D-4,BIG=150.0D0,rcz=0.0D0,rc1=1.0D0,&
+     &      rc2=2.0D0,rc4=4.0D0,rc3=3.0D0,RC8=8.0D0
+  real(kind=prec)::X(2),R(2),G(2),pi,spi,sigma,twosig,sigspi,tau,tau2,rmax,rmin,xz2,dum,sumr,sumrd,sumrdd
+  real(kind=prec)::rr,rr2,xz,pot,potd,potdd,QERF,USIG2,gmax,sumg,sumgd,sumgdd,fact
+  real(kind=prec)::ARG,ARG2,QERFC,QEXP,DRDX,DRDX2,DFDR,DFDR2,F,DFDX,DFDX2,gg,ALFA,ARGEXP,SIGGG,ARGERP,ARGERM
+  real(kind=prec)::ARGEXQ,COSALF,QEXPP,QEXPM,QERFCP,QERFCM,QEXPQ,PRODUP,PRODUM,SOUCET,ROZDIL,plr,plrd,plrdd
+  integer:: ir1,ir2,maxr1,maxr2,maxg1,maxg2,ig1,ig2,j
+  type(params):: opt
+  type(atoms_set):: system
+!                        CONSTANTS
+  pi  = rc4 * dATAN(rc1)
+  SPI = dSQRT(pi)
+  SIGMA  = CMUL * dSQRT(system%romega)
+  TWOSIG = rc2 * SIGMA
+  SIGSPI = SIGMA * SPI
+  TAU = XZ / TWOSIG
+  TAU2 = TAU**2
+
+!-------------------------------- LONG-RANGE POTENTIAL
+   QERF = rc1-ERRFC(TAU)
+   QEXP = rcz
+   if(TAU2.LT.BIG) QEXP = dexp(-TAU2)
+     PLR = -(rc4 * pi * XZ * QERF + RC8 * SIGSPI * QEXP) / system%romega
+     PLRD = -rc4 * pi * QERF / system%romega
+     PLRDD = -rc4 * SPI * QEXP / (SIGMA * system%romega)
+
+!--------------------------------- R-SUMMATION
+     RMAX = ARGMAX * TWOSIG
+     RMIN = TINY * SIGMA
+     XZ2  = XZ**2
+     USIG2 = rc1 / SIGMA**2
+     DUM   = RMAX * SQRT(system%VBR(1,2)**2 + system%VBR(2,2)**2)/system%romega
+     MAXR1 = 2 + INT(DUM)
+     DUM   = RMAX * SQRT(system%VBR(1,1)**2 + system%VBR(2,1)**2) / system%romega
+     MAXR2 = 2 + INT(DUM)
+
+     SUMR = rcz
+     SUMRD = rcz
+     SUMRDD = rcz
+
+     do IR1 = -MAXR1, MAXR1
+       do IR2 = -MAXR2, MAXR2
+         do J = 1, 2
+          R(J) = IR1 * system%VBR(J,1) + IR2 * system%VBR(J,2) - X(J)
+         enddo
+         RR2 = R(1)**2 + R(2)**2 + XZ2
+         RR  = dSQRT(RR2)
+
+         if (RR.GT.RMAX) cycle
+         if (RR.GT.RMIN) GO TO 220
+
+         SUMR   = SUMR - rc2 / SIGSPI
+         SUMRDD = SUMRDD + USIG2 / (rc3 * SIGSPI)
+         cycle
+
+220      ARG   = RR/TWOSIG
+         ARG2  = ARG**2
+         QERFC = ERRFC(ARG)
+         QEXP  = dEXP(-ARG2)
+
+         DRDX  = XZ / RR
+         DRDX2 = (rc1 - XZ2 / RR2) / RR
+         DFDR  = -rc2 * (QERFC / RR2 + QEXP / (RR * SIGSPI))
+         DFDR2 = rc4 * QERFC / (RR * RR2) + (rc4 / RR2 + USIG2) * QEXP / SIGSPI
+         F     = rc2 * QERFC / RR
+         DFDX  = DFDR * DRDX
+         DFDX2 = DFDR2 * DRDX**2 + DFDR * DRDX2
+
+         SUMR = SUMR + F
+         SUMRD = SUMRD + DFDX
+         SUMRDD = SUMRDD + DFDX2
+       enddo
+     enddo
+
+!--------------------------------- G-SUMMATION
+
+    GMAX = (ARGMAX + dABS(TAU)) / SIGMA
+    DUM = GMAX * dSQRT(system%vbg(1,2)**2 + system%vbg(2,2)**2) / system%gomega
+    MAXG1 = 1 + INT(DUM)
+    DUM = GMAX * dSQRT(system%vbg(1,1)**2+system%vbg(2,1)**2) / system%gomega
+    MAXG2 = 1 + INT(DUM)
+
+    SUMG = rcz
+    SUMGD = rcz
+    SUMGDD = rcz
+
+    do IG1 = -MAXG1, MAXG1
+      do IG2 = 0, MAXG2
+        if (IG1.LE.0.AND.IG2==0) cycle
+        do J = 1, 2
+         G(J) = IG1*system%vbg(J,1) + IG2*system%vbg(J,2)
+        enddo
+        GG = dSQRT(G(1)**2 + G(2)**2)
+        if (GG.GT.GMAX) cycle
+        ALFA = G(1) * X(1) + G(2) * X(2)
+        ARGEXP = GG * XZ
+        SIGGG  = SIGMA * GG
+        ARGERP = SIGGG + TAU
+        ARGERM = SIGGG - TAU
+        ARGEXQ = SIGGG**2 + TAU2
+        COSALF = dCOS(ALFA)
+        QEXPP  = dEXP(ARGEXP)
+        QEXPM  = dEXP(-ARGEXP)
+        QERFCP = ERRFC(ARGERP)
+        QERFCM = ERRFC(ARGERM)
+        QEXPQ  = dEXP(-ARGEXQ)
+        PRODUP = QEXPP * QERFCP
+        PRODUM = QEXPM * QERFCM
+        SOUCET = PRODUP + PRODUM
+        ROZDIL = PRODUP - PRODUM
+
+        SUMG = SUMG + COSALF * SOUCET / GG
+        SUMGD = SUMGD + COSALF * ROZDIL
+        SUMGDD = SUMGDD + COSALF * (GG * SOUCET - rc2 * QEXPQ / SIGSPI)
+       enddo
+    enddo
+
+    SUMG = rc2*SUMG
+    SUMGD = rc2*SUMGD
+    SUMGDD = rc2*SUMGDD
+    FACT = rc2*pi/system%romega
+    SUMG = FACT*SUMG
+    SUMGD = FACT*SUMGD
+    SUMGDD = FACT*SUMGDD
+
+
+    POT = PLR + SUMR + SUMG
+    POTD = PLRD + SUMRD + SUMGD
+    POTDD = PLRDD + SUMRDD + SUMGDD
+
+   return
+ end subroutine SEWON
+
+!*******************
+!XXX   ERRFC    ****
+!*******************
+  function errfc(x)
+!-------------------------------------------------------
+! COMPLEMENTARY ERROR FUNCTION
+!  ERRFC = ( 2 / SQRT(pi) ) * INTEGRAL FROM X TO Z OF A FUNCTION EXP(-T**2) DT
+!-------------------------------------------------------
+    implicit none
+    real(kind=prec),parameter:: EPS=1.0D-14,ALIM=13.0D0,rcz=0.0D0,rc1=1.0D0,rc2=2.0D0,rc4=4.0D0,rch=0.5D0
+    real(kind=prec):: errfc,spi,absx,x2,x,emx2,pn,pnp1,qn,qnp1,cit,sum,ylom,ylomw,pnm1,qnm1,absbet
+    real(kind=prec):: sigbet,twox2,beta,alfa
+    integer::n
+
+    SPI = dSQRT(rc4 * dATAN(rc1))
+    ABSX = dABS(X)
+    if(ABSX.LT.ALIM) GO TO 201
+    if(X.GT.rcz)ERRFC=rcz
+    if(X.LT.rcz)ERRFC=rc2
+
+  return
+
+201 X2 = X**2
+    EMX2 = dEXP(-X2)
+
+    if(ABSX.LT.rc2)GO TO 280
+
+!                    big ABSX
+    N = 0
+    PN   = rc1
+    PNP1 = ABSX
+    QN   = rcz
+    QNP1 = rc1
+    YLOM = rcz
+    CIT  = rcz
+
+222  N = N+1
+     YLOMW = YLOM
+
+    SUM = dABS(PNP1) + dABS(QNP1)
+    PNM1 = PN / SUM
+    PN   = PNP1 / SUM
+    QNM1 = QN / SUM
+    QN   = QNP1 / SUM
+
+    CIT = CIT + rch
+    PNP1 = ABSX * PN + CIT * PNM1
+    QNP1 = ABSX * QN + CIT * QNM1
+
+    YLOM = QNP1 / PNP1
+
+    if(dABS(YLOM-YLOMW).GT.EPS*dABS(YLOM))GO TO 222
+
+    ERRFC = EMX2 * YLOM / spi
+
+    if(X.LT.rcz) ERRFC = rc2 - ERRFC
+
+  return
+
+!        small ABSX
+
+280   N  = 0
+      PN = rc1
+      PNP1 = rc1
+      QN   = rcz
+      QNP1 = rc1
+      YLOM = rcz
+      ALFA = rc1
+      ABSBET = rcz
+      SIGBET = rc1
+      TWOX2  = rc2 * X2
+
+233   N = N + 1
+      YLOMW = YLOM
+
+      SUM = dABS(PNP1) + dABS(QNP1)
+      PNM1 = PN / SUM
+      PN   = PNP1 / SUM
+      QNM1 = QN / SUM
+      QN   = QNP1 / SUM
+
+      ALFA = ALFA + rc2
+      ABSBET = ABSBET + TWOX2
+      SIGBET = -SIGBET
+      BETA = SIGBET * ABSBET
+      PNP1 = ALFA * PN + BETA * PNM1
+      QNP1 = ALFA * QN + BETA * QNM1
+      YLOM = QNP1 / PNP1
+
+      if(ABS(YLOM-YLOMW).GT.EPS*ABS(YLOM)) GO TO 233
+
+      ERRFC = rc1 - rc2 * X * EMX2 * YLOM / spi
+
+  return
+ end function errfc
+ 
+
+
+end module maco_mod

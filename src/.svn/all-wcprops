@@ -1,0 +1,17 @@
+K 25
+svn:wc:ra_dav:version-url
+V 40
+/svn/codes/!svn/ver/2022/trans/trunk/src
+END
+rules.inc
+K 25
+svn:wc:ra_dav:version-url
+V 50
+/svn/codes/!svn/ver/1981/trans/trunk/src/rules.inc
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/svn/codes/!svn/ver/1995/trans/trunk/src/Makefile
+END

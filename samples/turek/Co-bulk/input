@@ -1,0 +1,17 @@
+--------------  INPUT DATA FOR FCC INAS   -------------------------------
+    REMARK:  SCALAR-RELATIVISTIC,  VWN XC, SPD 
+     3    2                                           NL, NS
+     1    0                                         IREL, IVXC
+     1   30    2                                NSYM, NK, INVE
+    14                                                NE
+   1.50       0.0                               DIAM, EF(START)
+     0                                              ICONT
+     30                                               NFUPR
+   1.0E-7     1.00                         CPA: DIFMAX, MIXING
+   0.01       1.00                          EF: DIFMAX, MIXING
+   0.02      119                             LDA: ALFA, NITER
+   0.10       49                                BETA, NITERA
+   0.005      30                                W0AM, NUH
+   0       0        0       0
+   0       0        0
+X----V----X----V----X----V----X----V----X----V----X----V----X----V----X

@@ -1,0 +1,29 @@
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/svn/codes/!svn/ver/2019/trans/trunk/src/htrans
+END
+deps.mk
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/svn/codes/!svn/ver/1981/trans/trunk/src/htrans/deps.mk
+END
+hseptrans.F90
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/codes/!svn/ver/1983/trans/trunk/src/htrans/hseptrans.F90
+END
+htrans.F90
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/codes/!svn/ver/2019/trans/trunk/src/htrans/htrans.F90
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/svn/codes/!svn/ver/1981/trans/trunk/src/htrans/Makefile
+END

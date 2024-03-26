@@ -1,0 +1,29 @@
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/svn/codes/!svn/ver/1983/trans/trunk/src/gamma
+END
+deps.mk
+K 25
+svn:wc:ra_dav:version-url
+V 54
+/svn/codes/!svn/ver/1981/trans/trunk/src/gamma/deps.mk
+END
+gammaiter.F90
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1983/trans/trunk/src/gamma/gammaiter.F90
+END
+gammatrans.F90
+K 25
+svn:wc:ra_dav:version-url
+V 61
+/svn/codes/!svn/ver/1983/trans/trunk/src/gamma/gammatrans.F90
+END
+Makefile
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/svn/codes/!svn/ver/1981/trans/trunk/src/gamma/Makefile
+END

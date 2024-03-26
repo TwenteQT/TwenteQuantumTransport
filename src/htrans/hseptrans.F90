@@ -1,0 +1,523 @@
+!!#   $Id:trans.F90 425 2007-05-23 18:18:58Z antst $
+!!$    This program calculates the condactance of
+!!$    "ideal lead|scattering region|ideal lead" system using Landauer
+!!$    formula. The transmission coefficients are calculated according to
+!!$    the method described in T.Ando PRB 44, 8017 (1991) modified for
+!!$    KKR (P-S) equation in screened representation (K.Xia et al, unpublished).
+!!$    The current incarnation is strongly influenced by the previous
+!!$    implementation by K.Xia and "enriched" by the outright theft of the
+!!$    parts of the self-consistent LMTO code by I.Turek.
+#include "math_def.h"
+
+Program hseptrans
+   Use transport
+   Use ando_module
+   Use atoms_module
+   Use geometry_module
+   Use structure
+   Use supercell
+   Use hamiltonian
+   Use logging
+   Use sparse_solvers
+   Use bzgrid
+   Use readcfg
+   Use hdf5io
+   Use compat
+   Use helpers
+   Use mpi
+   Implicit None
+   !Include 'mpif.h'
+
+!!$ Local
+   Integer, Parameter :: clen = 200, timef = 201
+   Type(t_options) :: opt
+   Type(t_atoms_set) :: atoms
+   Type(t_geometry) :: mgeo, lgeo, rgeo, trgeo, llgeo, rlgeo
+   Type(t_strconst) :: msc, lsc, rsc
+   Type(t_ando_sollution) :: l_ando, r_ando
+   Type(t_potpar_mats) :: mpar(2), lpar(2), rpar(2)
+   Type(t_mathop) :: msys, sk
+   Type(t_supercell) :: lscell, rscell
+   Type(bzone) :: bz
+   Type(t_tranrefl) :: tran(2)
+   Type(zdensemat) :: rhs
+   Real(Kind=DEF_DBL_PREC) :: iitime, ttime, ptime
+   Integer :: is, ik, havelr, haverl, needsolve, nkloops, loop, is1 = 1, is2 = 2, lnonpol, rnonpol, i
+   Real(Kind=DEF_DBL_PREC) :: k(2), cons, consr(2) = 0.0d0, conss(2)
+   Real(Kind=DEF_DBL_PREC) :: t_lr(2, 2) = 0.0d0, r_lr(2, 2) = 0.0d0, t_lr_spec(2, 2) = 0.0d0, &
+  & r_lr_spec(2, 2) = 0.0d0
+   Real(Kind=DEF_DBL_PREC) :: t_rl(2, 2) = 0.0d0, r_rl(2, 2) = 0.0d0, t_rl_spec(2, 2) = 0.0d0, &
+  & r_rl_spec(2, 2) = 0.0d0
+   Real(Kind=DEF_DBL_PREC) :: r_shc(2) = 0.0d0, l_shc(2) = 0.0d0
+   Complex(Kind=DEF_DBL_PREC) :: tmix(2) = 0.0d0, gmix(2) = 0.0d0
+   Integer :: rnm(2) = 0, lnm(2) = 0, hops, nmodl(4), nmodr(4)
+   Character(Len=clen) :: cwork
+   Character(Len=1) :: aspin
+!!$ MPI vars
+   Integer, Pointer :: jobs(:), nsols(:)
+   Integer :: ierr, my_mpi_id, local_comm, solve_comm, mpi_sz, boss, havejob, root = 0
+   integer :: solsize, ngrps, grpid
+   Integer :: mpi_loc_id, error
+   Integer(HID_T) :: h5out
+   Character(Len=2) :: slbl = 'ud'
+   Type(h5_iterout) :: h5tro
+   Type(t_decomp_data) :: ldecd, rdecd
+
+!!$ Porgram starts here
+!!$ -----------------------------------------------------------------------------
+
+   Call init_random_seed()
+   Call mpi_init(ierr)
+   solve_comm = mpi_comm_world
+   Call mpi_comm_rank(solve_comm, my_mpi_id, ierr)
+   Call mpi_comm_size(solve_comm, mpi_sz, ierr)
+
+   Log_Level = -1
+   If (my_mpi_id == root) Then
+      Call unlink('andout')
+      Log_Level = 1
+   End If
+#ifdef _VERS_
+   Call do_log(1, 'Transport code v'//_VERS_//' by Antst (HDF)')
+#else
+   Call do_log(1, 'Transport code vXXXX by Antst (HDF)')
+#endif
+!!$ Read  file with parameters
+
+   Call trans_config_init(opt, ispar_in=(mpi_sz > 1))
+   opt%po%rot_mask = 0
+   Call redistcomm(opt%par_nprock, solve_comm, local_comm, ngrps, grpid)
+   Call mpi_comm_rank(local_comm, mpi_loc_id, ierr)
+   Call mpi_comm_size(local_comm, solsize, ierr)
+   If (mpi_loc_id == 0) boss = 1
+   Allocate (nsols(solsize))
+
+!!$ Set LogLevel and open output files
+   Allocate (jobs(mpi_sz))
+   If (my_mpi_id == root) Then
+      Log_Level = opt%loglvl
+      Call hdf5lib_init()
+      Call h5fcreate_f('transout.h5', H5F_ACC_TRUNC_F, h5out, error)
+      Call hdfsetversion(h5out)
+      Call hdfwrite(h5out, '/opts', opt)
+
+      compat_flags(cpf_base) = 1
+      compat_flags(cpf_reliabledecompose) = 1
+      compat_flags(cpf_haslr) = opt%needlr
+      compat_flags(cpf_hasrl) = opt%needrl
+      Open (Unit=timef, File='times', Action='write')
+   Else
+!!$ uncomment line bellow if you want output from rest of CPUs
+!!$     Log_Level=opt%loglvl
+      Write (cwork, '(i2.2)') my_mpi_id
+      Write (logfilename, '("log.",A)') trim(cwork)
+   End If
+
+   ttime = MPI_Wtime()
+   iitime = MPI_Wtime()
+   ptime = 0
+
+   Call init_mathop(msys)
+   Call init_mathop(sk)
+   hops = 1
+   If (opt%po%kind > 2) hops = 2
+
+   If (mpi_loc_id == 0) Then
+!!$ Read atomic potentials
+      atoms = read_atoms('atomlist')
+!!$ Read geometries
+      lgeo = read_geom('geom_l', atoms)
+      rgeo = read_geom('geom_r', atoms)
+      mgeo = read_geom('geom_m', atoms, lgeo%scale)
+
+      If (my_mpi_id == root) Then
+         Call hdfwrite(h5out, 'geom/mgeo', mgeo)
+         Call hdfwrite(h5out, 'geom/rgeo', rgeo)
+         Call hdfwrite(h5out, 'geom/lgeo', lgeo)
+      End If
+
+!!$ Prepare geometry for leads
+      llgeo = make_leadgeom(lgeo, hops, -1)
+      rlgeo = make_leadgeom(rgeo, hops, 1)
+!!$ Free original geometry for leads, we don't need it anymore
+      Call free_geom(lgeo)
+      Call free_geom(rgeo)
+!!$ Prepare geometry for transport region
+      trgeo = make_transportgeom(llgeo, rlgeo, mgeo)
+      If (my_mpi_id == root) Then
+         Call hdfwrite(h5out, 'geom/trgeo', trgeo)
+         Call hdfwrite(h5out, 'geom/llgeo', llgeo)
+         Call hdfwrite(h5out, 'geom/rlgeo', rlgeo)
+      End If
+
+!!$ Free geometry for 'm' region, we don't need it anymore
+      Call free_geom(mgeo)
+!!$ Prepare parameters for supercell calculation
+      Call prepare_supercell(llgeo, lscell)
+      Call prepare_supercell(rlgeo, rscell)
+!!$ Calculate S(R)
+      msc = calc_screal(trgeo)
+      lsc = calc_screal(llgeo)
+      rsc = calc_screal(rlgeo)
+!!$ If you want to have loop over Energy  do it here
+!!$ Just change opt%Eoffset
+
+!!$ Calculate potential parameters
+      Call calc_potpar(atoms, opt%atopt, opt%Eoffset)
+!!$ Prepare potential parameters matrices
+!!$ for leads and transport region
+      mpar = make_ppar(trgeo, opt%po)
+      lpar = make_ppar(llgeo, opt%po)
+      rpar = make_ppar(rlgeo, opt%po)
+      lnonpol = 1
+      Do i = 1, llgeo%num
+         lnonpol = lnonpol*llgeo%atoms(i)%ptr%nopol
+      End Do
+      rnonpol = 1
+      Do i = 1, rlgeo%num
+         rnonpol = rnonpol*rlgeo%atoms(i)%ptr%nopol
+      End Do
+      compat_flags(cpf_lnonpol) = lnonpol
+      compat_flags(cpf_rnonpol) = rnonpol
+   End If
+!!$ Prepare grid for BZ integration
+
+   Call gibz(bz, trgeo%base, opt%bzo)
+
+   If (my_mpi_id == 0) Then
+      Call hdfwrite(h5out, 'bz', bz)
+      Call init_iterout(h5out, h5tro, bz%nkgrid)
+!! TIMES CHANGE HERE
+      Write (cwork, '("   Init Time = ", f12.4," seconds")') MPI_Wtime() - iitime
+      Call do_log(1, trim(cwork))
+      Call do_log(1, 'Starting transport calculation...')
+   End If
+
+   consr(1) = 0.0d0
+
+!!$  if ((mpi_sz>1) .and. solsize>1 .and. opt%lowmem/=0) then
+!!$     nkloops=bz%nkgrid
+!!$  else
+   nkloops = ceiling(bz%nkgrid/real(ngrps, kind=DEF_DBL_PREC))
+!!$  end if
+
+   Call MPI_Barrier(solve_comm, ierr)
+   If (opt%onlyspin == 0) Then
+      is1 = 1
+      is2 = 2
+   Else
+      is1 = opt%onlyspin
+      is2 = opt%onlyspin
+   End If
+!!$ Workaround of bug in Fortran MPI interface
+   Call mrealloc(msys%c, 1, 1)
+
+!SMP$ DO SERIAL
+   Do loop = 0, nkloops - 1
+      iitime = MPI_Wtime()
+      ik = 1 + loop*(ngrps) + grpid
+      havejob = 0
+      If (ik <= bz%nkgrid) Then
+         k = bz%k(:, ik)
+         havejob = 1
+      End If
+
+      If ((mpi_loc_id /= 0) .And. (solsize > 1)) havejob = 0
+
+      If (havejob /= 0) Then
+         Call make_sk(sk, msc, k, hops - 1)
+      End If
+      Call mpi_gather(havejob, 1, mpi_integer, jobs, 1, mpi_integer, root, solve_comm, ierr)
+
+      conss(:) = 0
+!SMP$ DO SERIAL
+      Do is = is1, is2
+         havelr = 0
+         haverl = 0
+         needsolve = 0
+         aspin = slbl(is:is)
+         cons = 0.0d0
+         If (havejob /= 0) Then
+!!$ Prepare Ando for left lead
+            If ((is - is1) > 0 .And. lnonpol > 0 .And. opt%lowmem == 0) Then
+               lnm(is) = lnm(is - 1)
+               lscell%nreal(:, is) = lscell%nreal(:, is - 1)
+            Else
+               lnm(is) = get_sc_ando(is, l_ando, k, lpar(is), lsc, lscell, opt%po, -1, opt%actl, decd=ldecd)
+            End If
+!!$ Prepare Ando for Right lead
+            If ((is - is1) > 0 .And. rnonpol > 0 .And. opt%lowmem == 0) Then
+               rnm(is) = rnm(is - 1)
+               rscell%nreal(:, is) = rscell%nreal(:, is - 1)
+            Else
+               rnm(is) = get_sc_ando(is, r_ando, k, rpar(is), rsc, rscell, opt%po, 1, opt%actl, decd=rdecd)
+            End If
+
+            If (my_mpi_id == 0) Then
+               Rewind (timef)
+               Write (timef, '("   Prev Time = ", f12.4," seconds")') ptime
+               Write (timef, '("   Ando Time = ", f12.4," seconds, kpt=",i3)') MPI_Wtime() - iitime, ik
+               flush (timef)
+            End If
+
+            If (l_ando%Nin*opt%needlr > 0) havelr = 1
+            If (r_ando%Nin*opt%needrl > 0) haverl = 1
+            needsolve = havelr + haverl
+            If (needsolve /= 0) Then
+!!$ Prepare P-S or H-HOH system for whole device
+               Call prep_system(msys, sk, mpar(is), opt%po, 0)
+               If (my_mpi_id == 0) Then
+                  Write (timef, '("   Prep Time = ", f12.4," seconds")') MPI_Wtime() - iitime
+                  flush (timef)
+               End If
+!!$ Embed boundary conditions and prepare RHS
+               Call embed_boundary(msys%c, rhs, l_ando, r_ando, opt%needlr, opt%needrl)
+               If (my_mpi_id == 0) Then
+                  Write (timef, '("  Embed Time = ", f12.4," seconds")') MPI_Wtime() - iitime
+                  flush (timef)
+               End If
+               If (opt%lowmem /= 0) Then
+                  Call free_ando_emb(l_ando)
+                  Call free_ando_emb(r_ando)
+               End If
+
+            End If
+         End If
+
+         If (opt%actl%writedecomp == 1) Then
+            Call hdfwrtset_par(h5out, '/kset', ik, aspin//'/ldecomp', solve_comm, root, havejob, ldecd)
+            Call hdfwrtset_par(h5out, '/kset', ik, aspin//'/rdecomp', solve_comm, root, havejob, rdecd)
+         End If
+
+         If (opt%writeham == 1) Then
+            Call hdfwrtset_par(h5out, '/kset', ik, aspin//'/ham', solve_comm, root, needsolve, msys%c)
+         End If
+
+         If (opt%writerhs == 1) Then
+            Call hdfwrtset_par(h5out, '/kset', ik, aspin//'/rhs', solve_comm, root, needsolve, rhs%bl)
+         End If
+
+!!$             Call MPI_Barrier (local_comm, ierr)
+         Call mpi_allgather(needsolve, 1, mpi_integer, nsols, 1, mpi_integer, local_comm, ierr)
+!!$ Solve system
+!SMP$ DO SERIAL
+         Do boss = 0, solsize - 1
+            If (nsols(boss + 1) /= 0) Then
+               Call sp_solve(msys%c, rhs, boss, local_comm, opt%leq)
+            End If
+         End Do
+
+         If (opt%writewf == 1) Then
+            Call hdfwrtset_par(h5out, '/kset', ik, aspin//'/wavefunc', solve_comm, root, needsolve, &
+           & rhs%bl)
+         End If
+
+!!$ Calculate conductance
+         If (havejob /= 0) Then
+            cons = cond_singlespin(is, tran, rhs, l_ando, r_ando, havelr, haverl)
+            Write (cwork, '(1x,i6,1x,i4,2(1x,f8.4),5(1x,i4),3x,f8.4,3x,g17.8)') ik, is, k(1), k(2), &
+           & floor(Log10(cons)), lnm(is), rnm(is), bz%ik(1, ik), bz%ik(2, ik), bz%kweight(ik), cons
+            conss(is) = cons
+            Call free(rhs)
+         End If
+
+         If (opt%loglvl > 1) Call log_parallel(solve_comm, root, havejob, jobs, cwork)
+         If (opt%writetm /= 0) Then
+            If (opt%needlr > 0) Then
+               Call hdfwrtset_par(h5out, '/kset', ik, 'tmx/lr/'//aspin//aspin, solve_comm, root, &
+              & tran(1)%T%exists(is, is), tran(1)%T%mat(is, is)%bl)
+               Call hdfwrtset_par(h5out, '/kset', ik, 'tmx/ll/'//aspin//aspin, solve_comm, root, &
+              & tran(1)%R%exists(is, is), tran(1)%R%mat(is, is)%bl)
+            End If
+            If (opt%needrl > 0) Then
+               Call hdfwrtset_par(h5out, '/kset', ik, 'tmx/rl/'//aspin//aspin, solve_comm, root, &
+              & tran(2)%T%exists(is, is), tran(2)%T%mat(is, is)%bl)
+               Call hdfwrtset_par(h5out, '/kset', ik, 'tmx/rr/'//aspin//aspin, solve_comm, root, &
+              & tran(2)%R%exists(is, is), tran(2)%R%mat(is, is)%bl)
+            End If
+         End If
+      End Do
+      nmodl(1:2) = l_ando%SNin
+      nmodr(1:2) = r_ando%SNin
+      nmodl(3:4) = l_ando%SNout
+      nmodr(3:4) = r_ando%SNout
+      Call write_trans_parallel(h5tro, opt, solve_comm, root, jobs, bz, ik, tran, cons, nmodl, nmodr)
+
+      If (havejob /= 0) Then
+!!$ Calculate specular components
+         cons = conss(1) + conss(2)
+         consr(1) = consr(1) + cons*bz%kweight(ik)
+         If (consr(2) < cons) consr(2) = cons
+
+         Call cond_spec(is1, is2, tran, lscell, rscell)
+
+!!$ Write results etc
+
+         If (lnonpol > 0 .And. lnm(1) /= 0) Then
+            gmix(1) = gmix(1) + bz%kweight(ik)*(lnm(1) - sum(tran(1)%R%mat(1, &
+           & 1)%bl*conjg(tran(1)%R%mat(2, 2)%bl)))
+            If (rnonpol > 0 .And. rnm(1) /= 0) Then
+               tmix(1) = tmix(1) + bz%kweight(ik)*(sum(tran(1)%T%mat(1, 1)%bl*conjg(tran(1)%T%mat(2, &
+              & 2)%bl)))
+            End If
+         End If
+
+         If (rnonpol > 0 .And. rnm(1) /= 0) Then
+            gmix(2) = gmix(2) + bz%kweight(ik)*(rnm(1) - sum(tran(2)%R%mat(1, &
+           & 1)%bl*conjg(tran(2)%R%mat(2, 2)%bl)))
+            If (lnonpol == 0 .And. lnm(2) /= 0) Then
+               tmix(2) = tmix(2) + bz%kweight(ik)*(sum(tran(2)%T%mat(1, 1)%bl*conjg(tran(2)%T%mat(2, &
+              & 2)%bl)))
+            End If
+         End If
+
+         t_lr = t_lr + bz%kweight(ik)*tran(1)%T%val
+         r_lr = r_lr + bz%kweight(ik)*tran(1)%R%val
+         t_rl = t_rl + bz%kweight(ik)*tran(2)%T%val
+         r_rl = r_rl + bz%kweight(ik)*tran(2)%R%val
+         l_shc = l_shc + bz%kweight(ik)*lnm
+         r_shc = r_shc + bz%kweight(ik)*rnm
+
+         t_lr_spec = t_lr_spec + bz%kweight(ik)*tran(1)%T%spec
+         r_lr_spec = r_lr_spec + bz%kweight(ik)*tran(1)%R%spec
+         t_rl_spec = t_rl_spec + bz%kweight(ik)*tran(2)%T%spec
+         r_rl_spec = r_rl_spec + bz%kweight(ik)*tran(2)%R%spec
+      End If
+
+      If (my_mpi_id == 0) Then
+         Write (timef, '(i3.3," x KP Time = ", f12.4," seconds")') ngrps, MPI_Wtime() - iitime
+         ptime = MPI_Wtime() - iitime
+         flush (timef)
+      End If
+   End Do
+   Call do_log(1, 'Done!')
+   If (mpi_loc_id == 0) Then
+      l_shc(2) = l_shc(2 - lnonpol)
+      r_shc(2) = r_shc(2 - rnonpol)
+   End If
+
+   Call MPI_summ_res_d(solve_comm, 0, t_lr, 4, mpi_sum)
+   Call MPI_summ_res_d(solve_comm, 0, t_rl, 4, mpi_sum)
+   Call MPI_summ_res_d(solve_comm, 0, r_lr, 4, mpi_sum)
+   Call MPI_summ_res_d(solve_comm, 0, r_rl, 4, mpi_sum)
+
+   Call MPI_summ_res_z(solve_comm, 0, gmix, 2, mpi_sum)
+   Call MPI_summ_res_z(solve_comm, 0, tmix, 2, mpi_sum)
+
+   Call MPI_summ_res_d(solve_comm, 0, t_lr_spec, 4, mpi_sum)
+   Call MPI_summ_res_d(solve_comm, 0, t_rl_spec, 4, mpi_sum)
+   Call MPI_summ_res_d(solve_comm, 0, r_lr_spec, 4, mpi_sum)
+   Call MPI_summ_res_d(solve_comm, 0, r_rl_spec, 4, mpi_sum)
+
+   Call MPI_summ_res_d(solve_comm, 0, l_shc, 2, mpi_sum)
+   Call MPI_summ_res_d(solve_comm, 0, r_shc, 2, mpi_sum)
+   Call MPI_summ_res_d(solve_comm, 0, consr(1), 1, mpi_sum)
+   Call MPI_summ_res_d(solve_comm, 0, consr(2), 1, mpi_max)
+
+   If (my_mpi_id == 0) Call write_legacy_ando(opt, t_lr, r_lr, t_rl, r_rl, t_lr_spec, t_rl_spec, l_shc, &
+  & r_shc, consr, tmix, gmix)
+
+   If (my_mpi_id == 0) Call hdf_write_conds(h5out, t_lr, t_rl, r_lr, r_rl, t_lr_spec, t_rl_spec, &
+  & r_lr_spec, r_rl_spec, gmix, tmix, l_shc, r_shc, consr)
+
+   Call MPI_Barrier(solve_comm, ierr)
+!!$ End here you loop over E
+
+   If (my_mpi_id == 0) Then
+      Call close_iterout(h5tro)
+      Call hdfwrite(h5out, '/compat', compat_flags)
+      Call hdfwrite(h5out, '/time', MPI_Wtime() - ttime)
+      Call h5fclose_f(h5out, error)
+      Call h5close_f(error)
+      Write (cwork, '("  Total Time = ", f12.4," seconds")') MPI_Wtime() - ttime
+      Write (timef, '("  Total Time = ", f12.4," seconds")') MPI_Wtime() - ttime
+      close (timef)
+      Call do_log(1, trim(cwork))
+   End If
+
+   Call mpi_finalize(ierr)
+
+!!$ End of Program!
+!!$ ---------------------------------------------------------------------------------------
+   Stop
+
+Contains
+
+   Subroutine write_legacy_ando(opt, t_lr, r_lr, t_rl, r_rl, t_lr_spec, t_rl_spec, l_shc, r_shc, consr, &
+  & tmix, gmix)
+!!$ Write results
+      Implicit None
+      Type(t_options) :: opt
+      Real(Kind=DEF_DBL_PREC) :: t_lr(2, 2), r_lr(2, 2), t_lr_spec(2, 2)
+      Real(Kind=DEF_DBL_PREC) :: t_rl(2, 2), r_rl(2, 2), t_rl_spec(2, 2)
+      Real(Kind=DEF_DBL_PREC) :: r_shc(2), l_shc(2)
+      Complex(Kind=DEF_DBL_PREC) :: tmix(2), gmix(2)
+      Real(Kind=DEF_DBL_PREC) :: consr(:)
+!!$Local
+      Integer, Parameter :: fl = 200
+
+!!$ Output results into "andout"
+      Open (Unit=fl, File='andout', Action='write')
+
+      Write (fl, *) ' Conservation: integrated,      worst'
+      Write (fl, '("         ",2(5x,g13.6))') consr
+
+      Write (fl, *) ' Left Sharvin conductance :'
+      Write (fl, '("     by spin :",2(3x,f15.10))') l_shc
+      Write (fl, '("     total   :",3x,f15.10)') sum(l_shc)
+      Write (fl, *) ' Right Sharvin conductance :'
+      Write (fl, '("     by spin :",2(3x,f15.10))') r_shc
+      Write (fl, '("     total   :",3x,f15.10)') sum(r_shc)
+      Write (fl, *) '---------------------------------------------'
+      Write (fl, *) ''
+
+      If (opt%needlr /= 0) Then
+         Write (fl, *) ' L->R Conductance:'
+         Write (fl, *) '              Up:                Down:'
+         Write (fl, '("   Up   :",2(3x,g17.10))') t_lr(1, :)
+         Write (fl, '("   Down :",2(3x,g17.10))') t_lr(2, :)
+         Write (fl, *) ''
+         Write (fl, *) ' Conductance total:'
+         Write (fl, '("         ",2(3x,g17.10))') sum(t_lr(1, :)), sum(t_lr(2, :))
+         Write (fl, '("  Grand total:                  ",g17.10)') sum(t_lr(:, :))
+         Write (fl, *) ''
+         Write (fl, *) ' Specular:'
+         Write (fl, *) '              Up:                Down:'
+         Write (fl, '("   Up   :",2(3x,g17.10))') t_lr_spec(1, :)
+         Write (fl, '("   Down :",2(3x,g17.10))') t_lr_spec(2, :)
+         Write (fl, *) ''
+         Write (fl, *) ' Mixing conductance (Re, Im):'
+         Write (fl, '("         ",2(3x,g17.10))') real(gmix(1)), imag(gmix(1))
+         Write (fl, *) ' Mixing transmission (Re, Im):'
+         Write (fl, '("         ",2(3x,g17.10))') real(tmix(1)), imag(tmix(1))
+         Write (fl, *) '---------------------------------------------'
+         Write (fl, *) ''
+      End If
+
+      If (opt%needrl /= 0) Then
+         Write (fl, *) ' R->L Conductance:'
+         Write (fl, *) '              Up                Down'
+         Write (fl, '("   Up   :",2(3x,g17.10))') t_rl(1, :)
+         Write (fl, '("   Down :",2(3x,g17.10))') t_rl(2, :)
+         Write (fl, *) ''
+         Write (fl, *) ' Conductance total:'
+         Write (fl, '("         ",2(3x,g17.10))') sum(t_rl(1, :)), sum(t_rl(2, :))
+         Write (fl, '("  Grand total:                  ",g17.10)') sum(t_rl(:, :))
+         Write (fl, *) ''
+         Write (fl, *) ' Specular:'
+         Write (fl, *) '              Up:                Down:'
+         Write (fl, '("   Up   :",2(3x,g17.10))') t_rl_spec(1, :)
+         Write (fl, '("   Down :",2(3x,g17.10))') t_rl_spec(2, :)
+         Write (fl, *) ''
+         Write (fl, *) ' Mixing conductance (Re, Im):'
+         Write (fl, '("         ",2(3x,g17.10))') real(gmix(2)), imag(gmix(2))
+         Write (fl, *) ' Mixing transmission (Re, Im):'
+         Write (fl, '("         ",2(3x,g17.10))') real(tmix(2)), imag(tmix(2))
+         Write (fl, *) '---------------------------------------------'
+         Write (fl, *) ''
+      End If
+
+      Close (fl)
+   End Subroutine write_legacy_ando
+End Program hseptrans
+!!$  call dump_matrix(sk%m,'sk.dat')

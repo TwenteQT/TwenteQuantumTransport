@@ -1,0 +1,55 @@
+#!/bin/bash
+#SBATCH -t 0-2
+#SBATCH -p fat 
+#SBATCH -N 1 --exclusive 
+#SBATCH -c 1
+#SBATCH -J bc_OMTA
+#SBATCH --output=o%j
+#SBATCH --error=e%j
+
+file_out='tot'
+
+#rm $file_out
+
+for i in {501..599}
+do
+
+en=$(echo "($i)/1000" | bc -l)
+
+cat >atomlist_EMTO <<EOF
+#Format: (the first line) label, atomic number, lmax
+#Format: (the second line) need downfold any basis? (1-calculate, 2-downfold)
+5
+ES 0 3 0     #name, atomic number, lmax (2 for spd and 3 for spdf)
+1 1 1 1
+0.70 0.70 0.70 0.70
+ESB 0 3 0     #name, atomic number, lmax (2 for spd and 3 for spdf)
+1 1 1 1
+0.70 0.70 0.70 0.70
+ESB1 0 3 0     #name, atomic number, lmax (2 for spd and 3 for spdf)
+1 1 1 1
+0.70 0.70 0.70 0.70
+ESB2 0 3 0     #name, atomic number, lmax (2 for spd and 3 for spdf)
+1 1 1 1
+0.70 0.70 0.70 0.70
+ESB3 0 3 0     #name, atomic number, lmax (2 for spd and 3 for spdf)
+1 1 1 1
+0.70 0.70 0.70 0.70
+2
+$en               #Fermi level
+0.0000000000 0            #Muffin-tin zero (constant in interstitial)
+EOF
+
+
+ulimit -s unlimited
+date "+Began at: %H:%M:%S"
+
+mpirun ~/work_trunk/bin/htrans.x 
+date "+Finished at: %H:%M:%S"
+
+mv andout andout_$i
+awk -v k="$i" <andout_$i >>$file_out '/Grand total/ {i+=$3/2} /  total  / {j=$3}END{print k/1000,i,j}'
+rm andout_$i
+
+done
+

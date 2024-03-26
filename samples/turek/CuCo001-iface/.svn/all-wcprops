@@ -1,0 +1,47 @@
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/CuCo001-iface
+END
+input
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/CuCo001-iface/input
+END
+test
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/CuCo001-iface/test
+END
+cci.nw
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/CuCo001-iface/cci.nw
+END
+inpch
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/CuCo001-iface/inpch
+END
+inpge
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/CuCo001-iface/inpge
+END
+inpbu
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/CuCo001-iface/inpbu
+END
+inpds
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/CuCo001-iface/inpds
+END

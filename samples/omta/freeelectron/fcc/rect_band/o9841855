@@ -1,0 +1,16 @@
+Began at: 15:29:48
+Finished at: 15:33:26
+
+JOB STATISTICS
+==============
+Job ID: 9841855
+Cluster: sara
+User/Group: mrang/mrang
+State: COMPLETED (exit code 0)
+Nodes: 1
+Cores per node: 24
+CPU Utilized: 00:03:37
+CPU Efficiency: 4.110f 01:28:00 core-walltime
+Job Wall-clock time: 00:03:40
+Memory Utilized: 81.41 MB
+Memory Efficiency: 0.130f 60.31 GB

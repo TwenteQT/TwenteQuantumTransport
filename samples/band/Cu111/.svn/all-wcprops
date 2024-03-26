@@ -1,0 +1,29 @@
+K 25
+svn:wc:ra_dav:version-url
+V 55
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Cu111
+END
+test
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Cu111/test
+END
+band.conf
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Cu111/band.conf
+END
+geom_b
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Cu111/geom_b
+END
+atomlist
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/codes/!svn/ver/1981/trans/trunk/samples/band/Cu111/atomlist
+END

@@ -1,0 +1,380 @@
+********  INPUT FOR PROGRAM AES:  Cobalt(Co)  **********************
+   27.0      2.621800                      AT. NUMBER, W.-S. RADIUS
+     5                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000     1.0000                         S-OCCUPANCY PER SPIN
+   0.0000     0.0000                         P-OCCUPANCY PER SPIN
+   4.0000     3.0000                         D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                  LDA-MIXING
+********  INPUT FOR PROGRAM AES:  Copper(Cu)  **********************
+   29.0      2.621000                      AT. NUMBER, W.-S. RADIUS
+     5                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     4    2    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   0.5000     0.5000                         S-OCCUPANCY PER SPIN
+   0.0000     0.0000                         P-OCCUPANCY PER SPIN
+   5.0000     5.0000                         D-OCCUPANCY PER SPIN
+   0.0000     0.0000                         F-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  Copper(Cu)  **********************
+   29.0      2.621000                      AT. NUMBER, W.-S. RADIUS
+     5                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     4    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   0.5000                              S-OCCUPANCY PER SPIN
+   0.0000                              P-OCCUPANCY PER SPIN
+   5.0000                              D-OCCUPANCY PER SPIN
+   0.0000                              F-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  Cobalt(Co)  **********************
+   27.0      2.6301                      AT. NUMBER, W.-S. RADIUS
+     5                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000     1.0000                         S-OCCUPANCY PER SPIN
+   0.0000     0.0000                         P-OCCUPANCY PER SPIN
+   4.0000     3.0000                         D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                  LDA-MIXING
+********  INPUT FOR PROGRAM AES:   IRON - POLARIZED  **************
+   26.0      2.6301                      AT. NUMBER, W.-S. RADIUS
+     5                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000    1.0000                    S-OCCUPANCY PER SPIN
+   0.0000    0.0000                    P-OCCUPANCY PER SPIN
+   4.0000    2.0000                    D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                  LDA-MIXING
+********  INPUT FOR PROGRAM AES:   Iron-Cobalt 70-30%  **************
+   26.30     2.6530                      AT. NUMBER, W.-S. RADIUS
+     5                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000    1.0000                    S-OCCUPANCY PER SPIN
+   0.0000    0.0000                    P-OCCUPANCY PER SPIN
+   4.0000    2.3000                    D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                  LDA-MIXING
+********  INPUT FOR PROGRAM AES:   IRON - NON POLARIZED  **************
+   26.0      2.369686                      AT. NUMBER, W.-S. RADIUS
+     5                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    1    0  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   0.0000                              P-OCCUPANCY PER SPIN
+   3.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                  LDA-MIXING
+********  INPUT FOR PROGRAM AES:  Niobium(Nb)  **********************
+   41.0      3.070000                      AT. NUMBER, W.-S. RADIUS
+     8                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2                                N, L
+     4    0                                N, L
+     4    1                                N, L
+     3    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   0.0000                              P-OCCUPANCY PER SPIN
+   4.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:   Pd - POLARIZED  **************
+    46.0      3.60000                      AT. NUMBER, W.-S. RADIUS
+     8                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2
+     4    0
+     4    1
+     3    2    0  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   0.0000    0.0000                    S-OCCUPANCY PER SPIN
+   0.0000    0.0000                    P-OCCUPANCY PER SPIN
+   6.0000    4.0000                    D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                  LDA-MIXING
+********  INPUT FOR PROGRAM AES:  Arsenic(As)  **********************
+   24.0      2.630381                      AT. NUMBER, W.-S. RADIUS
+     5                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000    0.0000                    S-OCCUPANCY PER SPIN
+   0.0000    0.0000                    P-OCCUPANCY PER SPIN
+   4.0000    1.0000                    D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  Arsenic(As)  **********************
+   33.0      2.630381                      AT. NUMBER, W.-S. RADIUS
+     6                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2                                N, L
+     3    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   1.5000                              P-OCCUPANCY PER SPIN
+   0.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  Germanium(Ge)  **********************
+   32.0      2.630381                      AT. NUMBER, W.-S. RADIUS
+     6                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2                                N, L
+     3    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   1.0000                              P-OCCUPANCY PER SPIN
+   0.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  Galimu(Ga)  **********************
+   31.0      2.630381                      AT. NUMBER, W.-S. RADIUS
+     6                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2                                N, L
+     3    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   0.5000                              P-OCCUPANCY PER SPIN
+   0.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  Silicon(SI)  **********************
+   14.0      2.81833287                      AT. NUMBER, W.-S. RADIUS
+     3                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   1.0000                              P-OCCUPANCY PER SPIN
+   0.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  Indium(In)  **********************
+   49.0      2.81833287                      AT. NUMBER, W.-S. RADIUS
+     9                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2                                N, L
+     4    0                                N, L
+     4    1                                N, L
+     4    2
+     3    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   0.5000                              P-OCCUPANCY PER SPIN
+   0.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  Arsen(An)  **********************
+   33.0      2.81833287                      AT. NUMBER, W.-S. RADIUS
+     6                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2                                N, L
+     3    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   1.5000                              P-OCCUPANCY PER SPIN
+   0.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  Tin(Sn)  **********************
+   50.0      2.80995761                      AT. NUMBER, W.-S. RADIUS
+     9                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2                                N, L
+     4    0                                N, L
+     4    1                                N, L
+     4    2
+     3    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   1.0000                              P-OCCUPANCY PER SPIN
+   0.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  Magnesium(Mg)  **********************
+   12.0      1.99831541                  AT. NUMBER, W.-S. RADIUS
+     3                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   0.0000                              P-OCCUPANCY PER SPIN
+   0.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  Oxygen(O)  **********************
+    8.0       2.36968609                 AT. NUMBER, W.-S. RADIUS
+     1                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     3    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   2.0000                              P-OCCUPANCY PER SPIN
+   0.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  Arsen(An)  **********************
+   33.0      2.7788                      AT. NUMBER, W.-S. RADIUS
+     6                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2                                N, L
+     3    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   1.5000                              P-OCCUPANCY PER SPIN
+   0.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  OXYGEN(O)  **********************
+    8.0      3.3000                      AT. NUMBER, W.-S. RADIUS
+     1                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     3    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   2.0000                              P-OCCUPANCY PER SPIN
+   0.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  SELENIUM(Se)  **********************
+   34.0      2.6600                      AT. NUMBER, W.-S. RADIUS
+     6                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2                                N, L
+     3    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   2.0000                              P-OCCUPANCY PER SPIN
+   0.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  ZINC(Zn)   **********************
+   30.0      2.6600                      AT. NUMBER, W.-S. RADIUS
+     5                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   0.0000                              P-OCCUPANCY PER SPIN
+   5.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  PLUMBUM    **********************
+   82.0      3.6556                      AT. NUMBER, W.-S. RADIUS
+    13                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2                                N, L
+     4    0                                N, L
+     4    1                                N, L
+     4    2                                N, L
+     4    3                                N, L
+     5    0                                N, L
+     5    1                                N, L
+     5    2                                N, L
+     3    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   1.0000                              P-OCCUPANCY PER SPIN
+   0.0000                              D-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+********  INPUT FOR PROGRAM AES:  IRIDIUM    **********************
+   77.0      2.83                        AT. NUMBER, W.-S. RADIUS
+    12                   -----  CORE ORBITALS: NUMBER OF CORES
+     1    0                                N, L
+     2    0                                N, L
+     2    1                                N, L
+     3    0                                N, L
+     3    1                                N, L
+     3    2                                N, L
+     4    0                                N, L
+     4    1                                N, L
+     4    2                                N, L
+     4    3                                N, L
+     5    0                                N, L
+     5    1                                N, L
+     4    1    1  400    ----- VALENCE ORBITALS: NL, NS, IREL, MESH
+   1.0000                              S-OCCUPANCY PER SPIN
+   0.0000                              P-OCCUPANCY PER SPIN
+   3.5000                              D-OCCUPANCY PER SPIN
+   0.0000                              F-OCCUPANCY PER SPIN
+   300                   -----  SELFCONSISTENCY: NO. OF ITERATIONS
+   0.1000                                   LDA-MIXING
+====================================================================
+
+
+

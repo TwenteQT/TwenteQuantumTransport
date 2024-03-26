@@ -1,0 +1,47 @@
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/Cu-bulk
+END
+input
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/Cu-bulk/input
+END
+test
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/Cu-bulk/test
+END
+cci.nw
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/Cu-bulk/cci.nw
+END
+inpch
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/Cu-bulk/inpch
+END
+inpge
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/Cu-bulk/inpge
+END
+aes.inp
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/Cu-bulk/aes.inp
+END
+inpds
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/codes/!svn/ver/1981/trans/trunk/samples/turek/Cu-bulk/inpds
+END
