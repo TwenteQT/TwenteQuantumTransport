@@ -7,8 +7,6 @@ Slater-Koster parametrized hamiltonians, model hamiltonians.
 It can be used to calculate conductance, k-point resolved transmission, gilbert damping, nonadiabatic \beta, 
 spin-diffusion length, spatial electron/spin current distribution and many more.
 
-Current maintainer (and sole user) is Max Rang. 
-
 I. _REQUIREMENTS_
 
 The program is written mostly in Fortran95, but uses F2003 (and even some F2008, I think) functionality as well. 
