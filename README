@@ -200,14 +200,47 @@ The (Sharvin) conductance is written to the `andout' file. By running the post-p
 
 V. _CREDIT_
 
-This code has been developed over the course of some years by various people. Some important publications documenting the development are
+The first version of this code was written by Ke Xia making use of the surface Green's function code written 
+by Ilya Turek, Josef Kudrnovsky and Vaclav Drchal to (i) generate self-consistent potentials [1-5] and (ii) stealing
+various subroutines [1. It was rewritten in Fortran 90 ??? by Maciej Zwierzycki and improved 
+This code was developed over the course of some 25 years by various people. Some important publications documenting 
+the development and applications are:
 
-P.A. Khomyakov, G. Brocks, V. Karpan, M. Zwierzycki and P.J. Kelly, PRB72, 035450 (2005)
-K. Xia, M. Zwierzycki, M. Talanan, P.J. Kelly and G.E.W. Bauer, PRB73, 064420 (2006)
-Yi Liu, Zhe Yuan, R.J.H. Wesselink, Anton A. Starikov, Mark van Schilfgaarde and Paul J. Kelly (2015)
-Anton A. Starikov, Yi Liu, Zhe Yuan and Paul J. Kelly, PRB97, 214415 (2018)
-R.J.H Wesselink, K. Gupta, Z. Yuan and Paul J. Kelly, PRB99, 144409 (2019)
-R.S. Nair and P.J. Kelly, PRB103, 195406 (2021)
-
-
-
+ [1] K. Xia, P.J. Kelly, G.E.W. Bauer, I. Turek, J. Kudrnovsky and V. Drchal, PRB63, 064407 (2001)
+ [2] K. Xia, P.J. Kelly, G.E.W. Bauer, A. Brataas, and I. Turek, PRB65, 220401 (2002)
+ [3] K. Xia, P.J. Kelly, G.E.W. Bauer and I. Turek, PRL89, 166603 (2002).
+ [4] M. Zwierzycki, K. Xia, P.J. Kelly, G.E.W. Bauer, and I. Turek, PRB67, 092401 (2003)
+ [5] G.E.W. Bauer, A. Brataas, Y. Tserkovnyak, B.I. Halperin, M. Zwierzycki and P.J. Kelly, PRL92, 126601 (2004)
+ [6] M. Zwierzycki, Y. Tserkovnyak, P.J. Kelly, A. Brataas and G.E.W. Bauer, PRB71, 064420 (2005).
+ [7] P.A. Khomyakov, G. Brocks, V. Karpan, M. Zwierzycki and P.J. Kelly, PRB72, 035450 (2005)
+ [8] G.E.W. Bauer, Y. Tserkovnyak, A. Brataas, J. Run, K. Xia, M. Zwierzycki and P.J. Kelly, PRB72, 155304 (2005).
+ [9] K. Xia, M. Zwierzycki, M. Talanana, P.J. Kelly and G.E.W. Bauer, PRB73, 064420 (2006)
+[10] A. Brataas, G.E.W. Bauer, and P.J. Kelly, Physics Reports 427, 157-255 (2006).
+[11] P.X. Xu, K. Xia, M. Zwierzycki, M. Talanana, P.J. Kelly, PRL96, 176602 (2006).
+[12] P.X. Xu, K. Xia, V. Karpan, I. Marushchenko, M. Zwierzycki, and P.J. Kelly, PRB73, 180402 (2006).
+[13] M. Hatami, G.E.W. Bauer, Q.F. Zhang, and P.J. Kelly, PRL99, 066603 (2007).
+[14] V.M. Karpan, G. Giovannetti, P.A. Khomyakov, M. Talanana, A.A. Starikov, M. Zwierzycki, J. van den Brink, 
+     G. Brocks and P.J. Kelly, PRL99, 176602 (2007).
+[15] M. Zwierzycki, P.A. Khomyakov, A.A. Starikov, K. Xia, M. Talanana, P.X. Xu, V.M. Karpan, I. Marushchenko, 
+     I. Turek, G.E.W. Bauer, G. Brocks, and P.J. Kelly, Physica Status Solidi (b)245, 623-640 (2008).
+[16] V.M. Karpan, G. Giovannetti, P.A. Khomyakov, M. Talanana, A.A. Starikov, M Zwierzycki, J. van den Brink, 
+     G. Brocks, and P.J. Kelly, PRB78, 195419 (2008).
+[17] M. Hatami, G.E.W. Bauer, Q.F. Zhang, and P.J. Kelly, PRB79, 174426 (2009).
+[18] A.A. Starikov, P.J. Kelly, A. Brataas, Y. Tserkovnyak and G.E.W. Bauer, PRL105, 236601 (2010).
+[19] Y. Liu, A.A. Starikov, Z. Yuan and P.J. Kelly, PRB84, 014412 (2011).
+[20] Z. Yuan, Y. Liu, A.A. Starikov, P.J. Kelly and A. Brataas, PRL109, 267201 (2012).
+[21] Y. Liu, Z. Yuan, R.J.H. Wesselink, A.A. Starikov and P.J. Kelly, PRL113, 207202 (2014).
+[22] Z. Yuan, K.M.D. Hals, Y. Liu, A.A. Starikov, A. Brataas and P.J. Kelly, PRL113, 266603 (2014).
+[23] Y. Liu, Z. Yuan, R.J.H. Wesselink, A.A. Starikov, M. van Schilfgaarde and P.J. Kelly, PRB91, 220405 (2015).
+[24] L. Wang, R.J.H. Wesselink, Y. Liu, Z. Yuan, K. Xia and P.J. Kelly, PRL116, 196602 (2016).
+[25] Z. Yuan and P.J. Kelly, PRB93, 224415 (2016).
+[26] A.A. Starikov, Y. Liu, Z. Yuan and P.J. Kelly, PRB97, 214415 (2018).
+[27] R.J.H Wesselink, K. Gupta, Z. Yuan and Paul J. Kelly, PRB99, 144409 (2019).
+[28] K. Gupta, R.J.H. Wesselink, R.X. Liu, Z. Yuan and P.J. Kelly, PRL124, 087702 (2020).
+[29] R.S. Nair and P.J. Kelly, PRB103, 195406 (2021)
+[30] R.S. Nair, E. Barati, K. Gupta, Z. Yuan and P.J. Kelly, PRL126, 196601 (2021).
+[31] K. Gupta, R.J.H. Wesselink, Z. Yuan and P.J. Kelly, PRB104, 205426 (2021).
+[32] R.S. Nair, M.S. Rang and P.J. Kelly, PRB104, L220411 (2021). 
+[33] R.X. Liu, K. Gupta, Z. Yuan and P.J. Kelly, PRB106, 014401 (2022).
+[34] K. Gupta, R.X. Liu, R.J.H. Wesselink, Z. Yuan and P.J. Kelly, PRB106, 115425 (2022).
+[35] Y. Liu, P.T. Yang and P.J. Kelly, PRB109, 014416 (2024).
