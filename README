@@ -1,11 +1,12 @@
-This is universal solid-state transport code which is primarily written by Anton Starikov.
-It can calculate transport-related parameters for large-scale systems with various kinds of 
-disorder (chemical, thermal, magnetic, etc), non-colinearity and more.
-Code incorporates next frameworks: LMTO with/without spin-orbit coupling, 
-Slater-Koster parametrized hamiltonians, model hamiltonians. 
+This is a universal solid-state transport code that was primarily written by Anton Starikov.
+It can be used to calculate transport-related parameters for large-scale systems with various 
+kinds of disorder (chemical, thermal, magnetic, etc), non-collinearity and more.
+The code incorporates the followingt frameworks: LMTO with/without spin-orbit coupling, 
+Slater-Koster parametrized hamiltonians, model Hamiltonians. 
 
-It can be used to calculate conductance, k-point resolved transmission, gilbert damping, nonadiabatic \beta, 
-spin-diffusion length, spatial electron/spin current distribution and many more.
+It can be used to calculate conductance, k-point resolved transmission, Gilbert magnetization 
+damping, nonadiabatic \beta, spin-diffusion length, spatial electron/spin current distribution 
+and many other things.
 
 I. _REQUIREMENTS_
 
