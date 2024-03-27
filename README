@@ -1,6 +1,6 @@
-The Twente Quantum Transport (TQT) code is a universal solid-state transport code that was written 
-over the course of 25 years in the Computational Materials Science group at the University of Twente 
-;see section V Credits for more details.
+The Twente Quantum Transport (TQT) code is a universal solid-state transport code that was 
+written over the course of 25 years in the Computational Materials Science group at the 
+University of Twente; see section "V Credits" for more details.
 It can be used to calculate transport-related parameters for large-scale systems with various 
 kinds of disorder (chemical, thermal, magnetic, etc), non-collinearity and more.
 The code incorporates the following frameworks: LMTO with/without spin-orbit coupling, 
@@ -203,15 +203,19 @@ The (Sharvin) conductance is written to the `andout' file. By running the post-p
 V. _CREDIT_
 
 This code was developed over the course of some 25 years by numerous people. The first version of the code
-was written by Ke Xia making use of the surface Green's function code written by Ilya Turek, Josef Kudrnovsky
-and Vaclav Drchal to (i) generate self-consistent potentials [1-4] and (ii) stealing various subroutines. It
-was rewritten in Fortran 90 ??? by Maciej Zwierzycki who improved it in numerous respects [9]. It was largely
-rewritten by Anton Starikov to make use of sparse matrix solvers and to include spin-orbit coupling [18,26]. 
-Zhe Yuan and Yi Liu systematically included thermal lattice and spin disorder [19,21,23]. Rien Wesselink added
-the possibility to calculate various plane-averaged charge and spin currents after the scattering problem is 
-solved [24,27]; this was generalized to full x,y,z resolved currents by Rohit Nair [29,32]. Zhe Yuan and 
-Max Rang extended the code to handle exact muffin tin orbitals (EMTOs). 
+was written by Ke Xia, stealing various subroutines from the surface Green's function code written by Ilya 
+Turek, Josef Kudrnovsky and Vaclav Drchal (with their permission) and using it to generate self-consistent 
+potentials [1-4]. It was rewritten in Fortran 90 ??? by Maciej Zwierzycki who improved it in numerous 
+respects ... [9]. It was largely rewritten by Anton Starikov to make use of sparse matrix solvers and to 
+include spin-orbit coupling [18,26]; its ability to routinely handle very large scattering regions containing 
+10^4-10^5 atoms is largely thanks to his effort. Zhe Yuan and Yi Liu systematically included thermal lattice
+and spin disorder [19,21,23] while Zhe Yuan implemented various domain wall scattering geometries [20,22,25]. 
+Rien Wesselink added the possibility to calculate various plane-averaged charge and spin currents after the 
+scattering problem is solved [24,27]; this was generalized to full x,y,z resolved currents by Rohit Nair [29,32].
+Zhe Yuan and Max Rang extended the code to handle exact muffin tin orbitals (EMTOs) [36]. 
 The most important publications documenting the technical development are [9], [26] and [27].
+
+Paul Kelly
 
  [1] K. Xia, P.J. Kelly, G.E.W. Bauer, I. Turek, J. Kudrnovsky and V. Drchal, PRB63, 064407 (2001)
  [2] K. Xia, P.J. Kelly, G.E.W. Bauer, A. Brataas, and I. Turek, PRB65, 220401 (2002)
@@ -251,3 +255,4 @@ The most important publications documenting the technical development are [9], [
 [33] R.X. Liu, K. Gupta, Z. Yuan and P.J. Kelly, PRB106, 014401 (2022).
 [34] K. Gupta, R.X. Liu, R.J.H. Wesselink, Z. Yuan and P.J. Kelly, PRB106, 115425 (2022).
 [35] Y. Liu, P.T. Yang and P.J. Kelly, PRB109, 014416 (2024).
+[36] M. Rang, Z. Rang, ... P.J. Kelly, to be published.
