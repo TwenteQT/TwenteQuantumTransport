@@ -75,13 +75,9 @@ Contains
 
          Read (geof,*) geo%base(:, 1)!  The in-plane trans. vectors
          Read (geof,*) geo%base(:, 2)
-         write(*,*) geo%base(:, 2)
-         
          geo%base (:, 1) = geo%base(:, 1) * scx (1:2)!  Rescaling
-         geo%base (:, 2) = geo%base(:, 2) * scx (1:2)
-         
+         geo%base (:, 2) = geo%base(:, 2) * scx (1:2)         
          Read (geof,*) geo%perp_trans(1:3)
-         write(*,*) geo%perp_trans(1:3)
          geo%perp_trans = geo%perp_trans * scx
          geo%l_perp_trans = geo%perp_trans
          geo%r_perp_trans = geo%perp_trans
