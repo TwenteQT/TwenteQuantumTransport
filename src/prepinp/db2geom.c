@@ -1,8 +1,14 @@
+#include <stdio.h>
+#include <unistd.h>
+#include <ctype.h>
+
+
 #include "libgen.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <limits.h>
+
 
 #define MAXSTRLEN 31
 
@@ -165,7 +171,7 @@ int read_db_entry(t_db_entry *dbe, char *name, char *dbloc);
 void strallcpy(char **str2, char *str1);
 int read_db(t_db_entry **dbe, t_multilay *ml, char *dbloc);
 int read_val(t_var *var, char *valstr, t_multilay *ml);
-
+int scaninf(char *str);
 
 void alloc_basket(t_basket *a, int num) {
     a->num = num;
@@ -484,9 +490,9 @@ void read_bulk_turek(t_bulk *bulk, char *path, t_atomset *atoms) {
     scanv3(buf,FP,&bulk->tr[2][0]);
     LOGMSG(4,"tr3: %le %le %le",bulk->tr[2][0], bulk->tr[2][1], bulk->tr[2][2]);
     for (i=0; i<3; i++) {
+        bulk->tr[0][i] *= scaling[i];
         bulk->tr[1][i] *= scaling[i];
         bulk->tr[2][i] *= scaling[i];
-        bulk->tr[3][i] *= scaling[i];
     }
         LOGMSG(4,"tr1: %le %le %le",bulk->tr[0][0], bulk->tr[0][1], bulk->tr[0][2]);
         LOGMSG(4,"tr2: %le %le %le",bulk->tr[1][0], bulk->tr[1][1], bulk->tr[1][2]);
@@ -1843,7 +1849,7 @@ static void usage(void){
         fclose(fp);
     }*/
     
-    write_geom_i(t_config *conf, char *fname) {
+void  write_geom_i(t_config *conf, char *fname) {
         int i;
         FILE *fp;
 

@@ -97,13 +97,12 @@ int readinput(t_scgeom *geom, t_atomset *atoms){
 
     LOGMSG(2,"Done with INPGE!");
 
-
 //     Read "inpch"
     LOGMSG(2,"Reading INPCH...");
     FP=openread("inpch");
     fgets(buf,400,FP);
-
     for (site=(geom->site+geom->nb);site<(geom->site+geom->nb+geom->nat);site++){
+
         LOGMSG(3,"Processing atom %d",site);
         fgets(buf,400,FP);
         if(sscanf(buf,"%d",&(site->nc))!=1) COMPLAIN_EXIT;
@@ -114,7 +113,7 @@ int readinput(t_scgeom *geom, t_atomset *atoms){
             LOGMSG(3,"Loading %d-th concentration...",i);        
             fgets(buf,400,FP);
             if(sscanf(buf,"%s",label)!=1) COMPLAIN_EXIT;
-            LOGMSG(3,"Label = %s",label);        
+	    LOGMSG(3,"Label = %s",label);        
             fgets(buf,400,FP);
             if(sscanf(buf,"%le",(site->conc)+i)!=1) COMPLAIN_EXIT;
             LOGMSG(3,"Concentration = %le",site->conc[i]);
@@ -124,7 +123,6 @@ int readinput(t_scgeom *geom, t_atomset *atoms){
     };   
     fclose(FP);
     LOGMSG(2,"Done with INPCH!");
-
 //     Read "inpbu"
     LOGMSG(2,"Loading INPBU...");
     FP=openread("inpbu");
@@ -156,7 +154,6 @@ int readinput(t_scgeom *geom, t_atomset *atoms){
     };
     fclose(FP);    
     LOGMSG(2,"Done with INPBU!");
-
     // for (i=0;i<geom->tnat;i++){
     //         for (n=0;n<geom->site[i].nc;n++){
     //             printf("%s ", geom->site[i].at[n]->label);
@@ -303,7 +300,7 @@ int readinput2(t_scgeom *geom, t_atomset *atoms){
         extbf=(fgetc(FP)=='+')?1:0;
         fgets(buf,400,FP); //sink name line
         site1=NULL;
-   sksite= geom->sitesk;
+	sksite= geom->sitesk;
             if ( (extbf==1) || (site1==NULL)){
                 fgets(buf,400,FP);
                 if(sscanf(buf,"%d",&(sksite->nc))!=1) COMPLAIN_EXIT;
@@ -376,28 +373,31 @@ int readinput3(t_scgeom *geom, t_atomset *atoms){
     atoms->num=0;
     // ADDD EOF DETECTION EVERYWHERE!!!!!!!!!!!!!!!!
     //     Read "inpge"
-    LOGMSG(2,"Reading INPGE...");
-    
+    LOGMSG(2,"Reading INPGE...");      // Reading the geometry of the system from inpge.
+                                       // The format follows I.Turek SCGF interface code
     FP=openread("inpge");
-    fgets(buf,400,FP);
-    fgets(buf,400,FP);
+    fgets(buf,400,FP);                 // Header/comment line
+    fgets(buf,400,FP);                 // see the description of t_scgeom structure in libgen.h
     if(sscanf(buf,"%d %d %d",&(geom->np),&(geom->nb),&(geom->nmtr))!=3) COMPLAIN_EXIT;
-    fgets(buf,400,FP);
+    fgets(buf,400,FP);                                  
     if (sscanf(buf,"%le",&(geom->cr))!=1) COMPLAIN_EXIT;
     geom->nat=geom->np*geom->nb;
     geom->tnat=(geom->np+2)*geom->nb;
     scanv3(buf,FP,geom->scx);
     scanv2(buf,FP,geom->trv[0]);
     scanv2(buf,FP,geom->trv[1]);
+    printf("%f   %f\n",geom->trv[0][0],geom->trv[0][1]);
+    printf("%f   %f\n",geom->trv[1][0],geom->trv[1][1]);
     scanv3(buf,FP,geom->ltrans);
     scanv3(buf,FP,geom->rtrans);
     geom->ltrans[0]=-geom->ltrans[0];
     geom->ltrans[1]=-geom->ltrans[1];
     geom->ltrans[2]=-geom->ltrans[2];
     
-    geom->site=(t_scsite *)malloc(sizeof(t_scsite)*geom->tnat);
-    geom->sitesk=(t_sksite *)malloc(sizeof(t_sksite)*1);
-    geom->sitesk2=(t_sksite *)malloc(sizeof(t_sksite)*1);
+    geom->site=(t_scsite *)malloc(sizeof(t_scsite)*geom->tnat); // list of all sites in central region + ends of leads.
+    /* sitesk, sitesk correspond to layers generated in central region when -i or -i -j options are present  */
+    geom->sitesk=(t_sksite *)malloc(sizeof(t_sksite)*1);        //   
+    geom->sitesk2=(t_sksite *)malloc(sizeof(t_sksite)*1);       //
     geom->plane=(t_scsite **)malloc(sizeof(t_scsite *)*(geom->np+2));
     
     for (i=0;i<(geom->tnat);i++){
@@ -406,6 +406,10 @@ int readinput3(t_scgeom *geom, t_atomset *atoms){
         geom->site[i].rmask=1.0;
     };
     fclose(FP);
+
+    // geom->plane[i] is a pointer pointing to a beginning of ith PL
+    // of the system, plane[0] corrresponds to the first site of
+    // the last PL of the left lead, plane[1] to the first site of the scattering region
     geom->plane[0]=geom->site;
     for (i=0;i<=(geom->np);i++){
         geom->plane[i+1]=(geom->plane[i])+geom->nb;
@@ -580,15 +584,15 @@ t_atom *getatom(t_atomset *atoms,char *label){
     for (ptr=atoms->ptr;ptr!=NULL; ptr=(t_atom *)(ptr->next)){
         if (!strcmp(ptr->label,label)) break;
     }
-    LOGMSG(2,"Loading atomic file for %s...",label);
+    LOGMSG(2,"Loading atomic file for %s...",label);    
     
     // Add new atom
     if (ptr==NULL) {
         char buf[400];
         t_atom *nptr;
         sprintf(buf,"atoms/%s",label);
-        fl=fopen(buf,"r");
-        nptr=(t_atom *)malloc(sizeof(t_atom));        
+        fl=fopen(buf,"r");	
+        nptr=(t_atom *)malloc(sizeof(t_atom));
         fgets(buf,400,fl);
         fgets(buf,400,fl);
         fgets(buf,400,fl);
@@ -1141,7 +1145,7 @@ int get_cf_dists(t_trgeom *geom, int** ApI,int **AiI, double **res, int **idxI){
         int i,j;
         double x;
     // memset(disp1,0,sizeof(double)*n);   
-        for (i=0;i<n;++i) disp0[i]*=sqrt(abs(Dg[i]));
+        for (i=0;i<n;++i) disp0[i]*=sqrt(fabs(Dg[i]));
         memcpy(disp1,disp0,sizeof(double)*n);   
 
         for (i=0;i<n;++i){

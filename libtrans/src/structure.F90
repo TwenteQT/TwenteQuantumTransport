@@ -1113,13 +1113,12 @@ Contains
                Do i = 2, clslist%cls(neibs(s)%cl_idx)%nsites
                   pos (:, i) = clslist%cls(neibs(s)%cl_idx)%site(i)%rvec(:)
                End Do
-!!$                write(*,*) s
                Call SymMol (clslist%cls(neibs(s)%cl_idx)%nsites, 1.0d-2, pos, els, pgr)
                If (1 == 0) Then
                   Write (cwork, '("cls",i3.3,".dat")') s
                   Call dumpcls (pos(1:3, 1:clslist%cls(neibs(s)%cl_idx)%nsites), trim(cwork))
                End If
-               Write (cwork, '("pos: ",3(1x,g15.9)," at=",a10," CL=",i3," NNB=",i3," SYM=",a4)') &
+               Write (cwork, '("pos: ",3(1x,g15.8)," at=",a10," CL=",i3," NNB=",i3," SYM=",a4)') &
               & geom%atoms(s)%coord, trim (geom%atoms(s)%ptr%label), neibs(s)%cl_idx, &
               & clslist%cls(neibs(s)%cl_idx)%nsites, trim (pgr)
                Call do_log (tll, trim(cwork))

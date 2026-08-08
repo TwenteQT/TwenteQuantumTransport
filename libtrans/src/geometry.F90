@@ -54,12 +54,11 @@ Contains
          Type (t_atom_defenition), Pointer :: at
 100      Format (5 a16)
 101      Format (1 x, 10 i5)
-104      Format (1 x, 4 g15.9)
-105      Format (4 x, i1, 11 x, 1 x, 4 g15.9)
-106      Format (1 x, 3 g15.9)
+104      Format (1 x, 4 g15.8)
+105      Format (4 x, i1, 11 x, 1 x, 4 g15.8)
+106      Format (1 x, 3 g15.8)
 
          Call do_log (1, 'Reading geometry:'//filename)
-
          Open (Unit=geof, File=filename, Action='read')
 
          Read (geof, 100) cwork ! Skipping the comment line
@@ -76,10 +75,13 @@ Contains
 
          Read (geof,*) geo%base(:, 1)!  The in-plane trans. vectors
          Read (geof,*) geo%base(:, 2)
-
+         write(*,*) geo%base(:, 2)
+         
          geo%base (:, 1) = geo%base(:, 1) * scx (1:2)!  Rescaling
          geo%base (:, 2) = geo%base(:, 2) * scx (1:2)
+         
          Read (geof,*) geo%perp_trans(1:3)
+         write(*,*) geo%perp_trans(1:3)
          geo%perp_trans = geo%perp_trans * scx
          geo%l_perp_trans = geo%perp_trans
          geo%r_perp_trans = geo%perp_trans
@@ -294,13 +296,13 @@ Contains
          Write (repf, '(" NAT=",i5," TR_PAR=",i3)') geo%num, geo%ntrpar
          Write (repf, '(" Cutrat: ",f5.3)') geo%cutrat
          Write (repf, '(" Supercel size: ",2(I3,1x))') geo%sc_size
-         Write (repf, '(" Base: ",2(g15.9,1x))') geo%base(:, 1)
-         Write (repf, '("       ",2(g15.9,1x))') geo%base(:, 2)
-         Write (repf, '("        TR_PERP_VEC: ",3(g15.9,1x))') geo%perp_trans
+         Write (repf, '(" Base: ",2(g15.8,1x))') geo%base(:, 1)
+         Write (repf, '("       ",2(g15.8,1x))') geo%base(:, 2)
+         Write (repf, '("        TR_PERP_VEC: ",3(g15.8,1x))') geo%perp_trans
          Write (repf, '(" Left side:  TR_PERP=",i3," trans.atoms=",i5)') geo%l_ntrperp, geo%l_transnum
-         Write (repf, '("             TR_PERP_VEC: ",3(g15.9,1x))') geo%l_perp_trans
+         Write (repf, '("             TR_PERP_VEC: ",3(g15.8,1x))') geo%l_perp_trans
          Write (repf, '(" Right side: TR_PERP=",i3," trans.atoms=",i5)') geo%r_ntrperp, geo%r_transnum
-         Write (repf, '("             TR_PERP_VEC: ",3(g15.9,1x))') geo%r_perp_trans
+         Write (repf, '("             TR_PERP_VEC: ",3(g15.8,1x))') geo%r_perp_trans
          If (Log_Level < 3) Return
          Write (repf, '(" Atoms:")')
          Do s = 1, geo%num
@@ -325,13 +327,13 @@ Contains
          Write (repf, '(" NAT=",i5," TR_PAR=",i3)') geo%num, geo%ntrpar
          Write (repf, '(" Cutrat: ",f5.3)') geo%cutrat
          Write (repf, '(" Supercel size: ",2(I3,1x))') geo%sc_size
-         Write (repf, '(" Base: ",2(g15.9,1x))') geo%base(:, 1) !temp /geo%alat
-         Write (repf, '("       ",2(g15.9,1x))') geo%base(:, 2) !temp /geo%alat
-         Write (repf, '("        TR_PERP_VEC: ",3(g15.9,1x))') geo%perp_trans
+         Write (repf, '(" Base: ",2(g15.8,1x))') geo%base(:, 1) !temp /geo%alat
+         Write (repf, '("       ",2(g15.8,1x))') geo%base(:, 2) !temp /geo%alat
+         Write (repf, '("        TR_PERP_VEC: ",3(g15.8,1x))') geo%perp_trans
          Write (repf, '(" Left side:  TR_PERP=",i3," trans.atoms=",i5)') geo%l_ntrperp, geo%l_transnum
-         Write (repf, '("             TR_PERP_VEC: ",3(g15.9,1x))') geo%l_perp_trans
+         Write (repf, '("             TR_PERP_VEC: ",3(g15.8,1x))') geo%l_perp_trans
          Write (repf, '(" Right side: TR_PERP=",i3," trans.atoms=",i5)') geo%r_ntrperp, geo%r_transnum
-         Write (repf, '("             TR_PERP_VEC: ",3(g15.9,1x))') geo%r_perp_trans
+         Write (repf, '("             TR_PERP_VEC: ",3(g15.8,1x))') geo%r_perp_trans
          If (Log_Level < 3) Return
          Write (repf, '(" Atoms:")')
          Do s = 1, geo%num

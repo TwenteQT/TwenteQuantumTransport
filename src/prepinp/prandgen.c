@@ -18,7 +18,7 @@ void extrafields(t_trgeom *geom);
 static void usage(void);
 void readopts(int argc, char *argv[], t_opt *par);
 
-//inline int genscdist(t_scsite *plane,t_trsite  *isite,double (*tr)[2],double *ofs,int nx,int ny,int nb, int ord, int pidx,int **kind, int ko){
+
 int genscdist(t_scsite *plane,t_trsite  *isite,double (*tr)[2],double *ofs,int nx,int ny,int nb, int ord, int pidx,int **kind, int ko){
     int j,at,nn,l,p;
     double pr;
@@ -26,15 +26,15 @@ int genscdist(t_scsite *plane,t_trsite  *isite,double (*tr)[2],double *ofs,int n
 
     site=isite;
     if (ord!=0)     
-    for (at=0;at<nb;at++){
-        for (j=0;j<ny;j++){
-            for (l=0;l<nx;l++)
+      for (at=0;at<nb;at++){ // loop over atoms within PL
+        for (j=0;j<ny;j++){  // second in-plane primitive vector
+	  for (l=0;l<nx;l++) // first in-plane vec.
             {
-
-                // printf("%d, %s, %s\n",at,(plane+at)->at[kind[at][nx*j+l]]->label,(plane+at)->at[0]->label);
+	      // coordinates of original atoms + translations
                 site->coord[0]=(plane+at)->coord[0]+l*tr[0][0]+j*tr[1][0]+ofs[0];
                 site->coord[1]=(plane+at)->coord[1]+l*tr[0][1]+j*tr[1][1]+ofs[1];
                 site->coord[2]=(plane+at)->coord[2]+ofs[2];
+		// read in the atom/element definition
                 site->at=(plane+at)->at[kind[at][nx*j+l+ko]];
                 site->pidx=pidx;
                 site->mask=1;
@@ -47,7 +47,7 @@ int genscdist(t_scsite *plane,t_trsite  *isite,double (*tr)[2],double *ofs,int n
         };
     }
     else
-    for (j=0;j<ny;j++){
+      for (j=0;j<ny;j++){  // the loops in alternative order
         for (l=0;l<nx;l++){
             for (at=0;at<nb;at++)
             {
@@ -191,18 +191,18 @@ void genchemdist(t_scsite *plane, int N, int nb, int **kind, int ko)
     double pr;
     LOGMSG(5,"genchemdist start for N=%d, nb=%d, ko=%d",N,nb,ko);
         for (j=0;j<nb;++j){
-            memset(kind[j]+ko,0,sizeof(int)*N); 
+	  memset(kind[j]+ko,0,sizeof(int)*N); // overwrites row of kind matrix w zeros
             LOGMSG(8,"genchemdist2: j=%d, nc=%d",j,((plane+j)->nc));
             for (at=1;at<((plane+j)->nc);at++) {
                 nn=round(((plane+j)->conc[at])*N);
 //                printf("%d,%d,%d\n",nn,N,at);
                 l=0;
-                while (l<nn) {
+                while (l<nn) {                  // increase the counter until the required concentration for this plane is reached
                     pr=drand48()-1e-16;
-                    p=floor(N*pr);
-                    if (kind[j][p+ko]==0){
-                        l++;
-                        kind[j][p+ko]=at;
+                    p=floor(N*pr);              // select one of the N sites randomly
+                    if (kind[j][p+ko]==0){      // Is there an atom assigne to this site yet?
+		      l++;                      // If no then increase the counter 
+		      kind[j][p+ko]=at;         // and set kind (of atom/element) for the current site 
                     };
                 };
             };
@@ -212,7 +212,6 @@ void genchemdist(t_scsite *plane, int N, int nb, int **kind, int ko)
 
 
 void maketrgeom(t_scgeom *inge, t_trgeom *geom, t_trgeom *lg, t_trgeom *rg, int nx,int ny,int nlb,int nrb, int ord,int reps,int repn,int nreps,int nskip,int plord){
-
     int na,N,nn,i,j,k,pl,l;
     double ofs[3]={0,0,0};
     double ofs0[3]={0,0,0};
@@ -227,34 +226,50 @@ void maketrgeom(t_scgeom *inge, t_trgeom *geom, t_trgeom *lg, t_trgeom *rg, int 
     repe=reps+repn;
     N=nx*ny;
     LOGMSG(5,"maketransgen call, N=%d, repe=%d, inge->nb=%d, nreps=%d,repn=%d, reps=%d",N,repe,inge->nb,nreps,repn,reps);
-    
-    kind=malloc(sizeof(int *)*inge->nb);
+
+    // kind - will contain information about chemical disorder    
+    kind=malloc(sizeof(int *)*inge->nb); // vector of *int pointers
     
     LOGMSG(5,"");
-    
+
+    // now we allocate a vector of integers starting at each kind[i] position
+    // It is called an array an in less refined languages
     for(i = 0; i < inge->nb; ++i)
     {
         kind[i]=malloc(sizeof(int)*N*nreps*MAX(repn,1));
     }
-    
-    // printf("%d\n",inge->nb*repn*(nreps-1));
-    na=(inge->nat+inge->nb*nlb+inge->nb*nrb+inge->nb*repn*(nreps-1))*N;
-    // printf("%d, %d, %d, %d, %d, %d\n",reps,repe,repn,nreps,na);
 
+    // na - number of atoms in:
+    //  nat*N - central region  
+    //  nb*nlb*N - left padding layer (nlb PLs of the left lead material)
+    //  nb*nrb*N  - right  padding layer (nrb PLs of the right lead material)
+    //  nb*repn*(nreps-1)*N extended part of the central region
+    //  N is the size od the lateral supercell
+    na=(inge->nat+inge->nb*nlb+inge->nb*nrb+inge->nb*repn*(nreps-1))*N;
+
+    // site - vector of all the sites (na) in the expanded central region
     LOGMSG(5,"maketransgen call, NA=%d",na);
     geom->site=(t_trsite  *)malloc(sizeof(t_trsite )*na);    
     
     nn=0;
     pl=0;
+    // Here we generate supercell sites for the left padding
     for (i=0;i<nlb;i++){
+      // out of plane offset/translation for left padding region
+      // we add one translation per iteration
         ofs[0]+=inge->ltrans[0];ofs[1]+=inge->ltrans[1];ofs[2]+=inge->ltrans[2];
+	// Generate chemical disorder. Distribute the elements over the lateral supercell
+	// so that expected concentrations are maintained
         genchemdist(inge->plane[0], N, inge->nb, kind,0);
+	// Generate the supercell sites and assigns elements according to kind values
+	// The function returns the number of sites (nn) in PL
         nn+=genscdist(inge->plane[0],geom->site+nn,inge->trv,ofs,nx,ny,inge->nb, ord,pl,kind,0);
-        pl++;
+        pl++; // PL index (?)
     }        
 
     LOGMSG(5,"maketransgen plane idx after left replication %d",pl);
-    
+
+    // As above for the PLs befor the start of the repeated slab
     for (i=0;i<(reps);i++){
         genchemdist(inge->plane[i+1], N, inge->nb, kind,0);
         nn+=genscdist(inge->plane[i+1],geom->site+nn,inge->trv,ofs,nx,ny,inge->nb, ord,pl,kind,0);
@@ -264,13 +279,15 @@ void maketrgeom(t_scgeom *inge, t_trgeom *geom, t_trgeom *lg, t_trgeom *rg, int 
     LOGMSG(5,"maketransgen plane idx after left base %d",pl);
     
     if ((repn>0)) {
+      // Calculate the translation for copying the slab
         for (i=0;i<3;++i) {
             trans[i]=(inge->plane[repe+1]->coord[i])-(inge->plane[reps+1]->coord[i]);
         }
         LOGMSG(2,"will perform replication with tv=[%le,%le,%le]",trans[0],trans[1],trans[2]);
 
+	// Chemical disorder introduced either per PL or per slab
         for (i=reps;i<repe;i++) {
-            if (plord==0){
+            if (plord==0) {
                 genchemdist(inge->plane[i+1], N*nreps, inge->nb, kind, N*nreps*(i-reps));
             }else{
                 for(l=0;l<nreps;l++){
@@ -278,11 +295,11 @@ void maketrgeom(t_scgeom *inge, t_trgeom *geom, t_trgeom *lg, t_trgeom *rg, int 
                 }
             }
         }
+	// Now the coordinates for the supercell copied and translated forward nreps times
         for (l=0;l<nreps;l++) {
             if (l>0) {ofs[0]+=trans[0];ofs[1]+=trans[1];ofs[2]+=trans[2];}
             for (i=reps;i<repe;i++) {
-                    nn+=genscdist(inge->plane[i+1],geom->site+nn,inge->trv,ofs,nx,ny,inge->nb, ord,pl,kind,N*l+N*nreps*(i-reps));
-                    
+                    nn+=genscdist(inge->plane[i+1],geom->site+nn,inge->trv,ofs,nx,ny,inge->nb, ord,pl,kind,N*l+N*nreps*(i-reps));                    
                     pl++;                    
             }
         }
@@ -573,6 +590,8 @@ void extrafields(t_trgeom *geom){
     }
 
     void readopts(int argc, char *argv[], t_opt *par){
+      //      argc and *argc[] are predefined in C standard and contain the command line options.
+      //      argc if the number of options
         int opt, iproc=0;
         char *st1,*st2;
         char buf[400];
@@ -594,12 +613,13 @@ void extrafields(t_trgeom *geom){
             {0, 0, 0, 0}
           };
         /* getopt_long stores the option index here. */
-        int option_index = 0;
+	int option_index = 0;
 
-        par->ny=par->nx=1;
-        par->lbnl=par->rbnl=0;
-        par->ord=0;
-        par->vis=1;
+        par->ny=par->nx=1;      // nx x ny is the supercell size
+        par->lbnl=par->rbnl=0;  // number of bulk layers to be added from the left/right side 
+        par->ord=0;             // order when generating in-plane supercell sites in the center: 
+	                        // iterate first the translations or the sites of the original PL
+        par->vis=1;            
         par->mask=0;
         par->scl=1.0;
         par->Tdeb=par->TK=-1.;
@@ -808,7 +828,7 @@ void extrafields(t_trgeom *geom){
         printf("Bulk layers to add: Left=%d,Right=%d\n",par->lbnl,par->rbnl);
         printf("SC Ordering       : %s\n",(par->ord==0)?"Default":"Alternative");
         printf("Fix concentration : %s\n",(par->plord==0)?"per slab":"per layer");            
-        
+
         printf("Clean side-layers : %d\n",par->skip_dis);
     // printf("Scaling factor = %f, ordering = %d (0 - default)\n",par->scl,par->ord);
         if (par->Tdeb>=0.0) {
@@ -854,39 +874,37 @@ void extrafields(t_trgeom *geom){
         t_visdat vis;
         LOGMSG(2,"Supercell generator\n");
         initrnd();
-        readopts(argc, argv, &par);
-
+        readopts(argc, argv, &par);                /* Read the command line options and store them in par structure.  */                   
         LOGMSG(1,"Finished options processing");
-        if(par.pin==1.0){
-            readinput2(&scgeo, &atoms);
-        }
-        else if(par.pin==2.0){
-            readinput3(&scgeo, &atoms);
-        }
-        else{
-            readinput(&scgeo, &atoms);
-        }
-        LOGMSG(1,"Input information is loaded");
 
+
+	/* printf("reps= %d   repn= %d  nreps= %d \n ",par.reps,par.repn,par.nreps); */
+	
+        if(par.pin==1.0) {                         // Read the inpge, inpch and inpbu files (default)   
+	  readinput2(&scgeo, &atoms);             // Read additional inpsk (and inpsk2) when -i (and -j) with argumrents are present  
+        }                                         // These fill some of the layers in the central region with elements defined in inpsk(2) 
+        else if(par.pin==2.0) {                    // creating a multilayer stacked in the direction normal to the transport direction.
+	  readinput3(&scgeo, &atoms);              // This can by used to define slab (as X/Vac bilayer).}
+	} 
+        else{
+          readinput(&scgeo, &atoms);
+        }
+	
+        LOGMSG(1,"Input information is loaded");
 
         loadmasks(&scgeo,par.rotmask,par.vibmask);
         LOGMSG(1,"Masks are loaded");
-
         
-        if (par.dimcf>0.0) scgeo.dimcf=par.dimcf;
-
-    //     if (mdef!=0.) printf("umsqr=%f, %f\n",devmeansqr(TK,Tdeb,mdef)/dimcf*sqrt(3.),devmeansqr(TK,Tdeb,mdef)/rawsr*sqrt(3.));
-    // if (mdef!=0.) printf("umsqr=%f, %f\n",devmeansqr(TK,Tdeb,mdef)/dimcf*sqrt(3.),devmeansqr(TK,Tdeb,mdef)/rawsr*sqrt(3.));
+        if (par.dimcf>0.0) scgeo.dimcf=par.dimcf; // unit of length/scaling of the coordinates in inpge and geom_* files
+	
+	// The generation of the supercell in the central region, optionally prolongued and padded with bulk layers to the left and/or right
+	// The chemical, posotional and magnetic disorder are added at this point
         maketrgeom(&scgeo, &mgeom, &lg, &rg, par.nx,par.ny,par.lbnl,par.rbnl, par.ord,par.reps,par.repn,par.nreps,par.skip_dis,par.plord);
         LOGMSG(5,"WA1");
 
         writeatomlist(&atoms);
         LOGMSG(5,"WA2");
         if(par.pin==1.0){
- //           printf("sink:%s\n",par.sink);
-//            genpingeom(&mgeom,par.nlayer,par.sink,1);
-//            genpingeom(&lg,par.nlayer,par.sink,0);
-//            genpingeom(&rg,par.nlayer,par.sink,0);
             genpingeom(&mgeom,&scgeo,par.nlayer,1);
             genpingeom(&lg,&scgeo,par.nlayer,0);
             genpingeom(&rg,&scgeo,par.nlayer,0);

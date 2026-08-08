@@ -35,7 +35,7 @@ CDP=-D
 #SCALAPACK= -lmkl_scalapack_lp64  -lmkl_blacs_intelmpi_lp64
 #SCALAPACK= -L/usr/lib/x86_64-linux-gnu/ -lscalapack-openmpi
 
-LD_LOCAL=/home/maz/local
+LD_LOCAL=/home/maz/local2
 
 INCHDF5=-I$(LD_LOCAL)/hdf5/include/
 HDF5LIB= -L$(LD_LOCAL)/hdf5/lib -lhdf5_hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5
@@ -48,8 +48,8 @@ XTRA_LIB =
 
 #Use available dbl-complex MUMPS library
 SP_SOLVER=USE_ZMUMPS 
-SOLVER_INC=-I$(LD_LOCAL)/mumps/include/ -I$(LD_LOCAL)/metis/include/
-SOLVER_LIB=-L$(LD_LOCAL)/mumps/lib/ -L$(LD_LOCAL)/metis/lib/ -lzmumps -lmumps_common -lparmetis -lmetis -lGKlib -lpord
+SOLVER_INC=-I$(LD_LOCAL)/include/ -I$(LD_LOCAL)/metis/include/
+SOLVER_LIB=-L$(LD_LOCAL)/lib/ -L$(LD_LOCAL)/metis/lib/ -lzmumps -lmumps_common -lparmetis -lmetis -lGKlib -lpord
 #        -lptesmumps # -lptscotch -lptscotcherr -lscotch -lscotcherr
 
 #SOLVER_LIB=-lzmumps -lmumps_common -lpord 

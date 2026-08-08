@@ -1,9 +1,14 @@
+    /* This program reads input files (in the format of I.Turek interface code) from ./base subdirectory       */
+    /* and sets up the inputs for the system with a number of pricipal layers (PLs) repeated. The range of PLs */
+    /* to be repeated and the number of repetitions are given as arguments at the command line.                */
 #include <sys/stat.h>   
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
 #include <time.h>
+
+/* Various macros/functions defined below for reading/writing lines of the files etc. */
 
 #define scanv3l(f,a,lb) fgets(buf,400,f);sscanf(buf,"%le %le %le %s",(a)+0,(a)+1,(a)+2,lb);
 
@@ -72,89 +77,91 @@ int main(int argc, char *argv[])
 
     int rbl,lbl;
 
-    if (argc<4) {
+    if (argc<4) {             /* Checks for the right number of arguments. arcp[0] is the name of the executable itsels. */
         printf("Usage: %s Nstart Nnum Nrep\n",argv[0]);
         exit(1);
     }
-    nstart=atoi(argv[1])-1;
-    nend=atoi(argv[2])+nstart;
-    nrep=atoi(argv[3])+1;	
+    nstart=atoi(argv[1])-1;                 /*  nstart is the number of PLs before the start of the repeated slice */
+    nend=atoi(argv[2])+nstart;              /*  The last PL to be repeated */
+    nrep=atoi(argv[3])+1;	            /* How many repetitions */
     if (nrep<1) {
         printf("Error! Nrep must be >=0");
         exit(1);
     }
-    dirn=argv[3];
+    dirn=argv[3];    
 
 
-    openinp(FP,"base/inpge");
+    openinp(FP,"base/inpge");                          /* reading the initial geometry number of PL, sites per PL, prymitive vectors etc. */
     scanline(FP,"");
     scanline(FP,"%d %d %d",&np,&nb,&nmtr);  
     scanline(FP,"%le",&cr);
-    nat=np*nb;  
+    nat=np*nb;                                         /* nat = total number of at. sites;    */  
     scanv3(FP,scx);
     scanv2(FP,tr1);
     scanv2(FP,tr2);
     scanv3(FP,ltr);
     scanv3(FP,rtr);
-    coord=(double *)malloc(sizeof(double)*nat*3);
+    coord=(double *)malloc(sizeof(double)*nat*3);            /* Coordinates */
 
 
-    natk=(int *)calloc(nat,sizeof(int));
-    conc=(double **)calloc(nat,sizeof(double*));
-    label=(char ***)calloc(nat,sizeof(char **));
+    natk=(int *)calloc(nat,sizeof(int));                    /* natk[i]=Number of atoms per site (in case of CPA) */  
+    conc=(double **)calloc(nat,sizeof(double*));            /* Concentrations. Here a vector (length nat) of pointers is allocated.*/
+    label=(char ***)calloc(nat,sizeof(char **));            /* Ditto for atomic labels */
     glabel=(char **)calloc(nat,sizeof(char *));
 
-    openinp(FPc,"base/inpch");
+    openinp(FPc,"base/inpch");                             /* Reading chemical composition */       
     scanline(FPc,"");
     mna=0;
-    for (i=0;i<nat;i++){
-        scanline(FPc,"%d",natk+i);
-        conc[i]=(double *)calloc(natk[i],sizeof(double));
-        label[i]=(char **)calloc(natk[i],sizeof(char *));
+    for (i=0;i<nat;i++){                                   /* Loop over atomic sites */
+      scanline(FPc,"%d",natk+i);                           /* Read the number of elements per site */
+      conc[i]=(double *)calloc(natk[i],sizeof(double));    /* Allocate appropriate vector holding concentrations */
+      label[i]=(char **)calloc(natk[i],sizeof(char *));
         glabel[i]=(char *)calloc(30,sizeof(char));
         glabel[i][0]=0;
-        for (j=0;j<natk[i];j++){
+        for (j=0;j<natk[i];j++){                              /* Loop over different elements populating site i  */
             label[i][j]=(char *)calloc(30,sizeof(char));    
             scanline(FPc,"%s",label[i][j]);
             // printf("%s\n",label[i][j]);
-            scanline(FPc,"%le",conc[i]+j);
+            scanline(FPc,"%le",conc[i]+j);                   /* Read the concentration, conc[i]+j is pointer arithmetics, basicaly equals conc[i][j] */
             strcat(glabel[i],label[i][j]);
             mna++;
         }
     }  
     fclose(FPc);
 
+     /* Begins to write a new inpge. So far the only czange is the number of principal layers/ */
     startwrite(FPg,"inpge",(np+(nrep-1)*(nend-nstart)),nb,nmtr,cr,scx,tr1,tr2,ltr,rtr);
 
-    FPco=fopen("inpch","w");
+    FPco=fopen("inpch","w"); /* Opens new inpch */
 
     fprintf(FPco,"------ CHEMICAL OCCUPATIONS:\n");
-
-    for (i=0;i<nb;i++) {
+    
+    for (i=0;i<nb;i++) {     /* Copies the coordinates of the PL of the left lead.  */       
         scanv3l(FP,pos,buf1);
         fpvec3(FPg,pos,buf1);
     }
 
-    for (i=0;i<nat;i++) {
+    for (i=0;i<nat;i++) {   /* Reads in the coordinates of the central part */
         scanv3(FP,(coord+3*i));
     }
 
 
-    for (i=0;i<3;++i) {
+    for (i=0;i<3;++i) {     /* Now we figure out the translation from the beggining to the end of the repeated section. */
         trans[i]=coord[3*nb*nend+i]-coord[3*nb*nstart+i];
     }
 
-
-    for (i=0;i<nstart;i++) {
-        for (j=0;j<nb;++j){
-            fpvec3(FPg,(coord+3*(nb*i+j)),glabel[nb*i+j]);
-            wrconc(nb*i+j);
+    
+    for (i=0;i<nstart;i++) {  /* The coordinates of the sites in PLs before the repeated region.  */
+      for (j=0;j<nb;++j){     /* Unchanged from oryginal */
+	fpvec3(FPg,(coord+3*(nb*i+j)),glabel[nb*i+j]);
+	wrconc(nb*i+j);
 
         }
     }
 
-    for (l=0;l<nrep;l++) {
+    for (l=0;l<nrep;l++) {               /* The PL from nstart to nend are repeated (with trnslation) nrep times  */
         for (i=nstart;i<nend;i++) {
+	  /* fprintf(FPg,"l=%d , i= %d \n ",l,i); */
             for (j=0;j<nb;++j){
                 getcoordz(pos,coord+3*(nb*i+j),trans,l);
                 fpvec3(FPg,pos,glabel[nb*i+j]);
@@ -164,7 +171,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    for (i=nend;i<np;i++) {
+    /* fprintf(FPg, " End of the extended region. \n "); */
+	
+    for (i=nend;i<np;i++) {            /* The remainig PL of the scattering region translated appropiately */         
         for (j=0;j<nb;++j){
             getcoordz(pos, (coord+3*(nb*i+j)),trans,nrep-1);
             fpvec3(FPg,pos,glabel[nb*i+j]);
@@ -173,7 +182,7 @@ int main(int argc, char *argv[])
     }
 
 
-    for (i=0;i<nb;i++) {
+    for (i=0;i<nb;i++) {              /* And the riht lead  */
         scanv3l(FP,pos,buf1);
         getcoordz(pos, pos,trans,nrep-1);		
         fpvec3(FPg,pos,buf1);
@@ -184,53 +193,53 @@ int main(int argc, char *argv[])
 
     openinp(FP,"base/inpbu");
 
-    FPco=fopen("inpbu","w");
-    extbf=(fgetc(FP)=='+')?1:0;
+    FPco=fopen("inpbu","w");                       /* inpbu describe the chemical composition of the leads */
+    extbf=(fgetc(FP)=='+')?1:0;                    /* seemingly copied line by line from the original */
     fputc((extbf)?'+':' ',FPco);
     scanline(FP,"");
-    fprintf(FPco,buf);	
+    fprintf(FPco,"%s",buf);	
     for (l=0;l<((extbf)?nb:1);l++){
         scanline(FP,"%d",&lbl);
-        fprintf(FPco,buf);		
+        fprintf(FPco,"%s",buf);		
         for (i=0;i<lbl;++i){
             scanline(FP,""); /* read concentration here if need */
-            fprintf(FPco,buf);			
+            fprintf(FPco,"%s",buf);			
             scanline(FP,"");
-            fprintf(FPco,buf);			
+            fprintf(FPco,"%s",buf);			
         }
     }
     scanline(FP,"");
-    fprintf(FPco,buf);		
+    fprintf(FPco,"%s",buf);		
     for (l=0;l<((extbf)?nb:1);l++){
         scanline(FP,"%d",&rbl);
-        fprintf(FPco,buf);		
+        fprintf(FPco,"%s",buf);		
         for (i=0;i<rbl;++i){
             scanline(FP,""); /* read concentration here if need  */
-            fprintf(FPco,buf);			
+            fprintf(FPco,"%s",buf);			
             scanline(FP,"");
-            fprintf(FPco,buf);			
+            fprintf(FPco,"%s",buf);			
         }
     }
     fclose(FP);
 
     fprintf(FPco,"-------=========== END OF BULK ===========-------\n");
     fclose(FPco);
- /////////////////////injection////////////
-    openinp(FP,"base/inpsk");
+    /////////////////////injection//////////// /* The rest of the code copies the inpsk and inpsk2 files line by line */
+    openinp(FP,"base/inpsk");                  /* from the files in ./base. I see no function here. It's likely a placeholder to be modified when needed   */
     
-    FPco=fopen("inpsk","w");
+    FPco=fopen("inpsk","w");                 
     extbf=(fgetc(FP)=='+')?1:0;
     fputc((extbf)?'+':' ',FPco);
     scanline(FP,"");
-    fprintf(FPco,buf);
+    fprintf(FPco,"%s",buf);
     for (l=0;l<((extbf)?nb:1);l++){
         scanline(FP,"%d",&lbl);
-        fprintf(FPco,buf);
+        fprintf(FPco,"%s",buf);
         for (i=0;i<lbl;++i){
             scanline(FP,""); /* read concentration here if need */
-            fprintf(FPco,buf);
+            fprintf(FPco,"%s",buf);
             scanline(FP,"");
-            fprintf(FPco,buf);
+            fprintf(FPco,"%s",buf);
         }
     }
     fclose(FP);
@@ -244,15 +253,15 @@ int main(int argc, char *argv[])
     extbf=(fgetc(FP)=='+')?1:0;
     fputc((extbf)?'+':' ',FPco);
     scanline(FP,"");
-    fprintf(FPco,buf);
+    fprintf(FPco,"%s",buf);
     for (l=0;l<((extbf)?nb:1);l++){
         scanline(FP,"%d",&lbl);
-        fprintf(FPco,buf);
+        fprintf(FPco,"%s",buf);
         for (i=0;i<lbl;++i){
             scanline(FP,""); /* read concentration here if need */
-            fprintf(FPco,buf);
+            fprintf(FPco,"%s",buf);
             scanline(FP,"");
-            fprintf(FPco,buf);
+            fprintf(FPco,"%s",buf);
         }
     }
     fclose(FP);
