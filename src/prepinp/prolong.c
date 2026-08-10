@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
 
     int rbl,lbl;
 
-    if (argc<4) {             /* Checks for the right number of arguments. arcp[0] is the name of the executable itsels. */
+    if (argc<4) {             /* Check number of arguments. argv[0] is the executable name. */
         printf("Usage: %s Nstart Nnum Nrep\n",argv[0]);
         exit(1);
     }
@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
     nend=atoi(argv[2])+nstart;              /*  The last PL to be repeated */
     nrep=atoi(argv[3])+1;	            /* How many repetitions */
     if (nrep<1) {
-        printf("Error! Nrep must be >=0");
+        printf("Error! Nrep must be >= 0\n");
         exit(1);
     }
     dirn=argv[3];    
@@ -129,7 +129,7 @@ int main(int argc, char *argv[])
     }  
     fclose(FPc);
 
-     /* Begins to write a new inpge. So far the only czange is the number of principal layers/ */
+     /* Begins to write a new inpge. So far the only change is the number of principal layers */
     startwrite(FPg,"inpge",(np+(nrep-1)*(nend-nstart)),nb,nmtr,cr,scx,tr1,tr2,ltr,rtr);
 
     FPco=fopen("inpch","w"); /* Opens new inpch */
@@ -141,27 +141,27 @@ int main(int argc, char *argv[])
         fpvec3(FPg,pos,buf1);
     }
 
-    for (i=0;i<nat;i++) {   /* Reads in the coordinates of the central part */
+    for (i=0;i<nat;i++) {   /* Read coordinates of the central part */
         scanv3(FP,(coord+3*i));
     }
 
 
-    for (i=0;i<3;++i) {     /* Now we figure out the translation from the beggining to the end of the repeated section. */
+    for (i=0;i<3;++i) {     /* Compute the translation from the beginning to the end of the repeated section. */
         trans[i]=coord[3*nb*nend+i]-coord[3*nb*nstart+i];
     }
 
     
     for (i=0;i<nstart;i++) {  /* The coordinates of the sites in PLs before the repeated region.  */
-      for (j=0;j<nb;++j){     /* Unchanged from oryginal */
+      for (j=0;j<nb;++j){     /* Unchanged from original */
 	fpvec3(FPg,(coord+3*(nb*i+j)),glabel[nb*i+j]);
 	wrconc(nb*i+j);
 
         }
     }
 
-    for (l=0;l<nrep;l++) {               /* The PL from nstart to nend are repeated (with trnslation) nrep times  */
+    for (l=0;l<nrep;l++) {               /* The PLs from nstart to nend are repeated (with translation) nrep times. */
         for (i=nstart;i<nend;i++) {
-	  /* fprintf(FPg,"l=%d , i= %d \n ",l,i); */
+  	  /* fprintf(FPg,"l=%d , i= %d : ",l,i); */
             for (j=0;j<nb;++j){
                 getcoordz(pos,coord+3*(nb*i+j),trans,l);
                 fpvec3(FPg,pos,glabel[nb*i+j]);
@@ -172,8 +172,8 @@ int main(int argc, char *argv[])
     }
 
     /* fprintf(FPg, " End of the extended region. \n "); */
-	
-    for (i=nend;i<np;i++) {            /* The remainig PL of the scattering region translated appropiately */         
+    	
+    for (i=nend;i<np;i++) {            /* The remaining PLs of the scattering region translated appropriately */         
         for (j=0;j<nb;++j){
             getcoordz(pos, (coord+3*(nb*i+j)),trans,nrep-1);
             fpvec3(FPg,pos,glabel[nb*i+j]);
@@ -182,7 +182,7 @@ int main(int argc, char *argv[])
     }
 
 
-    for (i=0;i<nb;i++) {              /* And the riht lead  */
+    for (i=0;i<nb;i++) {              /* And the right lead  */
         scanv3l(FP,pos,buf1);
         getcoordz(pos, pos,trans,nrep-1);		
         fpvec3(FPg,pos,buf1);
