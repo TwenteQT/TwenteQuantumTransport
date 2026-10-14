@@ -84,6 +84,8 @@ int main(int argc, char *argv[])
     nstart=atoi(argv[1])-1;                 /*  nstart is the number of PLs before the start of the repeated slice */
     nend=atoi(argv[2])+nstart;              /*  The last PL to be repeated */
     nrep=atoi(argv[3])+1;	            /* How many repetitions */
+    /* printf("%d %d %d",nstart,nend,nrep); */
+    
     if (nrep<1) {
         printf("Error! Nrep must be >= 0\n");
         exit(1);
@@ -101,7 +103,7 @@ int main(int argc, char *argv[])
     scanv2(FP,tr2);
     scanv3(FP,ltr);
     scanv3(FP,rtr);
-    coord=(double *)malloc(sizeof(double)*nat*3);            /* Coordinates */
+    coord=(double *)malloc(sizeof(double)*nat*3);            /* Coordinates (as one long vector because a (3,nat) matrix would less stylish) */
 
 
     natk=(int *)calloc(nat,sizeof(int));                    /* natk[i]=Number of atoms per site (in case of CPA) */  
@@ -136,7 +138,7 @@ int main(int argc, char *argv[])
 
     fprintf(FPco,"------ CHEMICAL OCCUPATIONS:\n");
     
-    for (i=0;i<nb;i++) {     /* Copies the coordinates of the PL of the left lead.  */       
+    for (i=0;i<nb;i++) {     /* Copies the coordinates of the single PL of the left lead.  */       
         scanv3l(FP,pos,buf1);
         fpvec3(FPg,pos,buf1);
     }
@@ -144,7 +146,6 @@ int main(int argc, char *argv[])
     for (i=0;i<nat;i++) {   /* Read coordinates of the central part */
         scanv3(FP,(coord+3*i));
     }
-
 
     for (i=0;i<3;++i) {     /* Compute the translation from the beginning to the end of the repeated section. */
         trans[i]=coord[3*nb*nend+i]-coord[3*nb*nstart+i];

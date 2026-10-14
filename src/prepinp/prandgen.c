@@ -253,7 +253,7 @@ void maketrgeom(t_scgeom *inge, t_trgeom *geom, t_trgeom *lg, t_trgeom *rg, int 
     
     nn=0;
     pl=0;
-    // Here we generate supercell sites for the left padding
+    // Here we generate supercell sites for the left padding (-l or -b option)
     for (i=0;i<nlb;i++){
       // out of plane offset/translation for left padding region
       // we add one translation per iteration
@@ -286,9 +286,9 @@ void maketrgeom(t_scgeom *inge, t_trgeom *geom, t_trgeom *lg, t_trgeom *rg, int 
         LOGMSG(2,"will perform replication with tv=[%le,%le,%le]",trans[0],trans[1],trans[2]);
 
 	// Chemical disorder introduced either per PL or per slab
-        for (i=reps;i<repe;i++) {
+         for (i=reps;i<repe;i++) {
             if (plord==0) {
-                genchemdist(inge->plane[i+1], N*nreps, inge->nb, kind, N*nreps*(i-reps));
+                genchemdist(inge->plane[i+1], N*nreps, inge->nb, kind, N*nreps*(i-reps));  
             }else{
                 for(l=0;l<nreps;l++){
                     genchemdist(inge->plane[i+1], N, inge->nb, kind, N*nreps*(i-reps)+N*l);
@@ -306,16 +306,17 @@ void maketrgeom(t_scgeom *inge, t_trgeom *geom, t_trgeom *lg, t_trgeom *rg, int 
     }
     
     LOGMSG(5,"maketransgen plane idx after replication %d",pl);
-    
-    for (i=repe;i<(inge->np);i++){
-        genchemdist(inge->plane[i+1], N, inge->nb, kind,0);        
-        nn+=genscdist(inge->plane[i+1],geom->site+nn,inge->trv,ofs,nx,ny,inge->nb, ord,pl,kind,0);
-        pl++;
+
+    // Supercell and chem. disord. for the remainig PLs
+    for (i=repe;i<(inge->np);i++){                   
+      genchemdist(inge->plane[i+1], N, inge->nb, kind,0);        
+      nn+=genscdist(inge->plane[i+1],geom->site+nn,inge->trv,ofs,nx,ny,inge->nb, ord,pl,kind,0);
+      pl++;
     }
 
-    LOGMSG(5,"maketransgen plane idx aftet right base %d",pl);
-
-
+    LOGMSG(5,"maketransgen plane idx after right base %d",pl);
+    
+// Right Padding (-r -or -b options)
     for (i=0;i<nrb;i++){
         genchemdist(inge->plane[inge->np+1], N, inge->nb, kind,0);        
         nn+=genscdist(inge->plane[inge->np+1],geom->site+nn,inge->trv,ofs,nx,ny,inge->nb, ord,pl,kind,0);
@@ -729,10 +730,14 @@ void extrafields(t_trgeom *geom){
                 st1=buf;
                 st2=strsep(&st1,",");
                 if (st1!=NULL){
-                    par->reps=atoi(st2)-1;
-                    st2=strsep(&st1,",");
+
+		  par->reps=atoi(st2)-1;
+
+		  st2=strsep(&st1,",");
+
                     if (st1!=NULL){
                         par->nreps=atoi(st1);
+
                     }
                     par->repn=atoi(st2);
                     if (par->nreps<1) {
@@ -840,7 +845,7 @@ void extrafields(t_trgeom *geom){
                 par->vibmask=1;
             }
         }else if(par->vib==0.0){
-            printf("Thermal vibrations: none\n");        
+	  printf("Thermal vibrations: none\n");
         }
         if (par->Tc>=0.0){
             printf("Spin disorder with prefitted model: Tc=%f, T=%f\n",par->Tc,par->Tm);
@@ -872,14 +877,14 @@ void extrafields(t_trgeom *geom){
         t_opt par;
         t_trgeom mgeom,lg,rg;
         t_visdat vis;
+
+
         LOGMSG(2,"Supercell generator\n");
         initrnd();
         readopts(argc, argv, &par);                /* Read the command line options and store them in par structure.  */                   
         LOGMSG(1,"Finished options processing");
-
-
-	/* printf("reps= %d   repn= %d  nreps= %d \n ",par.reps,par.repn,par.nreps); */
 	
+	/* printf("reps= %d   repn= %d  nreps= %d \n ",par.reps,par.repn,par.nreps); */
         if(par.pin==1.0) {                         // Read the inpge, inpch and inpbu files (default)   
 	  readinput2(&scgeo, &atoms);             // Read additional inpsk (and inpsk2) when -i (and -j) with argumrents are present  
         }                                         // These fill some of the layers in the central region with elements defined in inpsk(2) 
@@ -889,30 +894,30 @@ void extrafields(t_trgeom *geom){
         else{
           readinput(&scgeo, &atoms);
         }
-	
+
         LOGMSG(1,"Input information is loaded");
 
         loadmasks(&scgeo,par.rotmask,par.vibmask);
         LOGMSG(1,"Masks are loaded");
-        
+
         if (par.dimcf>0.0) scgeo.dimcf=par.dimcf; // unit of length/scaling of the coordinates in inpge and geom_* files
 	
 	// The generation of the supercell in the central region, optionally prolongued and padded with bulk layers to the left and/or right
-	// The chemical, posotional and magnetic disorder are added at this point
+	// The chemical disorder is added at this point (if defined in inpch file, i.e. when we take input from CPA calculations)
         maketrgeom(&scgeo, &mgeom, &lg, &rg, par.nx,par.ny,par.lbnl,par.rbnl, par.ord,par.reps,par.repn,par.nreps,par.skip_dis,par.plord);
         LOGMSG(5,"WA1");
 
         writeatomlist(&atoms);
         LOGMSG(5,"WA2");
-        if(par.pin==1.0){
-            genpingeom(&mgeom,&scgeo,par.nlayer,1);
-            genpingeom(&lg,&scgeo,par.nlayer,0);
-            genpingeom(&rg,&scgeo,par.nlayer,0);
+        if(par.pin==1.0){                          // When "-i n" option is present the atoms above n-th layer (here par.nlayer)
+	  genpingeom(&mgeom,&scgeo,par.nlayer,1);  // (normal to y axis) are replaced  by element
+	  genpingeom(&lg,&scgeo,par.nlayer,0);     // defined in inpsk file                                       
+	  genpingeom(&rg,&scgeo,par.nlayer,0);
         }
         else if(par.pin==2.0){
-            genpingeom_trilayer(&mgeom,&scgeo,par.nlayer,par.nlayer2,1);
-            genpingeom_trilayer(&lg,&scgeo,par.nlayer,par.nlayer2,0);
-            genpingeom_trilayer(&rg,&scgeo,par.nlayer,par.nlayer2,0);
+	  genpingeom_trilayer(&mgeom,&scgeo,par.nlayer,par.nlayer2,1); // With "-j m" present (in addition to "-i n")
+	  genpingeom_trilayer(&lg,&scgeo,par.nlayer,par.nlayer2,0);    // we additionally replace atoms above m-th
+	  genpingeom_trilayer(&rg,&scgeo,par.nlayer,par.nlayer2,0);    // layer with element from inpsk2
         }
         else{
             genpingeom(&mgeom,&scgeo,par.nlayer,0);
@@ -922,7 +927,7 @@ void extrafields(t_trgeom *geom){
 //            genpingeom(&lg,par.nlayer,par.sink,0);
 //            genpingeom(&rg,par.nlayer,par.sink,0);
         };
-        if (par.Tdeb>=0.0) {
+        if (par.Tdeb>=0.0) {                                           // Here the displacements (phonons) are added if -t <Tdeb,T> or options --rms are present
             if (par.corr==1){
                 getvibrations(&mgeom,par.Tdeb, par.TK,par.mdef);
             }else {
@@ -932,7 +937,7 @@ void extrafields(t_trgeom *geom){
         if(par.vib==1) {
             getsepvibrations(&mgeom);
         };
-        // geteasymagnons(&mgeom,par.Mtheta,par.Mphi,par.Mdev);        
+        // geteasymagnons(&mgeom,par.Mtheta,par.Mphi,par.Mdev);        // Magnons if -d Theta, -x <Tc,T> (reuires the presence of "magfit" files) or --rmask are present
         if (par.Mdev>=0.0){
             geteasymagnons(&mgeom,par.Mdev);  
             printf("Magnetic config: MAX(|Q|)=%f, M2(Q)=%f, M1(F)=%f\n",mgeom.mvals[2],mgeom.mvals[0],mgeom.mvals[1]);
