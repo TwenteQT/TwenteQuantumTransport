@@ -6,7 +6,7 @@ Module bzgrid
       Implicit None
 
       Type t_bz_opts
-         Integer :: nsym=0, nk=10, inve=0, iftr=0
+         Integer :: nsym=0, nk=10, inve=0, iftr=0, sc_scale=0
          Real (Kind=DEF_DBL_PREC) :: bzone (4), kpoint (2) = (/ 0.0d0, 0.0d0 /), BZpart=1.0d0
       End Type t_bz_opts
 
@@ -31,18 +31,19 @@ Contains
 !!$*******************
 !!$XXX    GIBZ    ****
 !!$*******************
-      Subroutine gibz (bz, vbr, bzopt)
+  Subroutine gibz (bz, vbr, bzopt,sc_size)
         Use logging 
 !!$****************************************************************
 !!$  GENERATES NETWORK OF K||-POINTS IN IRREDUCIBLE BRILLOUIN ZONE
 !!$****************************************************************
          Implicit None
          Type (t_bz_opts), Intent (In) :: bzopt
+         integer, Intent(In), optional :: sc_size (2)
          Type (bzone) :: bz
          Real (Kind=DEF_DBL_PREC), Intent (In) :: vbr (2, 2)
 !!$         Local vars
          Real (Kind=DEF_DBL_PREC) :: scale, bzdef (4), kpoint (2)
-         Integer :: nk, nsym, inve, iftr
+         Integer :: nk, nsym, inve, iftr,  N1, N2
          Character (Len=30) :: cwork
          Integer :: nbk1 (2*(2*bzopt%nk+1)**2), nbk2 (2*(2*bzopt%nk+1)**2), istart !,  ext=0
          Real (Kind=DEF_DBL_PREC) :: akbz (2, 2*(2*bzopt%nk+1)**2), wkbz (2*(2*bzopt%nk+1)**2), vbg (2, 2)!, k_pos(2)
@@ -97,11 +98,24 @@ Contains
             tw = 0.0d0      !!$ THE KX=0 OR KY=0                                         
             nk1 = nk
             nk2 = nk
+            ! write(*,*) 'Bulk:',nk, (2*nk-1)**2
+            if(present(sc_size)) then
+
+               N1=sc_size(1)
+               N2=sc_size(2)
+               nk1=nint((2*nk-1+N1-1)*1.0d0/(2*N1))
+               nk2=nint((2*nk-1+N2-1)*1.0d0/(2*N2))
+               ! write(*,*) 'SC:',(2*nk+N1-1)*1.0d0/(2*N1), (2*nk+N2-1)*1.0d0/(2*N2)
+               ! write(*,*) 'SC:',N1,N2, nk1,nk2
+               if(nk1.le.0) nk1=1
+               if(nk2.le.0) nk2=1
+               ! write(*,*) 'SC :',(2*nk1-1)*(2*nk2-1)
+            end if
             
             If (iftr == 0) Then
                istart = - nk1 + 1
             Else
-               istart = 1
+               istart = 0
             End If
             stx = real ((2*nk1-1), kind=DEF_DBL_PREC)
             sty = real ((2*nk2-1), kind=DEF_DBL_PREC)
@@ -114,6 +128,9 @@ Contains
                   nbk1 (ibz) = i1
                   nbk2 (ibz) = i2
                   wkbz (ibz) = 1.0d0
+                  
+                  if(i1==0) wkbz(ibz)=0.5d0
+
                   tw = tw + wkbz (ibz)
                   Do j = 1, 2
                      akbz (j, ibz) = fx1 * vbg (j, 1) + fx2 * vbg (j, 2)!+pofs(j)

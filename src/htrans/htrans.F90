@@ -273,7 +273,7 @@ Program htrans
          rlgeo%base(1, 2) = 0.d0
          rlgeo%base(2, 2) = dble(opt%po%nry)*opt%po%dy
          rlgeo%base(2, 1) = 0.d0
-         rlgeo%norbit = 2*opt%po%nrx*opt%po%nry*opt%po%nrz
+        rlgeo%norbit = 2*opt%po%nrx*opt%po%nry*opt%po%nrz
 
          Call prepare_supercell(llgeo, lscell, 1, split=1, ngrid=opt%po%nlx*opt%po%nly*opt%po%nlz)
          Call prepare_supercell(rlgeo, rscell, 1, split=1, ngrid=opt%po%nrx*opt%po%nry*opt%po%nrz)
@@ -411,13 +411,17 @@ Program htrans
          Call inspmatadd(mpar%c0, tempmat1, 1)
          Call free(tempmat1)
       End If
-         !!$ Prepare grid for BZ integration
+!!$ Prepare grid for BZ integration
       if (opt%po%kind == 6) then
          Call gibz(bz, trgeo_EMTO%base, opt%bzo)
       else
-         Call gibz(bz, trgeo%base, opt%bzo)
+         if(opt%bzo%sc_scale==1) then
+            Call gibz(bz, trgeo%base, opt%bzo,llgeo%sc_size)
+         else
+            Call gibz(bz, trgeo%base, opt%bzo)
+         end if
       end if
-      !!$write (*, *) 'gibz done! ', mpi_loc_id
+
    Else !mpi_loc_id .ne. 0
       Call alloc_torque(tors, 1, 1, 1)
       Call alloc_torque(tors1, 1, 1, 1)
