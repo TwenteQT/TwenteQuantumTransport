@@ -35,7 +35,7 @@ CDP=-D
 #SCALAPACK= -lmkl_scalapack_lp64  -lmkl_blacs_intelmpi_lp64
 #SCALAPACK= -L/usr/lib/x86_64-linux-gnu/ -lscalapack-openmpi
 
-LD_LOCAL=/home/maz/local2
+LD_LOCAL=/home/maz/local
 
 INCHDF5=-I$(LD_LOCAL)/hdf5/include/
 HDF5LIB= -L$(LD_LOCAL)/hdf5/lib -lhdf5_hl_fortran -lhdf5_hl -lhdf5_fortran -lhdf5
