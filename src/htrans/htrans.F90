@@ -413,7 +413,11 @@ Program htrans
       End If
 !!$ Prepare grid for BZ integration
       if (opt%po%kind == 6) then
-         Call gibz(bz, trgeo_EMTO%base, opt%bzo)
+         if(opt%bzo%sc_scale==1) then
+            Call gibz(bz, trgeo_EMTO%base, opt%bzo,llgeo_EMTO%sc_size)
+         else
+            Call gibz(bz, trgeo_EMTO%base, opt%bzo)
+         end if
       else
          if(opt%bzo%sc_scale==1) then
             Call gibz(bz, trgeo%base, opt%bzo,llgeo%sc_size)
