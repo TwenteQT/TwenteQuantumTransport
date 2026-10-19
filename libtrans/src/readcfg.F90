@@ -212,7 +212,7 @@ Contains
          End If
          Call do_log (1, '#')
          Call do_log (1, '### Defines number of K-points ib B.Zone for sampling')
-         Call do_log (1, '### NK=(2*bz_num_kpoints)^2')
+         Call do_log (1, '### NK=(2*bz_num_kpoints-1)^2')
          If (needar == 1) Then
             opt%nk = getopt_i (optlist, 'bz_num_kpoints', 30)
          Else
@@ -220,6 +220,8 @@ Contains
          End If
          Call do_log (1, '#')
          
+         Call do_log (1, '### When BZ_SC_SCALE=1, generate the k-mesh of approximately same density ')
+         Call do_log (1, '### as in 1x1 case with NK given above. Active only when NSYM=0')
          opt%sc_scale = getopt_i (optlist, 'bz_sc_scale', 0)
          
          Call do_log (1, '### bz_sym and bz_inve defines symmetry in B.Zone')
