@@ -219,7 +219,9 @@ Contains
             Call log_opt_i ('bz_num_kpoints', 1)
          End If
          Call do_log (1, '#')
-
+         
+         opt%sc_scale = getopt_i (optlist, 'bz_sc_scale', 0)
+         
          Call do_log (1, '### bz_sym and bz_inve defines symmetry in B.Zone')
          If (needsym == 1) Then
             opt%nsym = getopt_i (optlist, 'bz_sym', 0)
