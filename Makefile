@@ -6,8 +6,9 @@ bin: libcutils libtrans
 	+@(cd src && make)
 
 tags: 
-	+@(cd src && make tags)
-	+@(cd libtrans && make tags)
+#	+@(cd src && make tags)#
+#	+@(cd libtrans && make tags)
+	find . -name *.F90 -o -name *.[ch] -o -name *.[fF] | /usr/bin/xargs etags
 
 libcutils:
 	+(cd libcutils && make)
