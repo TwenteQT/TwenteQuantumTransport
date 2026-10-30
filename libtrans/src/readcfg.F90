@@ -175,12 +175,13 @@ Contains
          Type (t_config_option), Pointer, Intent (In) :: optlist
 !!$ Local
          Real (Kind=8) :: t1 (4) = 0.0d0
-         Integer :: needsym, needar
+         Integer :: needsym, needar,needk2
          Call do_log (1, '### Parameters of BZ sampling:')
          Call do_log (1, '#')
 
          needsym = 1
          needar = 1
+         needk2=0
 
          Call do_log (1, '# Perform calculation only for one K-point')
          Call do_log (1, '# Ignore rest of BZ options')
@@ -210,14 +211,27 @@ Contains
          Else
             Call do_log (1, '# BZ_AREA = [0.0,1.0,0.0,1.0] # [x0,x1,y0,y1]')
          End If
-         Call do_log (1, '#')
-         Call do_log (1, '### Defines number of K-points ib B.Zone for sampling')
-         Call do_log (1, '### NK=(2*bz_num_kpoints-1)^2')
-         If (needar == 1) Then
+
+         if(is_opt_exists(optlist,'bz_num_kpoints_2')==1) then
+            Call do_log (1, '#')
+            Call do_log (1, '### When both BZ_NUM_KPOINTS and BZ_NUM_KPOINTS_2 are present')
+            Call do_log (1, '### then their values indicate the numer of divisions along ')
+            Call do_log (1, '### the first and second reciprocal primitive vectors respectively.')
+            Call do_log (1, '### The number of k-points in the mesh is then equal to the product of the two values.')
+            Call do_log (1, '### This is different then the standard setting!.')
             opt%nk = getopt_i (optlist, 'bz_num_kpoints', 30)
-         Else
-            Call log_opt_i ('bz_num_kpoints', 1)
-         End If
+            opt%nk2 = getopt_i (optlist, 'bz_num_kpoints_2', 30)
+         else         
+            Call do_log (1, '#')
+            Call do_log (1, '### Defines number of K-points ib B.Zone for sampling')
+            Call do_log (1, '### NK=(2*bz_num_kpoints-1)^2')
+            If (needar == 1) Then
+               opt%nk = getopt_i (optlist, 'bz_num_kpoints', 30)
+            Else
+               Call log_opt_i ('bz_num_kpoints', 1)
+            End If
+         end if
+         
          Call do_log (1, '#')
          
          Call do_log (1, '### When BZ_SC_SCALE=1, generate the k-mesh of approximately same density ')

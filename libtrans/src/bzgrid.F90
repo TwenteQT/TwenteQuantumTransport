@@ -6,7 +6,7 @@ Module bzgrid
       Implicit None
 
       Type t_bz_opts
-         Integer :: nsym=0, nk=10, inve=0, iftr=0, sc_scale=0
+         Integer :: nsym=0, nk=10, inve=0, iftr=0, sc_scale=0,  nk2=-10
          Real (Kind=DEF_DBL_PREC) :: bzone (4), kpoint (2) = (/ 0.0d0, 0.0d0 /), BZpart=1.0d0
       End Type t_bz_opts
 
@@ -27,6 +27,24 @@ Contains
     Stop
   end subroutine exceed_mnbz
 
+
+  function is_even(n)
+    implicit none
+    logical :: is_even
+    integer, Intent (In) :: n
+    Real (Kind=DEF_DBL_PREC) :: test
+    Real (Kind=DEF_DBL_PREC), parameter ::  small=1.0d-8
+    integer :: ntest
+
+    test=(n-1)*1.0d0/2-floor((n-1)*1.0d0/2)
+
+    if(abs(test) < small)  then
+       is_even=.False.
+    else
+       is_even=.True.
+    end if
+       
+  end function is_even
   
 !!$*******************
 !!$XXX    GIBZ    ****
@@ -43,20 +61,21 @@ Contains
          Real (Kind=DEF_DBL_PREC), Intent (In) :: vbr (2, 2)
 !!$         Local vars
          Real (Kind=DEF_DBL_PREC) :: scale, bzdef (4), kpoint (2)
-         Integer :: nk, nsym, inve, iftr,  N1, N2
+         Integer :: nk,nk2, nsym, inve, iftr,  N1, N2,nk12(2)
          Character (Len=30) :: cwork
-         Integer :: nbk1 (2*(2*bzopt%nk+1)**2), nbk2 (2*(2*bzopt%nk+1)**2), istart !,  ext=0
-         Real (Kind=DEF_DBL_PREC) :: akbz (2, 2*(2*bzopt%nk+1)**2), wkbz (2*(2*bzopt%nk+1)**2), vbg (2, 2)!, k_pos(2)
+         Integer :: nbk1 (2*(2*bzopt%nk+1)**2), nbk2 (2*(2*bzopt%nk+1)**2) !,  ext=0
+         Real (Kind=DEF_DBL_PREC) :: akbz (2, 2*(2*bzopt%nk+1)**2), wkbz (2*(2*bzopt%nk+1)**2), vbg (2, 2), bz_corner(2)!, k_pos(2)
          Real (Kind=DEF_DBL_PREC) :: romega, gomega, ajm, rnk, anu3, dky, dkx, q, dk, lf, bt, hg, wd, dx, dy
-         Real (Kind=DEF_DBL_PREC) :: p, fx2, fx1, tw, cnorm, det, stx, sty
-         Integer :: nbz, iy, nu, ndy, ndx, nmy, nmx, i, j, i2, i1, nk1, nk2, ibz, mnbz
+         Real (Kind=DEF_DBL_PREC) :: p, fx2, fx1, tw, cnorm, det, stx, sty,weight
+         Integer :: nbz, iy, nu, ndy, ndx, nmy, nmx, i, j, i2, i1, nk1,  ibz, mnbz,istart(2),i1_end,i2_end, ksel,i12(2)
+         logical :: is_nk_even(2)
 
 
          Call do_log (1, ' Generating k mesh ...')
 
-
          scale = bzopt%BZpart
          nk = bzopt%nk
+         nk2 = bzopt%nk2
          nsym = bzopt%nsym
          inve = bzopt%inve
          iftr = bzopt%iftr
@@ -93,52 +112,95 @@ Contains
 !!$         Below, they are NSYM, INVE and IFTR respectively
          
          NSYM_SELECT: select case(nsym)
-         case(0)           !!$-------------------------- NSYM=0: GENERAL CASE           
-            ibz = 0         !!$ SHIFT THE K|| MESH A LITTER BIT IN ORDER TO AVOID        
+         case(0)            !!$-------------------------- NSYM=0: GENERAL CASE
+            ibz = 0         !!$ SHIFT THE K|| MESH A LITTLE BIT IN ORDER TO AVOID        
             tw = 0.0d0      !!$ THE KX=0 OR KY=0                                         
-            nk1 = nk
-            nk2 = nk
-            ! write(*,*) 'Bulk:',nk, (2*nk-1)**2
-            if(present(sc_size)) then
 
-               N1=sc_size(1)
-               N2=sc_size(2)
-               nk1=nint((2*nk-1+N1-1)*1.0d0/(2*N1))
-               nk2=nint((2*nk-1+N2-1)*1.0d0/(2*N2))
-               ! write(*,*) 'SC:',(2*nk+N1-1)*1.0d0/(2*N1), (2*nk+N2-1)*1.0d0/(2*N2)
-               ! write(*,*) 'SC:',N1,N2, nk1,nk2
-               if(nk1.le.0) nk1=1
-               if(nk2.le.0) nk2=1
-               ! write(*,*) 'SC :',(2*nk1-1)*(2*nk2-1)
-            end if
             
-            If (iftr == 0) Then
-               istart = - nk1 + 1
-            Else
-               istart = 0
-            End If
-            stx = real ((2*nk1-1), kind=DEF_DBL_PREC)
-            sty = real ((2*nk2-1), kind=DEF_DBL_PREC)
-            Do i1 = istart, nk1-1
-               fx1 = (real(i1, kind=DEF_DBL_PREC)) / stx
-               Do i2 = - nk2 + 1, nk2-1
-                  fx2 = (real(i2, kind=DEF_DBL_PREC)) / sty
-                  ibz = ibz + 1
-                  If (ibz .Gt. mnbz) call exceed_mnbz(ibz)
-                  nbk1 (ibz) = i1
-                  nbk2 (ibz) = i2
-                  wkbz (ibz) = 1.0d0
+            if (nk2 > 0) then   !!$  Sampling with number of divisions set independently for both vectors
+
+               nk12=(/nk,nk2/)           
+               
+               ksel=2
+               if(is_even(nk12(1))) ksel=1
+
+               istart(1:2)=1
+               
+               weight=1.0d0
+               wkbz(:)=weight
+               
+               if(iftr) then
+                  wkbz(:)=2.0d0
+                  if(is_even(nk12(ksel))) then
+                     istart(ksel)=nk12(ksel)/2+1
+                     weight=2.0d0
+                  else
+                     istart(ksel)=nint(1.0d0*(nk12(ksel)-1)/2)+1
+                     weight=1.0d0
+                  end if
+               else
+                  wkbz(:)=1.0d0
+               end if              
+               
+               bz_corner=-0.5d0*vbg(:,1)-0.5*vbg(:,2)
+
+               do i1=istart(1),nk12(1)
+                  do i2=istart(2),nk12(2)
+                     
+                     ibz=ibz+1
+                     nbk1 (ibz) = i1
+                     nbk2 (ibz) = i2
+                     
+                     if(ksel==1) then
+                        if (i1==istart(1)) wkbz (ibz) = weight
+                     else
+                        if (i2==istart(2)) wkbz (ibz) = weight
+                     end if
+                     
+                     akbz (:, ibz) =  (i1-0.5d0)* vbg (:, 1)/nk12(1) + (i2-0.5d0)* vbg (:, 2)/nk12(2)+bz_corner
+                     
+                     tw = tw + wkbz (ibz)
+
+                  end do
+               end do
+              
+               
+            else
+               
+               nk1 = nk
+               nk2 = nk               
+               
+               if(present(sc_size)) then
                   
-                  if(i1==0) wkbz(ibz)=0.5d0
-
-                  tw = tw + wkbz (ibz)
-                  Do j = 1, 2
-                     akbz (j, ibz) = fx1 * vbg (j, 1) + fx2 * vbg (j, 2)!+pofs(j)
+                  N1=sc_size(1)
+                  N2=sc_size(2)
+                  nk1=nint((2*nk-1+N1)*1.0d0/(2*N1))
+                  nk2=nint((2*nk-1+N2)*1.0d0/(2*N2))
+                  if(nk1.le.0) nk1=1
+                  if(nk2.le.0) nk2=1
+                  
+               end if
+               
+               stx = real ((2*nk1-1), kind=DEF_DBL_PREC)
+               sty = real ((2*nk2-1), kind=DEF_DBL_PREC)
+               Do i1 = -nk1+1, nk1-1
+                  fx1 = (real(i1, kind=DEF_DBL_PREC)) / stx
+                  Do i2 = - nk2 + 1, nk2-1
+                     fx2 = (real(i2, kind=DEF_DBL_PREC)) / sty
+                     ibz = ibz + 1
+                     If (ibz .Gt. mnbz) call exceed_mnbz(ibz)
+                     nbk1 (ibz) = i1
+                     nbk2 (ibz) = i2
+                     wkbz (ibz) = 1.0d0                   
+                     
+                     tw = tw + wkbz (ibz)
+                     Do j = 1, 2
+                        akbz (j, ibz) = fx1 * vbg (j, 1) + fx2 * vbg (j, 2)!+pofs(j)
+                     End Do
+                     !                end if
                   End Do
-                  !                end if
                End Do
-            End Do
-            
+            end if
          case(1)          !!$  NSYM = 1 - SYMMETRY OF CUBIC (001) SURFACES: 4-FOLD ROTATION, AXIS Z AND BY MIRROR PLANE X-Z            
 
             INVE_SELECT: select case(inve)
