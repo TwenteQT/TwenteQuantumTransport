@@ -138,28 +138,28 @@ int main(int argc, char *argv[])
     bufp++;        
 
     scanline(FP,"");
-    fprintf(FPco,buf);		
+    fprintf(FPco,"%s",buf);		
     bufp=stpcpy(bufp,buf)+1;
     scanline(FP,"%d",&rbl);		
-    fprintf(FPco,buf);	
+    fprintf(FPco,"%s",buf);	
     bufp=stpcpy(bufp,buf)+1;		
     for (i=0;i<rbl;++i){
         scanline(FP,""); /* read concentration here if need  */
-        fprintf(FPco,buf);	
+        fprintf(FPco,"%s",buf);	
         bufp=stpcpy(bufp,buf)+1;						
         // scanline(FP);
         scanline(FP,"%s",bulklbl);
-        fprintf(FPco,buf);			
+        fprintf(FPco,"%s",buf);			
         bufp=stpcpy(bufp,buf)+1;
         // strncpy(bulklbl,buf,20);             
         // bulklbl[19]=0;
     }
     bufp=bufr;
-    bufp+=(fprintf(FPco,bufp)+1);		
-    bufp+=(fprintf(FPco,bufp)+1);		
+    bufp+=(fprintf(FPco,"%s",bufp)+1);		
+    bufp+=(fprintf(FPco,"%s",bufp)+1);		
     for (i=0;i<rbl;++i){
-        bufp+=(fprintf(FPco,bufp)+1);		
-        bufp+=(fprintf(FPco,bufp)+1);		
+        bufp+=(fprintf(FPco,"%s",bufp)+1);		
+        bufp+=(fprintf(FPco,"%s",bufp)+1);		
     }
 
     if (side==1) {
@@ -173,7 +173,7 @@ int main(int argc, char *argv[])
 
     fclose(FP);
 
-    fprintf(FPco,"-------=========== END OF BULK ===========-------\n");
+    fprintf(FPco,"%s","-------=========== END OF BULK ===========-------\n");
     fclose(FPco);
 
     openinp(FP,"inpge");
@@ -255,7 +255,7 @@ startwrite(FPg,buf,np*2+1,nb,nmtr,cr,scx,tr1,tr2,ltr,rtr);
 sprintf(buf,"%s/inpch",dirn);
 FPco=fopen(buf,"w");
 
-fprintf(FPco,"------ CHEMICAL OCCUPATIONS:\n");
+fprintf(FPco,"%s","------ CHEMICAL OCCUPATIONS:\n");
 
 posl=(double*)malloc(sizeof(double)*nb*3);
 posr=(double*)malloc(sizeof(double)*nb*3);
@@ -446,7 +446,7 @@ else{
     //  fpvec3(FPg,pos,buf1);
     // }
 endwrite(FPg);
-fprintf(FPco,"-------=========== END OF CHEM ===========-------\n");	
+fprintf(FPco,"%s","-------=========== END OF CHEM ===========-------\n");	
 fclose(FPco);
 sprintf(buf,"%s/atoms",dirn);    
 symlink("../atoms",buf);

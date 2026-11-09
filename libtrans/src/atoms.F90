@@ -216,7 +216,7 @@ Contains
 
       If (Log_Level < 3) Return
 !!$ 38506    Format (12 x, 10(a1, G10.4, 2 x, G10.4, 2 x, G10.4, a1, 3 x))
-38506 Format(12 x, 10(a1, G10.4, 2 x, G10.4, a1, 3 x))
+38506 Format(12 x, 10(a1, G11.4, 2 x, G11.4, a1, 3 x))
       Write (repf, *) '---------------------------------------------------------------'
       Write (repf, *) 'Potential parameters report:'
       Do inp = 1, atoms%num
