@@ -175,7 +175,8 @@ Contains
          Type (t_config_option), Pointer, Intent (In) :: optlist
 !!$ Local
          Real (Kind=8) :: t1 (4) = 0.0d0
-         Integer :: needsym, needar,needk2
+         Integer :: needsym, needar,needk2,kselect=-1
+         logical :: if_nk12(2)
          Call do_log (1, '### Parameters of BZ sampling:')
          Call do_log (1, '#')
 
@@ -212,31 +213,55 @@ Contains
             Call do_log (1, '# BZ_AREA = [0.0,1.0,0.0,1.0] # [x0,x1,y0,y1]')
          End If
 
-         if(is_opt_exists(optlist,'bz_num_kpoints_2')==1) then
+         if_nk12(1)=is_opt_exists(optlist,'bz_alt_num_1')==1
+         if_nk12(2)=is_opt_exists(optlist,'bz_alt_num_2')==1
+
+         if(if_nk12(1).and.(if_nk12(2))) then
+            kselect=0
+         elseif(if_nk12(1).or.(if_nk12(2))) then
+            kselect=1
+         else
+            kselect=2
+         end if
+
+         select case(kselect)
+         case(1)
+            if(if_nk12(1)) then
+               opt%nk1 = getopt_i (optlist, 'bz_alt_num_1', 30)
+               opt%nk2=opt%nk1
+            end if
+            if(if_nk12(2))  then
+               opt%nk2 = getopt_i (optlist, 'bz_alt_num_2', 30)
+               opt%nk1=opt%nk2
+            end if
+            Call do_log (1, '### Setting: BZ_ALT_NUM__1 = BZ_ALT_NUM_2 ')                        
+         case(0)
+            opt%nk1 = getopt_i (optlist, 'bz_alt_num_1', 10)
+            opt%nk2 = getopt_i (optlist, 'bz_alt_num_2', 10)                        
+         case(2)
             Call do_log (1, '#')
-            Call do_log (1, '### When both BZ_NUM_KPOINTS and BZ_NUM_KPOINTS_2 are present')
-            Call do_log (1, '### then their values indicate the numer of divisions along ')
-            Call do_log (1, '### the first and second reciprocal primitive vectors respectively.')
-            Call do_log (1, '### The number of k-points in the mesh is then equal to the product of the two values.')
-            Call do_log (1, '### This is different then the standard setting!.')
-            opt%nk = getopt_i (optlist, 'bz_num_kpoints', 30)
-            opt%nk2 = getopt_i (optlist, 'bz_num_kpoints_2', 30)
-         else         
-            Call do_log (1, '#')
-            Call do_log (1, '### Defines number of K-points ib B.Zone for sampling')
+            Call do_log (1, '### Defines number of K-points in B.Zone for sampling')
             Call do_log (1, '### NK=(2*bz_num_kpoints-1)^2')
             If (needar == 1) Then
                opt%nk = getopt_i (optlist, 'bz_num_kpoints', 30)
             Else
                Call log_opt_i ('bz_num_kpoints', 1)
             End If
+         end select
+         if(if_nk12(1).or.(if_nk12(2))) then
+            Call do_log (1, '### When BZ_ALT_NUM_1 and/or BZ_ALT_NUM_2 are set')
+            Call do_log (1, '### then their values indicate the numer of divisions along ')
+            Call do_log (1, '### the first and second reciprocal primitive vectors respectively.')
+            Call do_log (1, '### The number of k-points in the mesh is then equal to the product of the two values.')
+            Call do_log (1, '### This is different then the standard setting!.')
          end if
-         
+
+
          Call do_log (1, '#')
          
-         Call do_log (1, '### When BZ_SC_SCALE=1, generate the k-mesh of approximately same density ')
-         Call do_log (1, '### as in 1x1 case with NK given above. Active only when NSYM=0')
-         opt%sc_scale = getopt_i (optlist, 'bz_sc_scale', 0)
+         ! Call do_log (1, '### When BZ_SC_SCALE=1, generate the k-mesh of approximately same density ')
+         ! Call do_log (1, '### as in 1x1 case with NK given above. Active only when NSYM=0')
+         ! opt%sc_scale = getopt_i (optlist, 'bz_sc_scale', 0)
          
          Call do_log (1, '### bz_sym and bz_inve defines symmetry in B.Zone')
          If (needsym == 1) Then

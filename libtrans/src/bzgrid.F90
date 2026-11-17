@@ -6,7 +6,7 @@ Module bzgrid
       Implicit None
 
       Type t_bz_opts
-         Integer :: nsym=0, nk=10, inve=0, iftr=0, sc_scale=0,  nk2=-10
+         Integer :: nsym=0, nk=10, inve=0, iftr=0, nk1=-10, nk2=-10
          Real (Kind=DEF_DBL_PREC) :: bzone (4), kpoint (2) = (/ 0.0d0, 0.0d0 /), BZpart=1.0d0
       End Type t_bz_opts
 
@@ -49,14 +49,13 @@ Contains
 !!$*******************
 !!$XXX    GIBZ    ****
 !!$*******************
-  Subroutine gibz (bz, vbr, bzopt,sc_size)
+  Subroutine gibz (bz, vbr, bzopt)
         Use logging 
 !!$****************************************************************
 !!$  GENERATES NETWORK OF K||-POINTS IN IRREDUCIBLE BRILLOUIN ZONE
 !!$****************************************************************
          Implicit None
          Type (t_bz_opts), Intent (In) :: bzopt
-         integer, Intent(In), optional :: sc_size (2)
          Type (bzone) :: bz
          Real (Kind=DEF_DBL_PREC), Intent (In) :: vbr (2, 2)
 !!$         Local vars
@@ -67,7 +66,7 @@ Contains
          Real (Kind=DEF_DBL_PREC) :: akbz (2, 2*(2*bzopt%nk+1)**2), wkbz (2*(2*bzopt%nk+1)**2), vbg (2, 2), bz_corner(2)!, k_pos(2)
          Real (Kind=DEF_DBL_PREC) :: romega, gomega, ajm, rnk, anu3, dky, dkx, q, dk, lf, bt, hg, wd, dx, dy
          Real (Kind=DEF_DBL_PREC) :: p, fx2, fx1, tw, cnorm, det, stx, sty,weight
-         Integer :: nbz, iy, nu, ndy, ndx, nmy, nmx, i, j, i2, i1, nk1,  ibz, mnbz,istart(2),i1_end,i2_end, ksel,i12(2)
+         Integer :: nbz, iy, nu, ndy, ndx, nmy, nmx, i, j, i2, i1, nk1,  ibz, mnbz,istart(2),i1_end,i2_end, ksel,i12(2),iter(2)
          logical :: is_nk_even(2)
 
 
@@ -75,6 +74,7 @@ Contains
 
          scale = bzopt%BZpart
          nk = bzopt%nk
+         nk1 = bzopt%nk1
          nk2 = bzopt%nk2
          nsym = bzopt%nsym
          inve = bzopt%inve
@@ -117,9 +117,11 @@ Contains
             tw = 0.0d0      !!$ THE KX=0 OR KY=0                                         
 
             
-            if (nk2 > 0) then   !!$  Sampling with number of divisions set independently for both vectors
+            if ((nk1 > 0).and.(nk2 >0)) then   !!$  Sampling with number of divisions set independently for both vectors
 
-               nk12=(/nk,nk2/)           
+
+               
+               nk12=(/nk1,nk2/)           
                
                ksel=2
                if(is_even(nk12(1))) ksel=1
@@ -146,17 +148,14 @@ Contains
 
                do i1=istart(1),nk12(1)
                   do i2=istart(2),nk12(2)
+                     iter=(/i1,i2/)
                      
                      ibz=ibz+1
                      nbk1 (ibz) = i1
-                     nbk2 (ibz) = i2
+                     nbk2 (ibz) = i2                     
                      
-                     if(ksel==1) then
-                        if (i1==istart(1)) wkbz (ibz) = weight
-                     else
-                        if (i2==istart(2)) wkbz (ibz) = weight
-                     end if
-                     
+                     if (iter(ksel)==istart(ksel)) wkbz (ibz) = weight
+                                          
                      akbz (:, ibz) =  (i1-0.5d0)* vbg (:, 1)/nk12(1) + (i2-0.5d0)* vbg (:, 2)/nk12(2)+bz_corner
                      
                      tw = tw + wkbz (ibz)
@@ -166,21 +165,10 @@ Contains
               
                
             else
-               
+            
                nk1 = nk
                nk2 = nk               
-               
-               if(present(sc_size)) then
-                  
-                  N1=sc_size(1)
-                  N2=sc_size(2)
-                  nk1=nint((2*nk-1+N1)*1.0d0/(2*N1))
-                  nk2=nint((2*nk-1+N2)*1.0d0/(2*N2))
-                  if(nk1.le.0) nk1=1
-                  if(nk2.le.0) nk2=1
-                  
-               end if
-               
+                              
                stx = real ((2*nk1-1), kind=DEF_DBL_PREC)
                sty = real ((2*nk2-1), kind=DEF_DBL_PREC)
                Do i1 = -nk1+1, nk1-1
