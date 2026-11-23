@@ -6,7 +6,7 @@ Module bzgrid
       Implicit None
 
       Type t_bz_opts
-         Integer :: nsym=0, nk=10, inve=0, iftr=0, nk1=-10, nk2=-10
+         Integer :: nsym=0, nk=10, inve=0, iftr=0, nk1=30, nk2=30
          Real (Kind=DEF_DBL_PREC) :: bzone (4), kpoint (2) = (/ 0.0d0, 0.0d0 /), BZpart=1.0d0
       End Type t_bz_opts
 
@@ -62,11 +62,11 @@ Contains
          Real (Kind=DEF_DBL_PREC) :: scale, bzdef (4), kpoint (2)
          Integer :: nk,nk2, nsym, inve, iftr,  N1, N2,nk12(2)
          Character (Len=30) :: cwork
-         Integer :: nbk1 (2*(2*bzopt%nk+1)**2), nbk2 (2*(2*bzopt%nk+1)**2) !,  ext=0
-         Real (Kind=DEF_DBL_PREC) :: akbz (2, 2*(2*bzopt%nk+1)**2), wkbz (2*(2*bzopt%nk+1)**2), vbg (2, 2), bz_corner(2)!, k_pos(2)
+         Integer :: nbk1 (bzopt%nk**2), nbk2(bzopt%nk**2),nbk12(2,bzopt%nk**2) !,  ext=0
+         Real (Kind=DEF_DBL_PREC) :: akbz (2, bzopt%nk**2), wkbz (bzopt%nk**2), vbg (2, 2), bz_corner(2)!, k_pos(2)
          Real (Kind=DEF_DBL_PREC) :: romega, gomega, ajm, rnk, anu3, dky, dkx, q, dk, lf, bt, hg, wd, dx, dy
          Real (Kind=DEF_DBL_PREC) :: p, fx2, fx1, tw, cnorm, det, stx, sty,weight
-         Integer :: nbz, iy, nu, ndy, ndx, nmy, nmx, i, j, i2, i1, nk1,  ibz, mnbz,istart(2),i1_end,i2_end, ksel,i12(2),iter(2)
+         Integer :: nbz, iy, nu, ndy, ndx, nmy, nmx, i, j, i2, i1, nk1,  ibz, mnbz,iend(2),i1_end,i2_end, ksel,i12(2),iter(2),ilast,kf,kh
          logical :: is_nk_even(2)
 
 
@@ -82,7 +82,7 @@ Contains
          bzdef = bzopt%bzone
          kpoint = bzopt%kpoint
 
-         mnbz = (2*nk+1) ** 2
+         mnbz = (nk) ** 2
 
          det = vbr (1, 1) * vbr (2, 2) - vbr (1, 2) * vbr (2, 1)
          romega = Abs (det)
@@ -116,79 +116,111 @@ Contains
             ibz = 0         !!$ SHIFT THE K|| MESH A LITTLE BIT IN ORDER TO AVOID        
             tw = 0.0d0      !!$ THE KX=0 OR KY=0                                         
 
-            
-            if ((nk1 > 0).and.(nk2 >0)) then   !!$  Sampling with number of divisions set independently for both vectors
 
+            ! if ((nk1 > 0).and.(nk2 >0)) then   !!$  Sampling with number of divisions set independently for both vectors
+            nk12=(/nk1,nk2/)                          
 
-               
-               nk12=(/nk1,nk2/)           
-               
-               ksel=2
-               if(is_even(nk12(1))) ksel=1
+            ksel=2
+            if(is_even(nk12(1))) ksel=1
 
-               istart(1:2)=1
-               
-               weight=1.0d0
-               wkbz(:)=weight
-               
-               if(iftr) then
-                  wkbz(:)=2.0d0
-                  if(is_even(nk12(ksel))) then
-                     istart(ksel)=nk12(ksel)/2+1
-                     weight=2.0d0
-                  else
-                     istart(ksel)=nint(1.0d0*(nk12(ksel)-1)/2)+1
-                     weight=1.0d0
-                  end if
+            iend(1:2)=nk12
+
+            weight=1.0d0
+            wkbz(:)=weight
+
+            if(iftr) then
+               wkbz(:)=2.0d0
+               if(is_even(nk12(ksel))) then
+                  iend(ksel)=nk12(ksel)/2
+                  weight=2.0d0
                else
-                  wkbz(:)=1.0d0
-               end if              
-               
-               bz_corner=-0.5d0*vbg(:,1)-0.5*vbg(:,2)
-
-               do i1=istart(1),nk12(1)
-                  do i2=istart(2),nk12(2)
-                     iter=(/i1,i2/)
-                     
-                     ibz=ibz+1
-                     nbk1 (ibz) = i1
-                     nbk2 (ibz) = i2                     
-                     
-                     if (iter(ksel)==istart(ksel)) wkbz (ibz) = weight
-                                          
-                     akbz (:, ibz) =  (i1-0.5d0)* vbg (:, 1)/nk12(1) + (i2-0.5d0)* vbg (:, 2)/nk12(2)+bz_corner
-                     
-                     tw = tw + wkbz (ibz)
-
-                  end do
-               end do
-              
-               
+                  iend(ksel)=nint(1.0d0*(nk12(ksel)-1)/2) !+1
+                  weight=1.0d0
+               end if
             else
-            
-               nk1 = nk
-               nk2 = nk               
-                              
-               stx = real ((2*nk1-1), kind=DEF_DBL_PREC)
-               sty = real ((2*nk2-1), kind=DEF_DBL_PREC)
-               Do i1 = -nk1+1, nk1-1
-                  fx1 = (real(i1, kind=DEF_DBL_PREC)) / stx
-                  Do i2 = - nk2 + 1, nk2-1
-                     fx2 = (real(i2, kind=DEF_DBL_PREC)) / sty
-                     ibz = ibz + 1
-                     If (ibz .Gt. mnbz) call exceed_mnbz(ibz)
-                     nbk1 (ibz) = i1
-                     nbk2 (ibz) = i2
-                     wkbz (ibz) = 1.0d0                   
-                     
-                     tw = tw + wkbz (ibz)
-                     Do j = 1, 2
-                        akbz (j, ibz) = fx1 * vbg (j, 1) + fx2 * vbg (j, 2)!+pofs(j)
-                     End Do
-                     !                end if
-                  End Do
-               End Do
+               wkbz(:)=1.0d0
             end if
+
+            bz_corner=-0.5d0*vbg(:,1)-0.5*vbg(:,2)
+
+            do i1=1,iend(1)
+               do i2=1,iend(2)
+                  iter=(/i1,i2/)
+
+                  ibz=ibz+1
+                  nbk12 (1,ibz) = i1
+                  nbk12 (2,ibz) = i2                     
+
+                  ! if (iter(ksel)==iend(ksel)) wkbz (ibz) = weight
+
+                  akbz (:, ibz) =  (i1-0.5d0)* vbg (:, 1)/nk12(1) + (i2-0.5d0)* vbg (:, 2)/nk12(2)+bz_corner
+
+                  tw = tw + wkbz (ibz)
+
+               end do
+            end do
+
+            kh=2
+            kf=1
+            if(ksel==1) then
+               kf=2
+               kh=1
+            end if
+
+            ilast=iter(kh)
+            
+            if (iftr.and. (   (.not.is_even( nk12(1))).and.(.not.is_even( nk12(2)))   ) ) then
+               do i=1,nint(1.0d0*(nk12(kf)-1)/2) !+1
+                  ibz=ibz+1
+
+                  nbk12(kh,ibz) = ilast+1
+                  nbk12(kf,ibz) = i                     
+                  
+                  akbz (:, ibz) =  (i-0.5d0)* vbg (:, kf)/nk12(kf) + (ilast+1-0.5d0)* vbg (:, kh)/nk12(kh) +bz_corner
+
+                  tw = tw + wkbz (ibz)
+                  ! wkbz (ibz) = weight
+               end do
+
+               ! Gamma point
+
+               ibz=ibz+1
+               nbk12(kh,ibz) = ilast+1
+               nbk12(kf,ibz) = i
+               wkbz(ibz)=1.0d0
+               tw = tw + wkbz (ibz)
+               
+               akbz (:, ibz) =  (i-0.5d0)* vbg (:, kf)/nk12(kf) + (ilast+1-0.5d0)* vbg (:, kh)/nk12(kh) +bz_corner
+               
+            end if
+            
+            
+
+            ! else
+            
+            !    nk1 = nk
+            !    nk2 = nk               
+                              
+            !    stx = real ((2*nk1-1), kind=DEF_DBL_PREC)
+            !    sty = real ((2*nk2-1), kind=DEF_DBL_PREC)
+            !    Do i1 = -nk1+1, nk1-1
+            !       fx1 = (real(i1, kind=DEF_DBL_PREC)) / stx
+            !       Do i2 = - nk2 + 1, nk2-1
+            !          fx2 = (real(i2, kind=DEF_DBL_PREC)) / sty
+            !          ibz = ibz + 1
+            !          If (ibz .Gt. mnbz) call exceed_mnbz(ibz)
+            !          nbk1 (ibz) = i1
+            !          nbk2 (ibz) = i2
+            !          wkbz (ibz) = 1.0d0                   
+                     
+            !          tw = tw + wkbz (ibz)
+            !          Do j = 1, 2
+            !             akbz (j, ibz) = fx1 * vbg (j, 1) + fx2 * vbg (j, 2)!+pofs(j)
+            !          End Do
+            !          !                end if
+            !       End Do
+            !    End Do
+            ! end if
          case(1)          !!$  NSYM = 1 - SYMMETRY OF CUBIC (001) SURFACES: 4-FOLD ROTATION, AXIS Z AND BY MIRROR PLANE X-Z            
 
             INVE_SELECT: select case(inve)
@@ -782,8 +814,8 @@ Contains
             bz%kweight = wkbz (1:nbz)
          End If
 
-         bz%ik (1, :) = nbk1 (1:nbz)
-         bz%ik (2, :) = nbk2 (1:nbz)
+         bz%ik (1, :) = nbk12(1,1:nbz)
+         bz%ik (2, :) = nbk12(2,1:nbz)
 
          Write (cwork, '(i8)') nbz
          
